@@ -1,5 +1,4 @@
 Lish TODO list							     -*- org -*-
-#+OPTIONS: H:4
 
 * BUGS:
 ** parsing < in first word?
@@ -44,6 +43,12 @@ Lish TODO list							     -*- org -*-
 ** linux
 ** cygwin?
 * port to windows
+#+TITLE:     Lish ToDo List
+#+AUTHOR:    Nibby Nebbulous
+#+EMAIL:     nibbula@gmail.com
+#+LANGUAGE:  en
+#+TEXT:      Things you may want to Do.
+#+OPTIONS:   H:2 num:t toc:t \n:nil @:t ::t |:t ^:nil *:t TeX:t LaTeX:nil
 * COMMENT MeTaDaTa
 creation date: [2014-12-01 Mon 00:20:33]
 creator: "Nibby Nebbulous" <nibbula@gmail.com>
