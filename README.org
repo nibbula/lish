@@ -1,4 +1,14 @@
-lish
-====
+=lish= is a LIsp SHell
 
-LIsp SHell
+* You
+** might
+*** notice
+**** that
+***** it's
+****** not
+******* quite
+******** done
+********* yet.
+
+/Some/ of the things it depends on are in:
+https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name.git
