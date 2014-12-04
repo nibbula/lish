@@ -10,5 +10,11 @@
 ******** done
 ********* yet.
 
-/Some/ of the things it depends on are in:
+/Some/ of the things it depends on are in:\\
 https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name.git
+
+#+BEGIN_SRC lisp
+(defun org-xor (a b)
+  "Exclusive or."
+   (if a (not b) b))
+#+END_SRC
