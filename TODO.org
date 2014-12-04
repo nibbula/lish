@@ -1,0 +1,49 @@
+Lish TODO list							     -*- org -*-
+
+* BUGS:
+** parsing < in first word?
+** glob expansion of filenames with quoted spaces?
+** cd to dir with spaces?
+** newly defined commands don't get recognized in completion
+** completion bugs
+*** // or absolute paths
+** tiny-rl display bugs
+* argument parsing for commands
+** fix edge cases, more testing for posix-to-lisp-args
+* work out error handling
+** compilation?
+** other?
+* have shell-eval return a value: for external commands return the
+  old shell exit status (from wait), otherwise the command function
+  return value, or lisp return value
+* at least handle ^Z of subprocess!
+* process stuff:
+** chains: || &&
+** background jobs: & fg bg jobs %n ^Z SIGTSTP etc
+** jobs command
+* redirections: < > << <()
+* smarter completion, specifically:
+** completion should use proper completion for command line argument types
+** come up with a way to add argument specs for external programs
+** just basically do the ‘right thing’ in any circumstance!!!
+   completion should know what you can type in any circumstance and
+   provide help.
+* start/end comment syntax? #| |#, use for tops20 style completion prompts?
+  Like: alias #|name|# ls #|expansion|# ls -CF
+  Maybe it's better to use the first lines of of ‘?’ output as a
+  description.
+* add more features to globbing (all the ignored arguments of glob)
+* more built-in commands (bash-like):
+** "command" command?
+** finish bind
+** ulimit
+** umask
+** wait
+* test portability
+** linux
+** cygwin?
+* port to windows
+* COMMENT MeTaDaTa
+creation date: [2014-12-01 Mon 00:20:33]
+creator: "Nibby Nebbulous" <nibbula@gmail.com>
+tags: lish lisp shell todo bugs

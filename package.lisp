@@ -1,0 +1,61 @@
+;;
+;; package.lisp - Package definition for Lish
+;;
+
+;; $Revision$
+
+(defpackage :lish
+  (:documentation "Unix Shell & Lisp somehow smushed together.")
+  (:use :cl :dlib :dlib-misc :opsys :stretchy :glob :completion :tiny-rl
+	:cl-ppcre)
+  (:export
+   ;; Main entry point(s)
+   #:lish
+   #:shell-toplevel
+   ;; variables
+   #:*lish-level*
+   #:*shell*
+   #:*old-pwd*
+   #:*dir-list*
+   #:*shell-path*
+   ;; (installation)
+   #:make-standalone
+   ;; shell object
+   #:shell
+   #:lish-sub-prompt
+   #:lish-prompt-char
+   #:lish-prompt-function
+   #:lish-aliases
+   ;; arguments
+   #:argument
+   #:arg-name #:arg-type #:arg-value #:arg-default #:arg-repeating
+   #:arg-optional #:arg-hidden #:arg-prompt #:arg-help #:arg-short-arg
+   #:arg-long-arg
+   ;; argument types
+   #:arg-boolean #:arg-number #:arg-integer #:arg-float #:arg-string
+   #:arg-keyword #:arg-date #:arg-pathname
+   #:arg-choice #:arg-choices #:arg-choice-labels
+   ;; argument generics
+   #:convert-arg
+   ;; commands
+   #:command #:command-name #:command-function #:command-arglist
+   #:command-built-in-p #:command-loaded-from
+   #:defcommand
+   #:!cd #:!pwd #:!pushd #:!popd #:!dirs #:!suspend #:!history #:!echo
+   #:!help #:!alias #:!unalias #:!type #:!exit #:!source #:!debug #:!bind
+   #:!times #:!time #:!ulimit #:!wait #:!export #:!format
+   #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash
+   ;; convenience / scripting
+   #:command-pathname
+   #:command-paths
+   #:input-line-words
+   #:command-output-words
+   #:command-output-list
+   ;; magic punctuation
+   #:! #:!? #:!! #:!$ #:!$$ #:!_
+   #:!and #:!or #:!bg
+   #:!> #:!>> #:!>! #:!>>!
+   #:!< #:!!<
+   ))
+
+;; EOF
