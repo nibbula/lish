@@ -6,8 +6,8 @@
 **** that
 ***** it's
 ****** not
-******* quite
-******** done
+******* quite \\
+******** done \\
 ********* yet.
 
 /Some/ of the things it depends on are in:\\

@@ -1,4 +1,5 @@
 Lish TODO list							     -*- org -*-
+#+OPTIONS: H:4
 
 * BUGS:
 ** parsing < in first word?
