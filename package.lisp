@@ -20,12 +20,20 @@
    #:*shell-path*
    ;; (installation)
    #:make-standalone
-   ;; shell object
-   #:shell
-   #:lish-sub-prompt
+   ;; shell options
    #:lish-prompt-char
    #:lish-prompt-function
+   #:lish-sub-prompt
+   #:lish-ignore-eof
+   #:lish-debug
+   ;; shell object
+   #:shell
    #:lish-aliases
+   #:lish-editor
+   #:lish-old-pwd
+   #:lish-dir-list
+   #:lish-suspended-jobs
+   #:lish-options
    ;; arguments
    #:argument
    #:arg-name #:arg-type #:arg-value #:arg-default #:arg-repeating
@@ -33,7 +41,7 @@
    #:arg-long-arg
    ;; argument types
    #:arg-boolean #:arg-number #:arg-integer #:arg-float #:arg-string
-   #:arg-keyword #:arg-date #:arg-pathname
+   #:arg-keyword #:arg-object #:arg-date #:arg-pathname
    #:arg-choice #:arg-choices #:arg-choice-labels
    ;; argument generics
    #:convert-arg
@@ -52,7 +60,7 @@
    #:command-output-words
    #:command-output-list
    ;; magic punctuation
-   #:! #:!? #:!! #:!$ #:!$$ #:!_
+   #:! #:!? #:!! #:!$ #:!$$ #:!_ #:!-
    #:!and #:!or #:!bg
    #:!> #:!>> #:!>! #:!>>!
    #:!< #:!!<

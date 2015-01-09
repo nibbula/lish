@@ -54,7 +54,6 @@ commands are added.")
   (or (probe-directory p) (probe-file p)))
 
 (defun verb-list (shell)
-  (declare (type shell shell))
   "Return the command list for the current shell: *shell*."
   (if (not *verb-list*)
       (setf *verb-list*
@@ -109,6 +108,18 @@ literally in shell syntax."
   (possibly-quote c))
       result)))
 
+;; Note that this takes different args than a normal completion function.
+(defun complete-command-arg (command exp word-num word pos all)
+  "Complete a command argument."
+  (if all
+      (progn
+	(if (and (= word-num 1) (= (length word) 0))
+	    (posix-synopsis command)
+	    (progn
+	      (dump-values command exp word-num word pos all)
+	      (complete-filename word pos all))))
+      (complete-filename word pos all)))
+
 (defvar *junk-package*
   (progn
     (when (find-package :lish-junk)
@@ -124,7 +135,8 @@ literally in shell syntax."
   "Analyze the context and try figure out what kind of thing we want to ~
 complete, and call the appropriate completion function."
   (let ((exp (ignore-errors (shell-read context :partial t
-					:package *junk-package*))))
+					:package *junk-package*)))
+	cmd)
     (typecase exp
       (shell-expr
        (let* ((word-num (shell-word-number exp pos))
@@ -156,7 +168,6 @@ complete, and call the appropriate completion function."
 					word-num))))
 	     ((and (eql (aref word 0) #\~) ; ~foo
 		   (valid-user-name (subseq word 1)))
-;;;	      (format t "CHING! ~a~%" (valid-user-name word))
 	      (simple-complete #'complete-user-name
 			       (subseq word 1)
 			       (1+ (elt (shell-expr-word-start exp)
@@ -167,18 +178,21 @@ complete, and call the appropriate completion function."
 	      (multiple-value-bind (v1 v2)
 		  (simple-complete #'complete-command context
 				   (elt (shell-expr-word-start exp) 0))
-;		(format t "CMD v1=~s v2=~s~%~%" v1 v2)
 		;; then symbols
+		;; XXX Symbols won't come up in the list.
 		(when (not v1)
 		  (setf (values v1 v2)
 			(complete-symbol context pos all))
-;		  (format t "SYM v1=~s v2=~s~%~%" v1 v2)
 		  )
 		(values v1 v2)))
 	     (t
 	      (let ((from-end (- (length context) pos)))
 		(multiple-value-bind (result new-pos)
-		    (complete-filename word (- (length word) from-end) all)
+		    (if (setf cmd (get-command word))
+			(complete-command-arg
+			 cmd exp word-num word
+			 (- (length word) from-end) all)
+			(complete-filename word (- (length word) from-end) all))
 		  (declare (ignore new-pos))
 		  (values (if (not all) (quotify result) result)
 			  (elt (shell-expr-word-start exp) word-num)))))))))

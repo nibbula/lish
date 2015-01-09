@@ -10,8 +10,8 @@
 ;; perhaps on another operating system you might not need them.
 ;; For example we might have a set of commands for an internet appliance
 ;; like a router.
-;; @@@ We should make some Windows PowerShell commands.
-;; @@@ We should be able to load a built-in ‘personality’.
+;; @@@ Perhaps we should make some Windows PowerShell commands.
+;; @@@ Perhaps we should be able to load a built-in ‘personality’.
 
 (in-package :lish)
 
@@ -22,7 +22,7 @@
   "Usage: cd [directory]
 Change the current directory to DIRECTORY."
   (setf (lish-old-pwd *shell*) (nos:current-directory))
-  (nos:change-directory directory))
+  (nos:change-directory (or directory (nos:getenv "HOME"))))
 
 (defbuiltin pwd ()
   "Usage: pwd
@@ -58,6 +58,10 @@ Suspend the shell."
 ;  (opsys:kill (opsys:getpid) opsys:sigstop))
   (opsys:kill (opsys:getpid) 17))	; SIGSTOP
 
+(define-builtin-arg-type job-descriptor (arg-integer)
+  "A job descriptor."
+  ())
+
 (defbuiltin resume (("job-descriptor" job-descriptor :optional t))
   "Resume a suspended job."
   (let (job)
@@ -83,13 +87,29 @@ Suspend the shell."
 	    (format t "Couldn't call the resume function ~a.~%"
 		    job-descriptor)))))
 
+(defbuiltin jobs (("long" boolean :short-arg #\l))
+  "Lists spawned processes that are active."
+  ;; @@@ not working yet for system commands
+  (loop :for j :in (lish-suspended-jobs *shell*)
+     :do
+     (with-slots (id name command-line resume-function) j
+       (format t "~3d ~10a ~20a ~:[~;~a ~]~a~%"
+	       id "LISP" name long resume-function command-line)))
+  (when (find-package :bt)
+    (loop :for j :in (ignore-errors (funcall (find-symbol "ALL-THREADS" :bt)))
+       :do
+       (format t "~3d ~10a ~20a ~:[~;~a ~]~a~%"
+	       0 "THREAD"
+	       (funcall (find-symbol "THREAD-NAME" :bt) j)
+	       long j ""))))
+
 (defbuiltin history
     (("clear"	      boolean  :short-arg #\c)
      ("write"	      boolean  :short-arg #\w)
      ("read"	      boolean  :short-arg #\r)
      ("append"	      boolean  :short-arg #\a)
      ("read-not-read" boolean  :short-arg #\n)
-     ("filename"      filename :short-arg #\f)
+     ("filename"      pathname :short-arg #\f)
      ("show-times"    boolean  :short-arg #\t)
      ("delete"	      integer  :short-arg #\d))
   "Show a list of the previously entered commands."
@@ -133,12 +153,18 @@ Output the arguments. If -n is given, then don't output a newline a the end."
 
 (defun help-choices ()
   "Return a list of choices for a help subject."
-  (append *help-subjects* *command-list*))
+  (append *help-subjects*
+	  (mapcar #'(lambda (x) (or (and (symbolp x) (symbol-name x))
+			    (and (stringp x) x)
+			    x))
+		  *command-list*)))
 
 (defclass arg-help-subject (arg-choice)
   ()
   (:default-initargs
-   :choice-func #'help-choices))
+   :choice-func
+      #+clisp 'help-choices		; I'm not sure why.
+      #-clisp #'help-choices))
 
 (defvar *basic-help*
 "~
@@ -273,7 +299,6 @@ NAME is replaced by EXPANSION before any other evaluation."
 ;;     ((position value +false-strings+ :test #'equalp) nil)
 ;;     (t (error "Can't convert ~w to a boolean." value))))
 
-;; @@@ state arg doesn't work right: make designator: 0 off nil
 (defbuiltin debug (("state" boolean-toggle))
   "Toggle shell debugging."
   (setf (lish-debug *shell*)
@@ -298,26 +323,38 @@ NAME is replaced by EXPANSION before any other evaluation."
   |#
 
 (defbuiltin export (("name" string) ("value" string))
-  "Set environment variable NAME to be VALUE. Omitting VALUE, just makes sure the current value of NAME is exported. Omitting both, prints all the exported environment variables."
+  "Set environment variable NAME to be VALUE. Omitting VALUE, just makes sure
+the current value of NAME is exported. Omitting both, prints all the exported
+environment variables. If NAME and VALUE are converted to strings if necessary."
+  (when (and name (not (stringp name)))
+    (setf name (princ-to-string name)))
+  (when (and value (not (stringp value)))
+    (setf value (princ-to-string value)))
   (if name
       (if value
 	  (nos:setenv name value)
-	  (nos:getenv name))		; actually does nothing
+	  (nos:getenv name))		; Actually does nothing
       (printenv)))
-
-(defbuiltin jobs (("long" boolean :short-arg #\l))
-  "Lists spawned processes that are active."
-  ;; @@@ not working yet for system commands
-  (loop :for j :in (lish-suspended-jobs *shell*)
-     :do
-     (with-slots (id name command-line resume-function) j
-       (format t "~3d ~20a ~:[~;~a ~]~a~%"
-	       id name long resume-function command-line))))
 
 (defun get-cols ()
   (let ((tty (tiny-rl::line-editor-terminal (lish::lish-editor *shell*))))
     (ansiterm:terminal-get-size tty)
     (ansiterm:terminal-window-columns tty)))
+
+(defparameter *signal-names* (make-array
+			      (list nos:*signal-count*)
+			      :initial-contents
+			      (cons ""
+			        (loop :for i :from 1 :below nos:*signal-count*
+				   :collect (nos:signal-name i))))
+  "Names of the signals.")
+
+(define-builtin-arg-type signal (arg-integer)
+  "A system signal."
+  ()
+  :convert string
+    (or (position value *signal-names* :test #'equalp)
+	(parse-integer value)))
 
 (defbuiltin kill
     (("list-signals" boolean :short-arg #\l)
@@ -397,7 +434,10 @@ Show accumulated times for the shell."
     (("print-command" boolean :short-arg #\p)
      ("symbolic"      boolean :short-arg #\S)
      ("mask"	     string))
-  "Set or print the default file creation mode mask (a.k.a. permission mask). If mode is not given, print the current mode. If PRINT-COMMAND is true, print the mode as a command that can be executed. If SYMBOLIC is true, output in symbolic format, otherwise output in octal."
+  "Set or print the default file creation mode mask (a.k.a. permission mask).
+If mode is not given, print the current mode. If PRINT-COMMAND is true, print
+the mode as a command that can be executed. If SYMBOLIC is true, output in
+symbolic format, otherwise output in octal."
   (declare (ignore symbolic)) ;; @@@
   (if (not mask)
       ;; printing
@@ -421,11 +461,22 @@ Show accumulated times for the shell."
 (defbuiltin wait ())
 
 (defbuiltin exec (("command-words" t :repeating t))
-  "Replace the whole Lisp system with another program. This seems like a rather drastic thing to do to a running Lisp system."
+  "Replace the whole Lisp system with another program. This seems like a rather
+drastic thing to do to a running Lisp system. Wouldn't you prefer a nice game
+of chess?"
   (when command-words
     (let ((path (command-pathname (first command-words))))
       (format t "path = ~w~%command-words = ~w~%" path command-words)
       (nos:exec path command-words))))
+
+(define-builtin-arg-type function (arg-symbol)
+  "A function name."
+  ()
+  :convert string (find-symbol (string-upcase value)))
+
+(define-builtin-arg-type key-sequence (arg-string)
+  "A key sequence."
+  ())
 
 (defbuiltin bind
     (("print-bindings"		 boolean      :short-arg #\p)
@@ -497,6 +548,10 @@ better just to use Lisp syntax.
 				      :arglist '())))
 	(format t "~a is not a function" func-symbol))))
 |#
+
+(defbuiltin undefcommand (("command" command))
+  "Undefine a command."
+  (undefine-command (string-downcase command)))
 
 (defun is-executable (s)
   (logand (file-status-mode s) S_IXUSR))

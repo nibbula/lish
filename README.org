@@ -13,6 +13,11 @@
 /Some/ of the things it depends on are in:\\
 https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name.git
 
+
+* When..
+  I'd like to stop using Bash. When I feel like I can do that, then perhaps
+  it will be the time to clean up the issues so other people can try to use it.
+
 #+BEGIN_SRC lisp
 (defun org-xor (a b)
   "Exclusive or."

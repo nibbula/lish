@@ -10,12 +10,14 @@
 ;; The extra infomation about arguments is most useful for completion and
 ;; input help.
 ;;
-;; The way commands work, we could also someday have an interface which reads
-;; Lish commands in a way that is more like Lisp machine command readers.
+;; The point is to give the user a lot of assistance entering commands.
 
 ;; $Revision$
 
 (in-package :lish)
+
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+		   (compilation-speed 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Command arguments
@@ -69,7 +71,8 @@
 		:accessor arg-long-arg))
   (:documentation "Generic command parameter."))
 
-(defmethod initialize-instance :after ((o argument) &rest initargs)
+(defmethod initialize-instance :after
+    ((o argument) &rest initargs &key &allow-other-keys)
   (declare (ignore initargs))
   ;; Make the long-arg default to the name if the short-arg is set.
   (when (slot-value o 'short-arg)
@@ -133,11 +136,28 @@
   (declare (ignore arg))
   value)
 
+(defmethod convert-arg ((arg arg-string) (value t))
+  (declare (ignore arg))
+  (princ-to-string value))
+
+(defclass arg-symbol (argument) () (:documentation "A symbol."))
+(defmethod convert-arg ((arg arg-symbol) (value string))
+  (declare (ignore arg))
+  value)
+
+(defmethod convert-arg ((arg arg-symbol) (value t))
+  (declare (ignore arg))
+  (princ-to-string value))
+
 (defclass arg-keyword (argument) () (:documentation "A Lisp keyword."))
 (defmethod convert-arg ((arg arg-keyword) (value string))
    (if (char/= (char arg 0) #\:)
        (intern (string-upcase (subseq value 1)) (find-package :keyword))
        value))
+
+(defclass arg-object (argument) () (:documentation "A Lisp object."))
+(defmethod convert-arg ((arg arg-object) (value string))
+  (safe-read-from-string value))
 
 (defclass arg-date (argument) () (:documentation "A date."))
 (defmethod convert-arg ((arg arg-date) (value string))
@@ -166,12 +186,22 @@
   (:documentation "An argument whose value must be one of a list of choices."))
 
 (defmethod convert-arg ((arg arg-choice) (value string))
-  (let (choice)
-    (if (setf choice (find value (arg-choices arg)
+  (let (choice
+	(choices (cond
+		   ((slot-boundp arg 'choices)
+		    (arg-choices arg))
+		   ((and (slot-boundp arg 'choice-func)
+			 (arg-choice-func arg))
+		    (funcall (arg-choice-func arg)))
+		   (t nil))))
+    (unless choices
+      (error "Choice arguemnt has no choices ~a." (arg-name arg)))
+    (if (setf choice (find value choices
 			   :test #'(lambda (a b)
 				     (equalp a (princ-to-string b)))))
 	choice
-	(error "Argument ~w is not one of ~a." value (arg-choices arg)))))
+	(error "~s is not one of the choices for the argument ~:@(~a~)."
+	       value (arg-name arg)))))
 
 #| Actually I think these should just be in the base class
 (defclass arg-command-line (argument)
@@ -189,23 +219,30 @@
   (:documentation "A true or false value from the command line."))
 |#
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun argument-class-name (symbol)
+    "Return a string representing the argument class for the SYMBOL."
+    (s+ "ARG-" (string-upcase symbol))))
+
 (defun argument-type-class (type)
   "Return the argument class for a given type. If the type is not a defined
 ARG-* class, it defaults to the generic ARGUMENT class."
-  (let* (;(pkg (symbol-package type))
-	 class-symbol arg-class)
+  (flet ((try-sym (s pkg)
+	   (find-class
+	    (and (find-package pkg)
+		 (find-symbol (argument-class-name s) pkg))
+	    nil)))
     (cond
       ((listp type)
        (if (not (eq (car type) 'or))
-	 (error "Only (or ...) compound types are supported.")
-	 'argument))
-      ((or (symbolp type) (stringp type))
-       (when (setf class-symbol
-		   (intern (s+ "ARG-" (string-upcase type)) :lish #|pkg|#))
-	 (setf arg-class (find-class class-symbol nil)))
-       (or arg-class 'argument))
-      ((eql type t)
+	   (error "Only (or ...) compound types are supported.")
+	   'argument))
+      ((or (eq type t) (eq type 't) (and (stringp type) (equalp type "T")))
        'argument)
+      ((or (symbolp type) (stringp type))
+       (or (try-sym type :lish-user)
+	   (try-sym type :lish)
+	   (progn (warn "Defaulting argument type ~s" type) 'argument)))
       (t
        (error "Argument type is not a symbol, string or T.")))))
 
@@ -215,34 +252,107 @@ ARG-* class, it defaults to the generic ARGUMENT class."
     (and p (elt arglist (1+ p)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defun make-argument-list (arglist)
-  "Take an ARGLIST from DEFCOMMAND and turn in into a list of argument objects,
+  (defun make-argument-list (arglist &optional compile-time)
+    "Take an ARGLIST from DEFCOMMAND and turn it into a list of argument objects,
 like in the command object."
 ;;;  (declare (type list arglist))
-  (when (not (listp arglist))
-    (error "Command argument list must be a list."))
-  (loop :with name :and type
-     :for a :in arglist :do
-;     (assert (listp a))
-     (when (not (listp a))
-       (error "Command argument list element must be a list."))
-     #|   (setf name (arglist-value a :name)
-     type (arglist-value a :type)) |#
-     (setf name (first a)
-	   type (second a))
-     (when (not name)
-       (error "Arguments must have a name."))
-     (when (not type)
-       (error "Arguments must have a type."))
-     (setf a (append (list :name name :type type) (cddr a)))
-     :collect (apply #'make-instance (argument-type-class type) a))))
+    (when (not (listp arglist))
+      (error "Command argument list must be a list."))
+    (loop :with name :and type
+       :for a :in arglist :do
+       (when (not (listp a))
+	 (error "Command argument list element must be a list."))
+       (setf name (first a)
+	     type (second a))
+       (when (not name)
+	 (error "Arguments must have a name."))
+       (when (not type)
+	 (error "Arguments must have a type."))
+       (setf a (append (list :name name :type type) (cddr a)))
+       :collect (apply #'make-instance
+		       (if compile-time
+			   'argument
+			   (argument-type-class type))
+		       a))))
+
+;; You can just do you own defclass, but the problem is what package
+;; it gets defined in, because we do snipping off of the ARG- prefix.
+;; It seems like we could either:
+;;   1. Require the ARG- prefix everywhere, and require exporting, importing
+;;      and normal symbol management.
+;; or
+;;   2. Just define all ARG- classes in a lish package and look them up
+;;      there too.
+;; I'm taking the second option for now, even though I may regret it.
+
+;; Yet another defclass wrapper.
+(defmacro %defargtype (name package (&rest superclasses) &body body)
+  "See the documentation for defargtype."
+  (let* ((bod body)
+	 (class-name (intern (argument-class-name name) package))
+	 (doc (when (stringp (first bod))
+		(pop bod)))
+	 (slots (if (listp (first bod))
+		    (pop bod)
+		    (error "Missing slot list in defargtype.")))
+	 (conversions '()))
+    (loop
+       :for form = bod :then (cdr bod)
+       :while (not (endp form))
+       :do
+       (cond
+	 ((keywordp (car form))
+	  (case (car form)
+	    (:convert
+	     (let ((val-type (cadr form))
+		   (conv-body (cddr form)))
+	       (pop bod)
+	       (pop bod)
+	       (push
+		`(defmethod convert-arg ((arg ,class-name) (value ,val-type))
+		   ,@conv-body)
+		conversions)))
+	    (otherwise
+	     (error "Unknown keyword in defargtype: ~s." (car form)))))
+	 (t
+	  (error "Unknown form in defargtype: ~s." (car form)))))
+    `(progn
+       (defclass ,class-name ,superclasses
+	 ,slots
+	 ,@(when doc `((:documentation ,doc))))
+       ,@conversions)))
+
+(defmacro defargtype (name (&rest superclasses) &body body)
+  "Define a command argument type. The syntax is something like:
+(defargtype foo (superclasses...)
+  \"doc\"
+  ((slot :blah blah))
+  :convert zoo-type
+    (and (arg-foo-ish arg) (bar-ize value))
+  :convert zib-type
+    (progn
+      (zabble arg)
+      (zibble arg value)))
+
+This defines a class ARG-FOO with superclasses SUPERS, with slot
+definitions suitable for DEFCLASS. DOC is optional class documentation.
+The optional :CONVERT clauses define ARG-CONVERT methods for
+the new argument class and the given type, e.g.:
+  (arg-convert ((arg arg-foo) (value zoo-type)))
+where ARG is the name of the argument and VALUE is the name of the
+value to be converted.
+"
+  `(%defargtype ,name :lish-user (,@superclasses) ,@body))
+
+(defmacro define-builtin-arg-type (name (&rest superclasses) &body body)
+  `(%defargtype ,name :lish (,@superclasses) ,@body))
 
 (defun arg-has-flag (arg)
   (or (arg-short-arg arg) (arg-long-arg arg)))
 
 ;; They must be keyworded if there are any flagged arguments.
 (defun args-keyworded (args)
-  "Check if an argument must be keyworded. "
+  "Check if an argument must be keyworded."
   (loop :for a :in args :do
      (when (arg-has-flag a)
        (return-from args-keyworded t)))
@@ -250,55 +360,56 @@ like in the command object."
 
 ;; Thankfully this is nowhere near as hairy as posix-to-lisp-args.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defun shell-to-lisp-args (shell-args)
-  "Return a Lisp argument list for the given lish argument list."
-  (let ((mandatories
-	 (loop :for a :in shell-args
-	    :if (not (arg-optional a))
-	    :collect a))
-	(optionals
-	 (loop :for a :in shell-args
-	    :if (arg-optional a)
-	    :collect a))
-	(repeating
-	 (loop :for a :in shell-args
-	    :if (arg-repeating a)
-	    :collect a))
-	(keyworded (args-keyworded shell-args))
-	(new-list '()))
-    ;; Mandatory arguments
-    (loop :for a :in mandatories :do
-       (push (symbolify (arg-name a)) new-list))
-    ;; This is augmented here to allow paralellism in the let above.
-    (setf keyworded (or keyworded
-			(and optionals repeating
-			     (and (not (equal optionals repeating))
-				  (= (length optionals) 1)))
-			(> (length repeating) 1)))
-    (if keyworded
-	(progn
-	  (push '&key new-list)
-	  (loop :for a :in optionals :do
-	     (push
-	      (if (arg-default a)
-		  (list (symbolify (arg-name a)) (arg-default a))
-		  (symbolify (arg-name a)))
-	      new-list)))
-	(cond
-	  ;; If both optional and repeating, do repeating (i.e. &rest)
-	  (repeating
-	   (push '&rest new-list)
-	   ;; Must be only one repeating, else it would be keyworded.
-	   (push (symbolify (arg-name (first repeating))) new-list))
+  (defun shell-to-lisp-args (shell-args)
+    "Return a Lisp argument list for the given lish argument list."
+    (let ((mandatories
+	   (loop :for a :in shell-args
+	      :if (not (arg-optional a))
+	      :collect a))
 	  (optionals
-	   (push '&optional new-list)
-	   (loop :for a :in optionals :do
-	      (push
-	       (if (arg-default a)
-		   (list (symbolify (arg-name a)) (arg-default a))
-		   (symbolify (arg-name a)))
-	       new-list)))))
-    (nreverse new-list))))
+	   (loop :for a :in shell-args
+	      :if (arg-optional a)
+	      :collect a))
+	  (repeating
+	   (loop :for a :in shell-args
+	      :if (arg-repeating a)
+	      :collect a))
+	  (keyworded (args-keyworded shell-args))
+	  (new-list '()))
+      ;; Mandatory arguments
+      (loop :for a :in mandatories :do
+	 (push (symbolify (arg-name a)) new-list))
+      ;; This is augmented here to allow for (mostly theoretical) paralellism
+      ;; in the let above.
+      (setf keyworded (or keyworded
+			  (and optionals repeating
+			       (and (not (equal optionals repeating))
+				    (= (length optionals) 1)))
+			  (> (length repeating) 1)))
+      (if keyworded
+	  (progn
+	    (push '&key new-list)
+	    (loop :for a :in optionals :do
+	       (push
+		(if (arg-default a)
+		    (list (symbolify (arg-name a)) (arg-default a))
+		    (symbolify (arg-name a)))
+		new-list)))
+	  (cond
+	    ;; If both optional and repeating, do repeating (i.e. &rest)
+	    (repeating
+	     (push '&rest new-list)
+	     ;; Must be only one repeating, else it would be keyworded.
+	     (push (symbolify (arg-name (first repeating))) new-list))
+	    (optionals
+	     (push '&optional new-list)
+	     (loop :for a :in optionals :do
+		(push
+		 (if (arg-default a)
+		     (list (symbolify (arg-name a)) (arg-default a))
+		     (symbolify (arg-name a)))
+		 new-list)))))
+      (nreverse new-list))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Commands
@@ -356,6 +467,9 @@ instances.")
 (defun set-command (name obj)
   (setf (gethash name (lish-commands)) obj))
 
+(defun unset-command (name)
+  (remhash name (lish-commands)))
+
 (defun get-command (name)
   (gethash name (lish-commands)))
 
@@ -399,7 +513,7 @@ shell."
 	(command-name (intern (string name) :lish))
 	(name-string (string-downcase name))
 ;;;	(name-string (concatenate 'string "\"" (string-downcase name) "\""))
-	(params (shell-to-lisp-args (make-argument-list arglist))))
+	(params (shell-to-lisp-args (make-argument-list arglist t))))
     `(progn
        (defun ,func-name ,params
 	 ,@body)
@@ -459,7 +573,7 @@ is a shell argument list. The BODY is the body of the function it calls."
   (let ((func-name (command-function-name name))
 	(command-name (intern (string name)))
 	(name-string (string-downcase name))
-	(params (shell-to-lisp-args (make-argument-list arglist))))
+	(params (shell-to-lisp-args (make-argument-list arglist t))))
     `(progn
        (defun ,func-name ,params
 	 ,@body)
@@ -474,17 +588,9 @@ is a shell argument list. The BODY is the body of the function it calls."
 				   :loaded-from *load-pathname*
 				   :arglist (make-argument-list ',arglist))))))
 
-;; Yet another defclass wrapper.
-;; (defmacro defargtype (name (&rest superclasses) &body body)
-;;   "This defines a command argument type. Mostly for the purposes "
-;;   (let ((slots '()) (body
-;; 	 (loop :for form :in body :do
-;; 	    (cond
-;; 	      ((listp form) ; a slot specifier
-;; 	       )
-;;     `(defclass ,name ,superclasses
-;;        ,rock-the-body)))
-
+(defun undefine-command (name)
+  (unset-command name)
+  (setf *command-list* (delete name *command-list*)))
 
 #|
   (defclass arg-list ()
@@ -502,22 +608,22 @@ is a shell argument list. The BODY is the body of the function it calls."
 
 #|
 
-The rules for converting POSIX arguments to lambda lists are fairly complicated.
-Here we try to examine some of the possiblities. We use a letter to denote the
-category of argument:
+  The rules for converting POSIX arguments to lambda lists are fairly complicated.
+  Here we try to examine some of the possiblities. We use a letter to denote the
+  category of argument:
   m = manditory  o = optional  r = repeating  f = flagged
 
-When only manditory and optional are present, we don't need keywords.
-The order of manditories vs optionals doesn't matter to lambda lists, but does
-to POSIX.
-Non-flagged optionals must come after manditories.
+  When only manditory and optional are present, we don't need keywords.
+  The order of manditories vs optionals doesn't matter to lambda lists, but does
+  to POSIX.
+  Non-flagged optionals must come after manditories.
 
   m1 m2		(m1 m2)				m1 m2
   m1 m2 o1 o2	(m1 m2 &optional o1 o2)		m1 m2 [o1] [o2]
   o1 o2 m1 m2 	(m1 m2 &optional o1 o2)		[o1] [o2] m1 m2  problematic???
   o1 o2		(&optional o1 o1)		[o1] [o2]
 
-We can't have more than one non-flagged repeating:
+  We can't have more than one non-flagged repeating:
   ro1		(&rest r1)			[ro1...]
   rm1 rm2	ERROR
   ro1 ro2	ERROR
@@ -533,7 +639,7 @@ We can't have more than one non-flagged repeating:
   of1 of2 rm1	(&key of1 of2 r1)		[-12] r1[...]
   of1 of2 ro1	(&key of1 of2 r1)		[-12] [r1...]
 
-Flagged optional must be done as keywords:
+  Flagged optional must be done as keywords:
   m1 m2 of1 o2	(m1 m2 &key of1 o2)		[-1] m1 m2 [o2]
   m1 m2 o1 of2	(m1 m2 &key o1 of2)		[-2] m1 m2 [o1]
   m1 m2 of1 of2	(m1 m2 &key o1 of2)		[-2] m1 m2 [o1]
@@ -543,10 +649,10 @@ Flagged optional must be done as keywords:
   o1 of2	(&key of1 of2)			[-2] [o1]
   of1 o2	(&key of1 of2)			[-1] [o2]
 
-Flagged manditory must be done as keywords, which DOES'T make other manditories
-keywords.
-Manditory flagged treated as optional flagged, except error afterward if
-not present.
+  Flagged manditory must be done as keywords, which DOES'T make other manditories
+  keywords.
+  Manditory flagged treated as optional flagged, except error afterward if
+  not present.
 
   mf1 m2 of1 o2		(m2 &key mf1 of1 o2)	[-of1] [-mf1] [o2] m2
   m1 mf2 o1 of2		(m1 &key mf2 o1 of2)	[-mf2] [-of2] [o1] m1
@@ -555,24 +661,24 @@ not present.
   of1 of2 m1 mf2 	(m1 &key of1 of2 mf2)	[-of1] [-of2] [-mf2] m1
   mf1 mf2		(&key mf1 mf2)		[-mf1] [-mf2]
 
-Repeating flagged: can have more than one, but values can't start with dashes!
-Repeating flagged manditory and optional are treated the same.
+  Repeating flagged: can have more than one, but values can't start with dashes!
+  Repeating flagged manditory and optional are treated the same.
   rf1		(&rest rf1)			[-rf1 foo] [...]
   (*stupid but legal)
   rf1 rf2	(&key rf1 rf2)			[-rf1 foo...] [-rf2 bar...]
   (*can be given in any order, e.g.: -rf2 foo bar -rf1 foo bar baz)
 
-Flagged arguments can appear in POSIX in multiple ways:
+  Flagged arguments can appear in POSIX in multiple ways:
   (:short-arg x :type boolean)		[-x]
   ((:short-arg x :type boolean)   	[-xy]
-   (:short-arg y :type boolean))
+(:short-arg y :type boolean))
   (:short-arg x :type (not boolean))	[-x arg]
   ((:short-arg x :type (not boolean))	[-x arg] [-y arg]
-   (:short-arg y :type (not boolean)))
+(:short-arg y :type (not boolean)))
   (:long-arg foo :type boolean)   	[--foo]
   (:long-arg foo :type (not boolean))   [--foo bar]
 
-|#
+  |#
 
 ;;
 ;; If there are any optional non-positional args (i.e. optional args with
@@ -631,9 +737,11 @@ Flagged arguments can appear in POSIX in multiple ways:
 	   (if ,keyworded
 	       (progn
 		 (setf ,new (push (arg-key ,arg) ,new))
-		 (setf ,new (push (nthcdr ,start ,old) ,new)))
+		 (setf ,new (push (mapcar #'(lambda (x)
+					      (convert-arg ,arg x))
+					  (nthcdr ,start ,old)) ,new)))
 	       (loop :for ,e :in (nthcdr ,start ,old) :do
-		  (setf ,new (push ,e ,new))))
+		  (setf ,new (push (convert-arg ,arg ,e) ,new))))
 	   (setf ,old (subseq ,old 0 ,start)))))))
 
 (defun posix-to-lisp-args (command p-args)

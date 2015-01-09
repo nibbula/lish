@@ -1,22 +1,38 @@
 Lish TODO list							     -*- org -*-
 
 * BUGS:
-** parsing < in first word?
+** hang going to second/continue prompt (-) when something unreadable
+   (e.g. token with missing package: bogus:token)
+** fix find -d ~/ -n foo
+** completion bugs of // or absolute paths
 ** glob expansion of filenames with quoted spaces?
+** completion interning of partial symbol, so completing doesn't work right
+** parsing < in first word?
 ** cd to dir with spaces?
+** argument defaults don't work in lish commands? (see wc)
 ** newly defined commands don't get recognized in completion
-** completion bugs
-*** // or absolute paths
 ** tiny-rl display bugs
+** fix arg-option
+*** fix help
+*** arg completion
+** lisp expressions after the first don't get evaluated?
+* add < redirect
+* give in and handle ENVVAR=value command
+* figure out a syntax for multiple commands on a line (like posix ;)
 * argument parsing for commands
 ** fix edge cases, more testing for posix-to-lisp-args
+** come up with a way to add argument specs for external programs
+*** defexternal?
+*** scrape --help output or man pages?
+*** steal from zsh or bash_completion
+* at least handle ^Z of subprocess!
+* be able to call lish functions from not in the shell, ! etc
 * work out error handling
 ** compilation?
 ** other?
 * have shell-eval return a value: for external commands return the
   old shell exit status (from wait), otherwise the command function
   return value, or lisp return value
-* at least handle ^Z of subprocess!
 * process stuff:
 ** chains: || &&
 ** background jobs: & fg bg jobs %n ^Z SIGTSTP etc
@@ -24,7 +40,6 @@ Lish TODO list							     -*- org -*-
 * redirections: < > << <()
 * smarter completion, specifically:
 ** completion should use proper completion for command line argument types
-** come up with a way to add argument specs for external programs
 ** just basically do the ‘right thing’ in any circumstance!!!
    completion should know what you can type in any circumstance and
    provide help.
@@ -40,15 +55,12 @@ Lish TODO list							     -*- org -*-
 ** umask
 ** wait
 * test portability
+** implementations
+*** clisp, cmu
 ** linux
 ** cygwin?
 * port to windows
-#+TITLE:     Lish ToDo List
-#+AUTHOR:    Nibby Nebbulous
-#+EMAIL:     nibbula@gmail.com
-#+LANGUAGE:  en
-#+TEXT:      Things you may want to Do.
-#+OPTIONS:   H:2 num:t toc:t \n:nil @:t ::t |:t ^:nil *:t TeX:t LaTeX:nil
+* edit ranting comments
 * COMMENT MeTaDaTa
 creation date: [2014-12-01 Mon 00:20:33]
 creator: "Nibby Nebbulous" <nibbula@gmail.com>

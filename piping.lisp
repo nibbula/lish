@@ -156,16 +156,22 @@ string as an argument."
 ;;; memorable word for each one of these and then these could be used as
 ;;; replacements (even automatcially / abbrev-like). Or maybe once they're
 ;;; working and I'm using them regularly, I will figure it out.
-
+;;;
 ;;; I call these the Snormnambulous™®© Shellbilitous Frobmogrifiers.
-;;; [Too. Much. Coffee.]
+;;; [after drinking far Too. Much. Coffee.]
+;;;
+;;; I'm also a bit worried that if we use these things is real code (vs
+;;; interactive commands lines), we may start to look like Perl (and I
+;;; really hope you know why that should be worrying:
+;;; (e.g. https://sites.google.com/site/steveyegge2/ancient-languages-perl))
 
 (defun ! (&rest args)
   "Evaluate the shell command."
   (shell-eval *shell* (shell-read (lisp-args-to-command args))))
 
 (defun !? (&rest args)
-  "Evaluate the shell command, converting Unix shell result code into boolean. This means the 0 is T and anything else is NIL."
+  "Evaluate the shell command, converting Unix shell result code into boolean.
+This means the 0 is T and anything else is NIL."
   (let ((result (shell-eval *shell* (shell-read (lisp-args-to-command args)))))
     (and (numberp result) (zerop result))))
 
@@ -177,9 +183,14 @@ string as an argument."
   "Return lines output from command as a string of quoted words."
   (command-output-words (lisp-args-to-command command) t))
 
-(defun !_ (command)
+(defun !_ (&rest command)
   "Return a list of the lines of output from the command."
-  (command-output-list command))
+  (command-output-list (lisp-args-to-command command)))
+
+(defun !- (&rest command)
+  "Return a string containing the output from the command."
+  (with-output-to-string (str)
+    (run-with-output-to str command)))
 
 (defun !and (&rest commands)
   "Run commands until one fails."
