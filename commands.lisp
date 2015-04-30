@@ -92,11 +92,17 @@
 	    (arg-long-arg o))))
 
 (defgeneric convert-arg (arg value)
-  (:documentation "Convert an argument value from one type to another."))
+  (:documentation "Convert an argument value from one type to another.")
+  (:method ((arg argument) value)
+    "The base default conversion just returns the value."
+    value))
 
-(defmethod convert-arg ((arg argument) value)
-  "The base default conversion just returns the value."
-  value)
+(defgeneric argument-choices (arg)
+  (:documentation
+   "Return a list of possible argument values or nil if unknown.")
+  (:method ((arg argument))
+    "The default choices are unknown."
+    nil))
 
 (defclass arg-boolean (argument) () (:documentation "A true or false value."))
 (define-constant +true-strings+ '("T" "TRUE" "YES" "ON" "1"))
@@ -106,6 +112,8 @@
     ((position value +true-strings+ :test #'equalp) t)
     ((position value +false-strings+ :test #'equalp) nil)
     (t (error "Can't convert ~w to a boolean." value))))
+;; (defmethod argument-choices ((arg arg-boolean))
+;;   (concatenate 'list +true-strings+ +false-strings+))
 
 (defclass arg-number (argument) () (:documentation "A number."))
 (defmethod convert-arg ((arg arg-number) (value string))
@@ -130,6 +138,18 @@
     (if (and num (floatp num))
 	num
 	(error "Can't convert ~w to a float." value))))
+
+(defclass arg-character (argument) () (:documentation "A character."))
+(defmethod convert-arg ((arg arg-character) (value character))
+  (declare (ignore arg))
+  value)
+
+(defmethod convert-arg ((arg arg-character) (value string))
+  (declare (ignore arg))
+  (if (= (length value) 1)
+      (char value 0)
+      (or (name-char value)
+	  (error "Can't convert character arg from string: ~s" value))))
 
 (defclass arg-string (argument) () (:documentation "A string."))
 (defmethod convert-arg ((arg arg-string) (value string))
@@ -157,7 +177,11 @@
 
 (defclass arg-object (argument) () (:documentation "A Lisp object."))
 (defmethod convert-arg ((arg arg-object) (value string))
-  (safe-read-from-string value))
+  (multiple-value-bind (obj end) (safe-read-from-string value)
+    ;; If the whole string wasn't an object, just treat as a string.
+    (if (= end (length value))
+	obj
+	value)))
 
 (defclass arg-date (argument) () (:documentation "A date."))
 (defmethod convert-arg ((arg arg-date) (value string))
@@ -169,6 +193,33 @@
 (defmethod convert-arg ((arg arg-pathname) (value string))
   (declare (ignore arg))
   value)
+
+(defmethod argument-choices ((arg arg-pathname))
+  "Return the possible path names."
+  ;; @@@ Perhaps we should just use opsys:read-directory ?
+  (completion::filename-completion-list ""))
+
+(defclass arg-stream (argument)
+  () (:documentation "An stream of some sort."))
+(defmethod convert-arg ((arg arg-pathname) (value symbol))
+  (declare (ignore arg))
+  (symbol-value value))
+
+(defclass arg-input-stream (arg-stream)
+  () (:documentation "An input stream."))
+(defclass arg-output-stream (arg-stream)
+  () (:documentation "An output stream."))
+(defclass arg-io-stream (arg-stream)
+  () (:documentation "An input/output stream."))
+
+(defclass arg-stream-or-filename (arg-stream)
+  () (:documentation "An stream or a filename."))
+(defclass arg-input-stream-or-filename (arg-stream-or-filename)
+  () (:documentation "An input stream or a filename."))
+(defclass arg-output-stream-or-filename (arg-stream-or-filename)
+  () (:documentation "An output stream or a filename."))
+(defclass arg-io-stream-or-file (arg-stream-or-filename)
+  () (:documentation "An I/O stream or a filename."))
 
 (defclass arg-choice (argument)
   ((choices	:type list
@@ -187,21 +238,24 @@
 
 (defmethod convert-arg ((arg arg-choice) (value string))
   (let (choice
-	(choices (cond
-		   ((slot-boundp arg 'choices)
-		    (arg-choices arg))
-		   ((and (slot-boundp arg 'choice-func)
-			 (arg-choice-func arg))
-		    (funcall (arg-choice-func arg)))
-		   (t nil))))
+	(choices (argument-choices arg)))
     (unless choices
-      (error "Choice arguemnt has no choices ~a." (arg-name arg)))
+      (error "Choice argument has no choices ~a." (arg-name arg)))
     (if (setf choice (find value choices
 			   :test #'(lambda (a b)
 				     (equalp a (princ-to-string b)))))
 	choice
 	(error "~s is not one of the choices for the argument ~:@(~a~)."
 	       value (arg-name arg)))))
+
+(defmethod argument-choices ((arg arg-choice))
+  (cond
+    ((slot-boundp arg 'choices)
+     (arg-choices arg))
+    ((and (slot-boundp arg 'choice-func)
+	  (arg-choice-func arg))
+     (funcall (arg-choice-func arg)))
+    (t nil)))
 
 #| Actually I think these should just be in the base class
 (defclass arg-command-line (argument)
@@ -253,8 +307,8 @@ ARG-* class, it defaults to the generic ARGUMENT class."
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-argument-list (arglist &optional compile-time)
-    "Take an ARGLIST from DEFCOMMAND and turn it into a list of argument objects,
-like in the command object."
+    "Take an ARGLIST from DEFCOMMAND and turn it into a list of argument
+objects, like in the command object."
 ;;;  (declare (type list arglist))
     (when (not (listp arglist))
       (error "Command argument list must be a list."))
@@ -486,20 +540,30 @@ DEFBUILTIN."
     (intern (concatenate 'string "!" (string-upcase n)))))
 
 #|
-  (defmacro squirrel-def (package &body body)
-(let ((squirrel-package (s+ package "-DEFS"))
-(defs-sym (gensym "SQUIRREL-DEF")))
-`(if (find-package ,package)
-(progn ,@body)
-(progn
-(when (not (find-package ,squirrel-package))
-(make-package ,squirrel-package)
-(let ((,defs-sym (intern "*DEFS*"
-(find-package ,squirrel-package))))
-(eval `(defvar ,,defs-sym '()))))
-(let ((,defs-sym (intern "*DEFS*" (find-package ,squirrel-package))))
-(set ,defs-sym (cons ',body (symbol-value ,defs-sym))))))))
-  |#
+(defmacro squirrel-def (package &body body)
+  (let ((squirrel-package (s+ package "-DEFS"))
+	(defs-sym (gensym "SQUIRREL-DEF")))
+    `(if (find-package ,package)
+	 (progn ,@body)
+	 (progn
+	   (when (not (find-package ,squirrel-package))
+	     (make-package ,squirrel-package)
+	     (let ((,defs-sym (intern "*DEFS*"
+				      (find-package ,squirrel-package))))
+	       (eval `(defvar ,,defs-sym '()))))
+	   (let ((,defs-sym (intern "*DEFS*" (find-package ,squirrel-package))))
+	     (set ,defs-sym (cons ',body (symbol-value ,defs-sym))))))))
+|#
+
+#|
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun eval-defaults (arglist)
+    "Evaluate default arguments."
+    (loop :for a :in arglist :do
+       (loop :for k = (cddr a) :then (cdr
+	  (
+    ))
+|#
 
 ;; There should be little distinction between a user defined command and
 ;; "built-in" command, except perhaps for a warning if you redefine a
@@ -509,16 +573,18 @@ DEFBUILTIN."
 (defmacro defbuiltin (name (&rest arglist) &body body)
   "This is like defcommand, but for things that are considered built in to the
 shell."
-  (let ((func-name (command-function-name name))
-	(command-name (intern (string name) :lish))
-	(name-string (string-downcase name))
-;;;	(name-string (concatenate 'string "\"" (string-downcase name) "\""))
-	(params (shell-to-lisp-args (make-argument-list arglist t))))
+  (let* ((func-name (command-function-name name))
+	 #| (command-name (intern (string name) :lish)) |#
+	 (name-string (string-downcase name))
+	 #| (name-string (concatenate 'string "\"" (string-downcase name) "\"")) |#
+;;;	 (evaled-arglist (eval-defaults arglist))
+	 (params (shell-to-lisp-args (make-argument-list arglist t))))
     `(progn
        (defun ,func-name ,params
 	 ,@body)
-;       (export (quote ,func-name))
-       (push (quote ,command-name) *command-list*)
+;;;       (export (quote ,func-name))
+;;;       (push (quote ,command-name) *command-list*)
+       (pushnew ,name-string *command-list* :test #'equal)
        (push (list ,name-string (make-instance
 				 'command :name ,name-string
 				 :arglist (make-argument-list ',arglist)
@@ -571,7 +637,7 @@ shell."
   "Define a command for the shell. NAME is the name it is invoked by. ARGLIST
 is a shell argument list. The BODY is the body of the function it calls."
   (let ((func-name (command-function-name name))
-	(command-name (intern (string name)))
+;;;	(command-name (intern (string name)))
 	(name-string (string-downcase name))
 	(params (shell-to-lisp-args (make-argument-list arglist t))))
     `(progn
@@ -580,7 +646,8 @@ is a shell argument list. The BODY is the body of the function it calls."
        ;; Don't export stuff because it causes package variance on reloading.
        ;; @@@ Perhaps we should define commands in the LISH-USER package
        ;; instead, so they can be exported and used by other packages?
-       (push (quote ,command-name) lish::*command-list*)
+;;;       (push (quote ,command-name) lish::*command-list*)
+       (pushnew ,name-string lish::*command-list* :test #'equal)
 ;;;       (set (find-symbol "*COMMAND-LIST*" :lish) (quote ,command-name))
        (set-command ,name-string
 		    (make-instance (find-symbol "COMMAND" :lish)
@@ -704,6 +771,13 @@ is a shell argument list. The BODY is the body of the function it calls."
      (setf ,new (push (convert-arg ,arg (nth ,i ,old)) ,new))
      (setf ,old (delete-nth ,i ,old))))
 
+(defmacro push-key (new arg value keyworded)
+  "Push a possibly keyworded arg VALUE to the NEW list."
+  `(progn
+     (when ,keyworded
+       (setf ,new (push (arg-key ,arg) ,new)))
+     (setf ,new (push (convert-arg ,arg ,value) ,new))))
+
 (defmacro move-flag (old new i arg)
   `(progn
      (setf ,new (push (arg-key ,arg) ,new))
@@ -712,8 +786,9 @@ is a shell argument list. The BODY is the body of the function it calls."
 ;;;	     (convert-arg ,arg (nth ,i ,old)))
 ;;;     (setf ,new (push (convert-arg ,arg (nth (1+ ,i) ,old)) ,new))
      (setf ,new (push (convert-arg ,arg (nth (1+ ,i) ,old)) ,new))
-     (setf ,old (delete-nth ,i ,old))  ; flag
-     (setf ,old (delete-nth ,i ,old)))) ; arg
+     (setf ,old (delete-nth ,i ,old)) ; flag
+     (setf ,old (delete-nth ,i ,old)) ; arg
+     (setf possible-flags (delete ,arg possible-flags))))
 
 (defmacro move-boolean-2 (old new i arg)
   `(progn
@@ -726,24 +801,41 @@ is a shell argument list. The BODY is the body of the function it calls."
   (declare (ignore old i))
   `(progn
      (setf ,new (push (arg-key ,arg) ,new))
-     (setf ,new (push t ,new))))
+     (setf ,new (push t ,new))
+     (setf possible-flags (delete ,arg possible-flags))))
 
 (defmacro move-repeating (old new start arg keyworded &optional until)
-  (let ((e (gensym "e")))
-  `(progn
-     (if ,until
-	 (error "can't do until yet") ;; @@@
-	 (progn
-	   (if ,keyworded
-	       (progn
-		 (setf ,new (push (arg-key ,arg) ,new))
-		 (setf ,new (push (mapcar #'(lambda (x)
-					      (convert-arg ,arg x))
-					  (nthcdr ,start ,old)) ,new)))
-	       (loop :for ,e :in (nthcdr ,start ,old) :do
-		  (setf ,new (push (convert-arg ,arg ,e) ,new))))
-	   (setf ,old (subseq ,old 0 ,start)))))))
+  (let ((e (gensym "move-repeating-e"))
+	(did-one (gensym "move-repeating-did-one")))
+    `(progn
+       (let (,did-one)
+	 (if ,until
+	     (error "can't do until yet") ;; @@@
+	     (progn
+	       (if ,keyworded
+		   (progn
+		     (setf ,new (push (arg-key ,arg) ,new))
+		     (setf ,new (push (mapcar #'(lambda (x)
+						  (convert-arg ,arg x))
+					      (nthcdr ,start ,old)) ,new))
+		     (when (length (nthcdr ,start ,old))
+		       (setf ,did-one t)))
+		   (loop :for ,e :in (nthcdr ,start ,old) :do
+		      (setf ,new (push (convert-arg ,arg ,e) ,new)
+			    ,did-one t)))
+	       (setf ,old (subseq ,old 0 ,start))
+	       ;; Push default if we have one and didn't get any values.
+#|	       (when (and (not ,did-one) (arg-default ,arg))
+		 (when ,keyworded
+		   (setf ,new (push (arg-key ,arg) ,new)))
+		 (setf ,new (push (convert-arg
+				   ,arg (arg-default ,arg)) ,new))) |#
+	       ))))))
 
+;; I used to handle default values to arguments here, but they were not getting
+;; evaluated properly, so it's probably best to let the command function handle
+;; defaulting arguments. It could be confusing to have two different defaulting
+;; mechanisms anyway.
 (defun posix-to-lisp-args (command p-args)
   "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
 become keyword arguments, in a way specified in the command's arglist."
@@ -757,12 +849,16 @@ become keyword arguments, in a way specified in the command's arglist."
 	(new-optionals   '())
 	(new-repeating   '())
 	(keyworded (args-keyworded (command-arglist command)))
+	(possible-flags  (loop :for a :in (command-arglist command)
+			    :if (or (arg-short-arg a)
+				    (arg-long-arg a))
+			    :collect a))
 	#| (optionals '()) |#)
     ;; Flagged arguments (optional or manditory)
     (loop :for a :in p-args :do
        (if (and (stringp a) (> (length a) 0)
-		(char= (char a 0) #\-)) ; arg starts with dash
-	   (if (eql (char a 1) #\-)		    ; two dash arg
+		(char= (char a 0) #\-))	; arg starts with dash
+	   (if (eql (char a 1) #\-)	; two dash arg
 	       ;; --long-arg
 	       (loop :for arg :in (command-arglist command) :do
 		  ;; @@@ have to deal with repeating?
@@ -774,21 +870,26 @@ become keyword arguments, in a way specified in the command's arglist."
 		  (loop :for cc :from 1 :below (length a) :do
 		     (setf flag-taken nil)
 		     (loop :for arg :in (command-arglist command) :do
-		       (when (eql (arg-short-arg arg) (char a cc))
-			 (setf flag-taken t)
-			 ;; @@@ have to deal with repeating?
-			 (if (eq (arg-type arg) 'boolean)
-			     (progn
-			       (move-boolean old-list new-flags i arg)
-			       (setf boolean-taken t))
-			     (if (/= cc (1- (length a)))
-				 (error "Unrecognized flag ~a." a)
-				 (move-flag old-list new-flags i arg)))))
+			(when (eql (arg-short-arg arg) (char a cc))
+			  (setf flag-taken t)
+			  ;; @@@ have to deal with repeating?
+			  (if (eq (arg-type arg) 'boolean)
+			      (progn
+				(move-boolean old-list new-flags i arg)
+				(setf boolean-taken t))
+			      (if (/= cc (1- (length a)))
+				  (error "Unrecognized flag ~a." a)
+				  (move-flag old-list new-flags i arg)))))
 		     (when (not flag-taken)
 		       (warn "Unrecognized option ~a" (char a cc))))
 		  (when boolean-taken
 		    (setf old-list (delete-nth i old-list)))))
 	   (incf i)))
+#|    ;; Default any left over defaultable flags
+    (loop :for a :in possible-flags :do
+       (when (arg-default a)
+	 (push (arg-key a) new-flags)
+	 (push (arg-default a) new-flags))) |#
     (setf new-flags (nreverse new-flags))
     ;; Non-flagged mandatories.
     (loop
@@ -805,9 +906,111 @@ become keyword arguments, in a way specified in the command's arglist."
     (loop
        :for arg :in (command-arglist command) :do
        (if (and (arg-optional arg) (not (arg-repeating arg))
-		(not (arg-has-flag arg)) (> (length old-list) 0))
-	   (move-key old-list new-optionals 0 arg keyworded)
+		(not (arg-has-flag arg)))
+	   (if (> (length old-list) 0)
+	       (move-key old-list new-optionals 0 arg keyworded)
+	       #| (if (arg-default arg)
+		   (push-key new-optionals arg (arg-default arg) keyworded) |#
+	       (incf i))))
+    (setf new-optionals (nreverse new-optionals))
+    ;; Repeating
+    (loop #| :with i = 0 :and did-one = nil :and end-flag |#
+       :for arg :in (command-arglist command) :do
+       (if (arg-repeating arg)
+	   (cond
+	     ((and (>= i (length old-list)) (not (arg-optional arg)))
+	      (error "Missing mandatory argument ~a." (arg-name arg)))
+;	     ((setf end-flag (arg-end-flag arg command))
+;	      ;; collect until end flag
+;	      (move-repeating (old-list new-list 0 arg keyworded end-flag)))
+;	     (check-for-multipe-repeats
+;	      ;; error
+;	      )
+	     (t
+	      ;; collect
+	      (move-repeating old-list new-repeating 0 arg keyworded)))))
+    (setf new-repeating (nreverse new-repeating))
+    (when (> (length old-list) 0)
+      (warn "Extra arguments: ~w" old-list))
+    (concatenate
+     'list new-mandatories new-optionals new-repeating new-flags)))
+
+(defun OLD-posix-to-lisp-args (command p-args)
+  "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
+become keyword arguments, in a way specified in the command's arglist."
+  ;; (when (= (length p-args) 0)
+  ;;   (return-from new-posix-to-lisp-args nil))
+  (let ((i 0)
+;	(new-list        '())
+	(old-list        (copy-list p-args)) ; so we don't modify it
+	(new-flags       '())
+	(new-mandatories '())
+	(new-optionals   '())
+	(new-repeating   '())
+	(keyworded (args-keyworded (command-arglist command)))
+	(possible-flags  (loop :for a :in (command-arglist command)
+			    :if (or (arg-short-arg a)
+				    (arg-long-arg a))
+			    :collect a))
+	#| (optionals '()) |#)
+    ;; Flagged arguments (optional or manditory)
+    (loop :for a :in p-args :do
+       (if (and (stringp a) (> (length a) 0)
+		(char= (char a 0) #\-))	; arg starts with dash
+	   (if (eql (char a 1) #\-)	; two dash arg
+	       ;; --long-arg
+	       (loop :for arg :in (command-arglist command) :do
+		  ;; @@@ have to deal with repeating?
+		  (if (equalp (subseq a 2) (arg-long-arg arg))
+		      (move-flag old-list new-flags i arg)
+		      (incf i)))
+	       ;; -abcxyz (short args)
+	       (prog (flag-taken boolean-taken)
+		  (loop :for cc :from 1 :below (length a) :do
+		     (setf flag-taken nil)
+		     (loop :for arg :in (command-arglist command) :do
+			(when (eql (arg-short-arg arg) (char a cc))
+			  (setf flag-taken t)
+			  ;; @@@ have to deal with repeating?
+			  (if (eq (arg-type arg) 'boolean)
+			      (progn
+				(move-boolean old-list new-flags i arg)
+				(setf boolean-taken t))
+			      (if (/= cc (1- (length a)))
+				  (error "Unrecognized flag ~a." a)
+				  (move-flag old-list new-flags i arg)))))
+		     (when (not flag-taken)
+		       (warn "Unrecognized option ~a" (char a cc))))
+		  (when boolean-taken
+		    (setf old-list (delete-nth i old-list)))))
 	   (incf i)))
+    ;; Default any left over defaultable flags
+    (loop :for a :in possible-flags :do
+       (when (arg-default a)
+	 (push (arg-key a) new-flags)
+	 (push (arg-default a) new-flags)))
+    (setf new-flags (nreverse new-flags))
+    ;; Non-flagged mandatories.
+    (loop
+       :for arg :in (command-arglist command) :do
+       (if (not (or (arg-optional arg)
+		    (arg-has-flag arg)
+		    (arg-repeating arg)))
+	   (if (> (length old-list) 0)
+	       (move-arg old-list new-mandatories 0 arg)
+	       (error "Missing mandatory argument ~a." (arg-name arg)))
+	   (incf i)))
+    (setf new-mandatories (nreverse new-mandatories))
+    ;; Non-flagged optionals
+    (loop
+       :for arg :in (command-arglist command) :do
+       (if (and (arg-optional arg) (not (arg-repeating arg))
+		(not (arg-has-flag arg)))
+	   (if (> (length old-list) 0)
+	       (move-key old-list new-optionals 0 arg keyworded)
+	       (if (arg-default arg)
+		   (push-key new-optionals arg (arg-default arg) keyworded)
+		   (incf i)))))
     (setf new-optionals (nreverse new-optionals))
     ;; Repeating
     (loop #| :with i = 0 :and did-one = nil :and end-flag |#
@@ -861,5 +1064,107 @@ become keyword arguments, in a way specified in the command's arglist."
 	   (format str "..."))
 	 (when (arg-optional a)
 	   (format str "]"))))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; These arguemnt types have to come after commands are defined.
+
+(defclass arg-command (arg-choice) () (:documentation "A lish command name."))
+(defmethod convert-arg ((arg arg-command) (value string))
+  (declare (ignore arg))
+  (get-command value))
+
+(defmethod argument-choices ((arg arg-command))
+  "Return the possible path names."
+  *command-list*)
+
+;; This is for anything that can be the first word of command line.
+(defclass arg-shell-command (arg-choice) ()
+  (:documentation "A lish shell command name."))
+
+(defmethod argument-choices ((arg arg-command))
+  "Return the possible path names."
+  *command-list*)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Command statistics
+
+(defvar *command-stats* nil
+  "Command statistics.")
+
+(defstruct command-record
+  "Statistics for commands."
+  (type nil)
+  (count 0 :type integer)
+  (dates '()))
+  
+(defun record-command-stats (name type)
+  (when (not *command-stats*)
+    (setf *command-stats* (make-hash-table :test #'equal)))
+  (let* ((nt (cons name type))
+	 (record (gethash nt *command-stats*)))
+    (when (not record)
+      (setf record (make-command-record)))
+    (setf (command-record-type record) type)
+    (incf (command-record-count record))
+    (push (get-universal-time) (command-record-dates record))
+    (setf (gethash nt *command-stats*) record)))
+
+;; @@@ This means if we want the real statistics, we'll have to combine them
+;; all together. Otherwise we would have to deal with concurrent access. Or we
+;; could require clsql and sqlite do constant updating, But that doesn't seem
+;; like a good idea at this point.
+(defun save-command-stats ()
+  (let ((filename (s+ (user-homedir-pathname)
+		      "/.lish-stats-" (get-universal-time) "-"
+		      (random 100000))))
+    (with-open-file (str filename :direction :output)
+      (loop :with h
+	 :for k :being :the :hash-keys :of *command-stats* :do
+	 (setf h (gethash k *command-stats*))
+	 (format str "(:command ~s :type ~s :count ~s :dates ~a)~%" (car k)
+		 (command-record-type h) (command-record-count h)
+		 (command-record-dates h))))
+    filename))
+
+(defun show-command-stats (&optional (all nil))
+  (declare (ignore all))
+  (let ((table
+	 (loop :with h
+	    :for k :being :the :hash-keys :of *command-stats* :do
+	    (setf h (gethash k *command-stats*))
+	    :collect
+	    (list (car k)
+		  (command-record-type h) (command-record-count h)))))
+    ;; @@@ why is this sort so insane on sbcl? it spits a bunch of notes????
+    (setf table (sort table #'> :key #'third))
+    (table:nice-print-table table '("Command" "Type" "Count"))))
+
+(defun merge-stats (from to)
+  (when (not (equal (command-record-type from) (command-record-type to)))
+    (error "Command types to merge differ."))
+  ;; Add the counts
+  (incf (command-record-count to) (command-record-count from))
+  (let (new-dates)
+    ;; First normalize the existing dates
+    (loop :for d :in (command-record-dates to) :do (pushnew d new-dates))
+    ;; Then add the new ones
+    (loop :for d :in (command-record-dates from) :do (pushnew d new-dates))
+    (setf (command-record-dates to) new-dates)))
+
+(defun glom-stats-files ()
+  (let ((glom (make-hash-table :test #'equal)))
+    (loop :with expr :and from :and to
+       :for f :in (glob (s+ (user-homedir-pathname) "/.lish-stats-*")) :do
+       (with-open-file (stream f)
+	 (loop :while (setf expr (read stream nil nil))
+	    :do
+	    ;; Get an existing record
+	    (setf to (gethash (cadr expr) glom))
+	    ;; Make a new record from expression we read
+	    (setf from (apply #'make-command-record (cddr expr)))
+	    (if (not to)
+		(setf to from)
+		(merge-stats from to))
+	    (setf (gethash (cadr expr) glom) to))))))
 
 ;; EOF

@@ -17,7 +17,13 @@ Lish TODO list							     -*- org -*-
 *** arg completion
 ** lisp expressions after the first don't get evaluated?
 * add < redirect
-* give in and handle ENVVAR=value command
+* objects (return values) as pipeline data
+  Perhaps generic streams which could be object streams or character streams.
+  But how to determine which one?
+  Perhaps the stream is multiple/paralell? aka there is always an object
+  stream, since there are always return values, AND there is a possible
+  output stream which...
+* give in and handle ENVVAR=value command -OR- make env builtin work
 * figure out a syntax for multiple commands on a line (like posix ;)
 * argument parsing for commands
 ** fix edge cases, more testing for posix-to-lisp-args
@@ -26,6 +32,9 @@ Lish TODO list							     -*- org -*-
 *** scrape --help output or man pages?
 *** steal from zsh or bash_completion
 * at least handle ^Z of subprocess!
+** must be able to run code (reset job signals) after fork
+** -OR-
+** make a spawn/fork/pipe in C which handles job signals
 * be able to call lish functions from not in the shell, ! etc
 * work out error handling
 ** compilation?
@@ -61,6 +70,8 @@ Lish TODO list							     -*- org -*-
 ** cygwin?
 * port to windows
 * edit ranting comments
+* syntax colorization
+* suggestions from history?
 * COMMENT MeTaDaTa
 creation date: [2014-12-01 Mon 00:20:33]
 creator: "Nibby Nebbulous" <nibbula@gmail.com>

@@ -84,7 +84,7 @@ Suspend the shell."
 	      (setf (lish-suspended-jobs *shell*)
 		    (delete job (lish-suspended-jobs *shell*)))
 	      (funcall (suspended-job-resume-function job)))
-	    (format t "Couldn't call the resume function ~a.~%"
+	    (format t "The job doesn't have a resume function ~a.~%"
 		    job-descriptor)))))
 
 (defbuiltin jobs (("long" boolean :short-arg #\l))
@@ -153,18 +153,21 @@ Output the arguments. If -n is given, then don't output a newline a the end."
 
 (defun help-choices ()
   "Return a list of choices for a help subject."
-  (append *help-subjects*
-	  (mapcar #'(lambda (x) (or (and (symbolp x) (symbol-name x))
-			    (and (stringp x) x)
-			    x))
-		  *command-list*)))
+  (concatenate
+   'list *help-subjects*
+   (mapcar #'(lambda (x)
+	       (or (and (symbolp x) (string-downcase (symbol-name x)))
+		   (and (stringp x) x)
+		   x))
+	   *command-list*)))
 
 (defclass arg-help-subject (arg-choice)
   ()
   (:default-initargs
    :choice-func
       #+clisp 'help-choices		; I'm not sure why.
-      #-clisp #'help-choices))
+      #-clisp #'help-choices)
+  (:documentation "Something which we can get help on."))
 
 (defvar *basic-help*
 "~
@@ -177,6 +180,7 @@ Subjects:
   help commands       Show help on built-in commands.
   help editor         Show help on the line editor.
   help keys           Show help on key bindings.
+  help <command>      Show help for the command.
 ")
 
 (defvar *editor-help*
@@ -226,15 +230,16 @@ Without a subject show some subjects that are available."
 	 (format t "Here are the keys active in the editor:~%")
 	 (!bind :print-bindings t))
 	(t ;; Try a specific command
-	 (let* ((b    (get-command subject))
+	 (let* ((cmd  (get-command subject))
 		(symb (intern (string-upcase subject) :lish))
-		(doc  (when b (documentation b 'function)))
+		(doc  (when cmd (documentation cmd 'function)))
 		(fdoc (when (fboundp symb)
 			(documentation (symbol-function symb) 'function))))
+;	   (print-values* (subject cmd symb doc fdoc))
 	   (cond
 	     (doc  (format t "~a~%" doc))
 	     (fdoc (format t "Lisp function:~%~a~%" fdoc))
-	     (b    (format t "Sorry, there's no help for \"~a\".~%" subject))
+	     (cmd  (format t "Sorry, there's no help for \"~a\".~%" subject))
 	     (t    (format t "I don't know about the subject \"~a\"~%"
 			   subject))))))))
 
@@ -244,8 +249,9 @@ Without a subject show some subjects that are available."
     (format str "~a" (posix-synopsis b))
     (when (documentation (command-function b) 'function)
       (format str "~%~a" (documentation (command-function b) 'function)))
-    (when (command-loaded-from b)
-      (format str "~%Loaded from ~a" (command-loaded-from b)))))
+#|    (when (command-loaded-from b)
+      (format str "~%Loaded from ~a" (command-loaded-from b))) |#
+    ))
 
 (defun set-alias (sh name expansion)
   "Define NAME to be an alias for EXPANSION.
@@ -299,6 +305,8 @@ NAME is replaced by EXPANSION before any other evaluation."
 ;;     ((position value +false-strings+ :test #'equalp) nil)
 ;;     (t (error "Can't convert ~w to a boolean." value))))
 
+;(defvar howji (macroexpand-
+
 (defbuiltin debug (("state" boolean-toggle))
   "Toggle shell debugging."
   (setf (lish-debug *shell*)
@@ -335,6 +343,37 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 	  (nos:setenv name value)
 	  (nos:getenv name))		; Actually does nothing
       (printenv)))
+
+(defbuiltin env (("ignore-environment" boolean :short-arg #\i)
+		 ("variable-assignment" string :repeating t)
+		 ("shell-command" shell-command)
+		 ("arguments" object :repeating t))
+  "Modify the command environment. If ignore-environment"
+  (if (and (not shell-command) (not arguments))
+      ;; Just print variables
+      (loop :for v :in variable-assignment
+	 :do
+	 (let ((var (if (position #\= v)
+			(first (split-sequence #\= v))
+			v)))
+	   (when var
+	     (format t "~a=~a~%" var (nos:getenv var)))))
+      ;; Set variables and execute command
+      (progn
+	(loop :for v :in variable-assignment
+	   :do
+	   (let ((pos (position #\= v))
+		 var val seq)
+	     (if pos
+		 (setf seq (split-sequence #\= v)
+		       var (first seq)
+		       val (third seq))
+		 (setf var v))
+	     (when (and var val)
+	       (nos:setenv var val))))
+	(apply #'do-system-command
+	       `(,`(,shell-command ,@arguments)
+		   ,@(if ignore-environment '(nil nil nil)))))))
 
 (defun get-cols ()
   (let ((tty (tiny-rl::line-editor-terminal (lish::lish-editor *shell*))))
@@ -549,6 +588,15 @@ better just to use Lisp syntax.
 	(format t "~a is not a function" func-symbol))))
 |#
 
+(defclass arg-command (arg-choice)
+  ()
+  (:default-initargs
+   :choice-func #'verb-list)
+  (:documentation "The name of a lish command."))
+(defmethod convert-arg ((arg arg-command) (value string))
+  "Convert a string to a command."
+  (get-command value))
+
 (defbuiltin undefcommand (("command" command))
   "Undefine a command."
   (undefine-command (string-downcase command)))
@@ -633,8 +681,8 @@ Show remembered full pathnames of commands. If -r is given, forget them all."
 	      (maphash #'(lambda (c p) (declare (ignore c)) (pr-cmd p))
 		       *command-cache*))))))
 
-;; Since this is based on phonetics, we would need a phonetic English
-;; dictionary to do this right.
+;; Since this is based on phonetics, we would need phonetic dictionaries to do
+;; this right.
 (defun indefinite (str)
   (declare (type string str))
   "Return an approximately appropriate indefinite article for the given ~
@@ -703,5 +751,15 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 		  (format t "~a~%" tt)
 		  (describe-command n))))))
 	 (setf args (cdr args)))))
+
+(defbuiltin stats (("command" choice :choices ("save" "show")))
+  "Show command statistics."
+  (cond
+    ((equal command "save")
+     (format t "Stats saved in ~a.~%" (save-command-stats)))
+    ((equal command "show")
+     (show-command-stats))
+    (t
+     (show-command-stats))))
 
 ;; EOF

@@ -4,23 +4,6 @@
 
 ;; $Revision$
 
-#|
-
-If we can't do at least a good as Tops-20 COMND% JSYS, then we suck.
-
-I dream and aspire to be as good as or better than CP, "The Command Processor
-Reader" on Symbolics Genera, but since I never really used it, I won't know,
-will I. Anyway, we're ostensibly driving Unix underneath, which is a bit of a
-different beasty.
-
-I designed this thing without really knowing about the Symbolics stuff but it
-turns out I did something similar. It seems like having something like
-"defcommand" and a reader which does the right thing based on it, and which
-can basicly prompt for lambda expressions, is an inherently Lispy way to do
-it. But the part with translating to Unix style is really quite crufty.
-
-|#
-
 (in-package :lish)
 
 ; (defun quoted-start (str pos)
@@ -108,17 +91,47 @@ literally in shell syntax."
   (possibly-quote c))
       result)))
 
+(defun words-past (expr pos)
+  "Return how many words the position POS is past in EXPR."
+  (let ((past 0))
+    (loop :for i :from 0 :below (length (shell-expr-words expr))
+       :do (when (> pos (elt (shell-expr-word-end expr) i))
+	     (setf past (1+ i))))
+    past))
+
 ;; Note that this takes different args than a normal completion function.
-(defun complete-command-arg (command exp word-num word pos all)
+(defun complete-command-arg (command expr pos all &optional word-num word)
   "Complete a command argument."
-  (if all
-      (progn
-	(if (and (= word-num 1) (= (length word) 0))
-	    (posix-synopsis command)
-	    (progn
-	      (dump-values command exp word-num word pos all)
-	      (complete-filename word pos all))))
-      (complete-filename word pos all)))
+  (let* ((past (words-past expr pos))
+	 (fake-word (or word ""))
+	 (arg (nth (1- past) (command-arglist command)))
+	 (doc (and arg (documentation (type-of arg) 'type)))
+	 (choices (argument-choices arg)))
+    (if all
+	(progn
+	  #| (print-values* (command expr pos all word-num word)) |#
+;;;	  (format t "ummm...~a~%" past)
+	  (if (and (= past 1) (not word-num))
+	      (progn
+;		(format t "snoo ~a? words-past ~a~%" command past)
+		(let* ((cols
+			(ansiterm:terminal-window-columns
+			 (tiny-rl::line-editor-terminal (lish-editor *shell*))))
+		       (out-str (s+ (posix-synopsis command) #\newline
+				    (or doc "") #\newline
+				    (or (and choices
+					     (with-output-to-string (str)
+					       (print-columns choices :stream str
+							      :columns cols)))
+					""))))
+		  (when (eql (char out-str (1- (length out-str))) #\newline)
+		    (setf out-str (subseq out-str 0 (1- (length out-str)))))
+		  (list out-str)))
+	      (progn
+		(complete-filename fake-word pos all))))
+	(if choices
+	    (complete-list fake-word (length fake-word) all choices)
+	    (complete-filename fake-word pos all)))))
 
 (defvar *junk-package*
   (progn
@@ -137,25 +150,49 @@ complete, and call the appropriate completion function."
   (let ((exp (ignore-errors (shell-read context :partial t
 					:package *junk-package*)))
 	cmd)
+;;;    (format t "High-ya ~a is a ~a~%" exp (type-of exp))
     (typecase exp
       (shell-expr
        (let* ((word-num (shell-word-number exp pos))
-	      (word     (if word-num
-			    (elt (shell-expr-words exp) word-num))))
-	 (dbug "~%word-num = ~w word = ~w~%exp ~w~%" word-num word exp)
+	      (word (if word-num
+			(elt (shell-expr-words exp) word-num)
+			nil)))
+;;;	 (format t "~%word-num = ~w word = ~w~%exp ~w~%" word-num word exp)
 	 (flet ((simple-complete (func word wpos)
 		  (if all
 		      (let ((list (funcall func word all)))
 			(values list (length list)))
 		      (values (funcall func word all) wpos))))
 	   (cond
-	     ((not word-num)		; no words
+	     ((and (not word-num) (= pos 0))
+	      ;; no words
+;;;	      (format t "none~%")
 	      (simple-complete #'complete-command "" 0))
-	     ((not word)		; probably ()
-	      (complete-symbol context pos all))
+	     ((not word)
+	      (if (= 0 (length (shell-expr-words exp)))
+		  (progn
+		    ;; probably ()
+;;;		    (format t "bogo~%")
+		    (complete-symbol context pos all))
+		  (let ((from-end (- (length context) pos))
+			(first-word (first (shell-expr-words exp))))
+;;;		    (format t "heyba~%")
+		    (multiple-value-bind (result new-pos)
+			(if (setf cmd (get-command first-word))
+			    (progn
+;;;			      (format t "Baaa~%")
+			      (complete-command-arg cmd exp pos all))
+			    (complete-filename word (- (length word) from-end) all))
+		      (declare (ignore new-pos))
+		      (values (if (not all) (quotify result) result)
+			      (or (and word-num
+				       (elt (shell-expr-word-start exp) word-num))
+				  pos))))))
 	     ((symbolp word)
+;;;	      (format t "janky~%")
 	      (complete-bang-symbol context pos all))
 	     ((consp word)		; (foo)
+;;;	      (format t "junky~%")
 	      (complete-symbol context pos all))
 	     ((eql (aref word 0) #\()	; (foo
 	      (complete-symbol context pos all))
@@ -174,6 +211,7 @@ complete, and call the appropriate completion function."
 					word-num))))
 	     ;; first word, when not starting with directory chars
 	     ((and (= word-num 0) (not (position (aref word 0) "/.~")))
+;;;	      (format t "jinky~%")
 	      ;; try commands
 	      (multiple-value-bind (v1 v2)
 		  (simple-complete #'complete-command context
@@ -187,16 +225,21 @@ complete, and call the appropriate completion function."
 		(values v1 v2)))
 	     (t
 	      (let ((from-end (- (length context) pos)))
+;;;		(format t "hello ~a~%" word)
 		(multiple-value-bind (result new-pos)
-		    (if (setf cmd (get-command word))
-			(complete-command-arg
-			 cmd exp word-num word
-			 (- (length word) from-end) all)
+		    (if (setf cmd (get-command
+				   (elt (shell-expr-words exp) 0)))
+			(progn
+;;;			  (format t "blurgg~%")
+			  (complete-command-arg
+			   cmd exp pos #| (- (length word) from-end) |#
+			   all word-num word))
 			(complete-filename word (- (length word) from-end) all))
 		  (declare (ignore new-pos))
 		  (values (if (not all) (quotify result) result)
 			  (elt (shell-expr-word-start exp) word-num)))))))))
       (cons
+       (format t "Hellow I am janky!~%")
        (complete-symbol context pos all)))))
 
 ;; EOF

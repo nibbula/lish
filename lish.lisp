@@ -372,22 +372,28 @@ The syntax is vaguely like:
 		 (setf (fill-pointer w) 0
 		       in-word nil
 		       did-quote nil)))
+	     (return-partial ()
+	       (push i word-start)
+	       (push (subseq line i) args)
+	       (push (length line) word-end)
+	       (push nil word-quoted)
+	       (return-from shell-read
+		 (make-shell-expr
+		  :line line
+		  :words (nreverse args)
+		  :word-start (reverse word-start)
+		  :word-end (nreverse word-end) 
+		  :word-end (nreverse word-quoted))))
 	     (do-continue ()
 	       "Handle when the expression is incomplete."
 	       (if partial
-		   (progn
-		     (push i word-start)
-		     (push (subseq line i) args)
-		     (push (length line) word-end)
-		     (push nil word-quoted)
-		     (return-from shell-read
-		       (make-shell-expr
-			:line line
-			:words (nreverse args)
-			:word-start (reverse word-start)
-			:word-end (nreverse word-end) 
-			:word-end (nreverse word-quoted))))
+		   (return-partial)
 		   (return-from shell-read *continue-symbol*)))
+	     (do-reader-error (c)
+	       "Handle when the expression has an error."
+	       (if partial
+		   (return-partial)
+		   (signal c)))
 	     (next-char ()
 	       "Return the next character or NIL."
 	       (when (< (+ i 1) len) (aref line (1+ i))))
@@ -457,9 +463,11 @@ The syntax is vaguely like:
 		  (push obj args)
 		  (push i word-end)
 		  (push nil word-quoted))
-;;	      (end-of-file ()
-	      (error () (do-continue))
-	      (condition (c) (signal c))))
+	      (end-of-file () (do-continue))
+	      (reader-error (c) (do-reader-error c))
+;	      (error () (do-continue))
+;	      (condition (c) (signal c))
+	      ))
 	   ;; a lisp expr
 	   ((eql c #\!)
 	    (finish-word)
@@ -467,16 +475,17 @@ The syntax is vaguely like:
 	    (handler-case
 		(multiple-value-bind (obj pos)
 		    (with-package package
-		      (read-from-string line nil *continue-symbol*
-					:start (+ i 1)))
+		      (read-from-string line nil nil :start (+ i 1)))
 		  (push i word-start)
 		  (setf i pos)
 		  (push i word-end)
 		  (push nil word-quoted)
 		  (push obj args))
-	      (error () (do-continue))
+	      (end-of-file () (do-continue))
+;	      (error () (do-continue))
 ;	      (end-of-file () (do-continue))
-	      (condition (c) (signal c))))
+;	      (condition (c) (signal c))
+	      ))
 	   ;; quote char
 	   ((eql c #\\)
 	    (setf do-quote t)
@@ -594,7 +603,7 @@ The syntax is vaguely like:
 ;       (set-terminal-group our-pid))))
 
 (defun in-lisp-path (command)
-  "Return true if a command is in the lisp path."
+  "Return true if a command can be found by ASDF."
   ;; (loop :with path
   ;;    :for dir :in *lisp-path* :do
   ;;    (when (setf path (probe-file (s+ dir command)))
@@ -613,7 +622,9 @@ The syntax is vaguely like:
 	;; failed
 	nil)))
 
-(defun do-system-command (command-line &optional in-pipe out-pipe)
+(defun do-system-command (command-line
+			  &optional in-pipe out-pipe
+			    (environment nil env-p))
   "Run a system command. IN-PIPE is an input stream to read from, if non-nil.
 OUT-PIPE is T to return a input stream which the output of the command can be
 read from."
@@ -627,23 +638,27 @@ read from."
 	(error "~a not found." program)
 	(progn
 	  (set-default-job-sigs)
-	  (cond
-	    (out-pipe
-	     (setf result-stream
-		   (if in-pipe
-		       (nos:popen path args :in-stream in-pipe)
-		       (nos:popen path args))))
-	    (in-pipe
-	     (nos:popen path args :in-stream in-pipe :out-stream t))
-	    (t
-	     (setf result
-;;;		   #+(or clisp ecl cmu lispworks) (fork-and-exec path args)
-		   #+(or clisp ecl lispworks) (fork-and-exec path args)
-		   #+cmu (nos:run-program path args)	;@@@ until fork fixed
-		   #+sbcl (nos:run-program path args)	;@@@ until fork fixed
-;;;		   #+ccl (nos:system-command path args)	;@@@ until fork fixed
-		   #+ccl (nos:run-program path args)	;@@@ until fork fixed		   
-		   )))))
+	  (if (or in-pipe out-pipe)
+	      (progn
+		(setf result-stream
+		      (apply #'nos:popen
+			     `(,path ,args
+			       ,@(when in-pipe `(:in-stream ,in-pipe))
+			       ,@(when (not out-pipe) '(:out-stream t))
+			       ,@(when env-p `(:environment ,environment)))))
+		(when (not out-pipe)
+		  (setf result-stream nil)))
+	      (setf result
+		    #+(or clisp ecl lispworks)
+		    (apply #'fork-and-exec
+		     `(,path ,args
+		       ,@(when env-p `(:environment ,environment))))
+		    #-(or clisp ecl lispworks)
+		    (apply
+		     #'nos:run-program
+		     `(,path ,args
+		       ,@(when env-p `(:environment ,environment))))
+		   ))))
     (values (or result '(0)) result-stream)))
 
 (defun unquoted-string-p (w expr i)
@@ -723,7 +738,7 @@ bound during command."
     (if out-pipe
 	(let ((out-str (make-stretchy-string 20)))
 	  (values
-	   ;; @@@ I'm sure this is horribly inefficient.
+	   ;; @@@ This is probably horribly inefficient.
 	   (list (with-output-to-string (*standard-output* out-str)
 		   (if in-pipe
 		       (let ((*standard-input* in-pipe))
@@ -775,13 +790,16 @@ probably fail, but perhaps in similar way to other shells."
       ((and (in-lisp-path cmd)	
 	    (setf command (load-lisp-command cmd)))
        ;; now try it as a command
+       (record-command-stats cmd :command)
        (call-command command (subseq expanded-words 1) in-pipe out-pipe))
       ;; Lish command
       (command			
+       (record-command-stats cmd :command)
        (call-command command (subseq expanded-words 1) in-pipe out-pipe))
       (t
        (flet ((sys-cmd ()
 		"Do a system command."
+		(record-command-stats (first expanded-words) :system-command)
 		(setf (values result result-stream)
 		      (do-system-command expanded-words in-pipe out-pipe))
 		(dbug "result = ~w~%" result)
@@ -796,13 +814,15 @@ probably fail, but perhaps in similar way to other shells."
 	     (multiple-value-bind (symb pos)
 		 (read-from-string (shell-expr-line expr) nil nil)
 	       (if (and (symbolp symb) (fboundp symb))
-		   (values
-		    (multiple-value-list
-		     (apply (symbol-function symb)
-			    (read-parenless-args
-			     (subseq (shell-expr-line expr) pos))))
-		    nil ;; stream
-		    t)	;; show the values
+		   (progn
+		     (record-command-stats (first expanded-words) :function)
+		     (values
+		      (multiple-value-list
+		       (apply (symbol-function symb)
+			      (read-parenless-args
+			       (subseq (shell-expr-line expr) pos))))
+		      nil ;; stream
+		      t))  ;; show the values
 		   ;; Just try a system command anyway, which will likely fail.
 		   (sys-cmd)))))))))
 
@@ -940,7 +960,8 @@ suspend itself."
   prefix-string)
 
 (defun lish-read (sh state)
-  "Read a string with the line editor and convert it shell expressions, handling errors."
+  "Read a string with the line editor and convert it shell expressions,
+handling errors."
   (with-slots ((str string) (pre-str prefix-string)) state
     (handler-case
 	(handler-bind
@@ -975,7 +996,7 @@ suspend itself."
 	    ((equal str *real-eof-symbol*)		*real-eof-symbol*)
 	    ((equal str *quit-symbol*)	  		*quit-symbol*)
 	    (t (shell-read (if pre-str
-			       (s+ pre-str str)
+			       (s+ pre-str #\newline str)
 			       str)))))
       #+sbcl
       (sb-sys:interactive-interrupt ()
@@ -1106,6 +1127,7 @@ suspend itself."
 			      (= lvl 0) (/= lvl 0) lvl))
 		    nil))))))))
       (stop-job-control saved-sigs))
+    (save-command-stats)
     (when (lish-exit-flag sh)
       (return-from lish (when (lish-exit-values sh)
 			  (values-list (lish-exit-values sh)))))

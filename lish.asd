@@ -22,7 +22,7 @@
     ((:file "package")
      (:file "vars"	:depends-on ("package"))
      (:file "commands"  :depends-on ("package" "vars"))
-     (:file "builtin"   :depends-on ("package" "vars" "commands"))
      (:file "complete"  :depends-on ("package" "vars" "commands"))
+     (:file "builtin"   :depends-on ("package" "vars" "commands" "complete"))
      (:file "lish"   	:depends-on ("package" "vars" "commands" "complete"))
      (:file "piping"	:depends-on ("package" "vars" "commands" "lish"))))
