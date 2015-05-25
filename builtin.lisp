@@ -588,6 +588,7 @@ better just to use Lisp syntax.
 	(format t "~a is not a function" func-symbol))))
 |#
 
+#|
 (defclass arg-command (arg-choice)
   ()
   (:default-initargs
@@ -596,6 +597,7 @@ better just to use Lisp syntax.
 (defmethod convert-arg ((arg arg-command) (value string))
   "Convert a string to a command."
   (get-command value))
+|#
 
 (defbuiltin undefcommand (("command" command))
   "Undefine a command."

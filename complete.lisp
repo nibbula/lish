@@ -106,7 +106,7 @@ literally in shell syntax."
 	 (fake-word (or word ""))
 	 (arg (nth (1- past) (command-arglist command)))
 	 (doc (and arg (documentation (type-of arg) 'type)))
-	 (choices (argument-choices arg)))
+	 (choices (and arg (argument-choices arg))))
     (if all
 	(progn
 	  #| (print-values* (command expr pos all word-num word)) |#
@@ -121,7 +121,8 @@ literally in shell syntax."
 				    (or doc "") #\newline
 				    (or (and choices
 					     (with-output-to-string (str)
-					       (print-columns choices :stream str
+					       (print-columns choices
+							      :stream str
 							      :columns cols)))
 					""))))
 		  (when (eql (char out-str (1- (length out-str))) #\newline)
@@ -150,8 +151,10 @@ complete, and call the appropriate completion function."
   (let ((exp (ignore-errors (shell-read context :partial t
 					:package *junk-package*)))
 	cmd)
-;;;    (format t "High-ya ~a is a ~a~%" exp (type-of exp))
     (typecase exp
+      (cons
+;;;       (format t "Hellow I am janky!~%")
+       (complete-symbol context pos all))
       (shell-expr
        (let* ((word-num (shell-word-number exp pos))
 	      (word (if word-num
@@ -195,6 +198,7 @@ complete, and call the appropriate completion function."
 ;;;	      (format t "junky~%")
 	      (complete-symbol context pos all))
 	     ((eql (aref word 0) #\()	; (foo
+;;;	      (format t "half baka~%")
 	      (complete-symbol context pos all))
 	     ((eql (aref word 0) #\!)	; !foo
 	      (complete-bang-symbol context pos all))
@@ -234,12 +238,12 @@ complete, and call the appropriate completion function."
 			  (complete-command-arg
 			   cmd exp pos #| (- (length word) from-end) |#
 			   all word-num word))
-			(complete-filename word (- (length word) from-end) all))
+			(progn
+;;;			  (format t "jorky~%")
+			  (complete-filename word (- (length word) from-end)
+					     all)))
 		  (declare (ignore new-pos))
 		  (values (if (not all) (quotify result) result)
-			  (elt (shell-expr-word-start exp) word-num)))))))))
-      (cons
-       (format t "Hellow I am janky!~%")
-       (complete-symbol context pos all)))))
+			  (elt (shell-expr-word-start exp) word-num))))))))))))
 
 ;; EOF

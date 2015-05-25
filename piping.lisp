@@ -160,7 +160,7 @@ string as an argument."
 ;;; I call these the Snormnambulous™®© Shellbilitous Frobmogrifiers.
 ;;; [after drinking far Too. Much. Coffee.]
 ;;;
-;;; I'm also a bit worried that if we use these things is real code (vs
+;;; I'm also a bit worried that if we use these things in real code (vs
 ;;; interactive commands lines), we may start to look like Perl (and I
 ;;; really hope you know why that should be worrying:
 ;;; (e.g. https://sites.google.com/site/steveyegge2/ancient-languages-perl))

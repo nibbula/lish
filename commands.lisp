@@ -19,56 +19,77 @@
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
 		   (compilation-speed 0)))
 
+(deftype function-designator ()
+  "Something that denotes a function."
+  `(or function symbol null))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Command arguments
 
 (defclass argument ()
-  ((name	:documentation "Name"
-		:initarg :name
-		:accessor arg-name)
-   (type	:documentation "Declared type"
-		:initarg :type
-		:accessor arg-type)
-   (value	:documentation "Value"
-		:initarg :value
-		:accessor arg-value)
-   (default	:documentation "Default value, if optional."
-		:initarg :default
-		:initform nil
-		:accessor arg-default)
-   (repeating	:type boolean
-		:documentation "True if value can repeat."
-		:initarg :repeating
-		:initform nil
-		:accessor arg-repeating)
-   (optional	:type boolean
-		:documentation "True if a value is not required."
-		:initarg :optional
-		:initform t
-		:accessor arg-optional)
-   (hidden	:type boolean
-		:documentation "If true, don't show in help."
-		:initarg :hidden
-		:initform nil
-		:accessor arg-hidden)
-   (prompt	:type string
-		:documentation "Show when asking user for value."
-		:initarg :propmt
-		:accessor arg-propmt)
-   (help	:type string
-		:documentation "Description for the user."
-		:initarg :help
-		:accessor arg-help)
-   (short-arg	:type (or character null)
-		:documentation "Command line argument, short form."
-		:initarg :short-arg
-		:initform nil
-		:accessor arg-short-arg)
-   (long-arg	:type (or string null)
-		:documentation "Command line argument, long form."
-		:initarg :long-arg
-		:initform nil
-		:accessor arg-long-arg))
+  ((name
+    :documentation "Name"
+    :initarg :name
+    :accessor arg-name)
+   (type
+    :documentation "Declared type"
+    :initarg :type
+    :accessor arg-type)
+   (value
+    :documentation "Value"
+    :initarg :value
+    :accessor arg-value)
+   (default
+    :documentation "Default value, if optional."
+    :initarg :default
+    :initform nil
+    :accessor arg-default)
+   (repeating
+    :type boolean
+    :documentation "True if value can repeat."
+    :initarg :repeating
+    :initform nil
+    :accessor arg-repeating)
+   (optional
+    :type boolean
+    :documentation "True if a value is not required."
+    :initarg :optional
+    :initform t
+    :accessor arg-optional)
+   (hidden
+    :type boolean
+    :documentation "If true, don't show in help."
+    :initarg :hidden
+    :initform nil
+    :accessor arg-hidden)
+   (prompt
+    :type string
+    :documentation "Show when asking user for value."
+    :initarg :propmt
+    :accessor arg-propmt)
+   (help
+    :type string
+    :documentation "Description for the user."
+    :initarg :help
+    :accessor arg-help)
+   (completion-function
+    :type function-designator
+    :initarg :completion-function
+    :accessor arg-completion-function
+    :initform nil
+    :documentation "A special completion function for the argument.")
+   (short-arg
+    :type (or character null)
+    :documentation "Command line argument, short form."
+    :initarg :short-arg
+    :initform nil
+    :accessor arg-short-arg)
+   (long-arg
+    :type (or string null)
+    :documentation "Command line argument, long form."
+    :initarg :long-arg
+    :initform nil
+    :accessor arg-long-arg))
   (:documentation "Generic command parameter."))
 
 (defmethod initialize-instance :after
@@ -836,6 +857,12 @@ is a shell argument list. The BODY is the body of the function it calls."
 ;; evaluated properly, so it's probably best to let the command function handle
 ;; defaulting arguments. It could be confusing to have two different defaulting
 ;; mechanisms anyway.
+;;
+;; @@@ But the problem is that when the command function defun gets constructed
+;; at compile time, default arguments from the argument class may not be
+;; availible yet if the argument class is defined in the same file, since the
+;; class may not be fully defined until the end of the compilation phase?
+
 (defun posix-to-lisp-args (command p-args)
   "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
 become keyword arguments, in a way specified in the command's arglist."
@@ -858,7 +885,7 @@ become keyword arguments, in a way specified in the command's arglist."
     (loop :for a :in p-args :do
        (if (and (stringp a) (> (length a) 0)
 		(char= (char a 0) #\-))	; arg starts with dash
-	   (if (eql (char a 1) #\-)	; two dash arg
+	   (if (and (> (length a) 1) (eql (char a 1) #\-)) ; two dash arg
 	       ;; --long-arg
 	       (loop :for arg :in (command-arglist command) :do
 		  ;; @@@ have to deal with repeating?
@@ -935,6 +962,7 @@ become keyword arguments, in a way specified in the command's arglist."
     (concatenate
      'list new-mandatories new-optionals new-repeating new-flags)))
 
+#|
 (defun OLD-posix-to-lisp-args (command p-args)
   "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
 become keyword arguments, in a way specified in the command's arglist."
@@ -1033,6 +1061,7 @@ become keyword arguments, in a way specified in the command's arglist."
       (warn "Extra arguments: ~w" old-list))
     (concatenate
      'list new-mandatories new-optionals new-repeating new-flags)))
+|#
 
 (defun posix-synopsis (command)
   "Return a string with the POSIX style argument synopsis for the COMMAND."
@@ -1081,7 +1110,7 @@ become keyword arguments, in a way specified in the command's arglist."
 (defclass arg-shell-command (arg-choice) ()
   (:documentation "A lish shell command name."))
 
-(defmethod argument-choices ((arg arg-command))
+(defmethod argument-choices ((arg arg-shell-command))
   "Return the possible path names."
   *command-list*)
 
@@ -1128,13 +1157,13 @@ become keyword arguments, in a way specified in the command's arglist."
 
 (defun show-command-stats (&optional (all nil))
   (declare (ignore all))
-  (let ((table
+  (let ((table 
 	 (loop :with h
 	    :for k :being :the :hash-keys :of *command-stats* :do
 	    (setf h (gethash k *command-stats*))
 	    :collect
-	    (list (car k)
-		  (command-record-type h) (command-record-count h)))))
+	    (list 
+	     (car k) (command-record-type h) (command-record-count h)))))
     ;; @@@ why is this sort so insane on sbcl? it spits a bunch of notes????
     (setf table (sort table #'> :key #'third))
     (table:nice-print-table table '("Command" "Type" "Count"))))

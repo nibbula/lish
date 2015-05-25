@@ -898,26 +898,31 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	 (values (multiple-value-list (eval expr)) nil t))))))
 
 (defun load-file (sh file)
-  (if (probe-file file)
-      (with-open-file (streamy file :direction :input)
-	(with-package *lish-user-package*
-	  (loop :with line = nil :and newy-line = t :and expr = nil
-	     :while (and (setf line (read-line streamy nil))
-			 newy-line)
-	     :do
-	     (loop :while (and (eql (setf expr (shell-read line))
-				    *continue-symbol*)
-			       (setf newy-line (read-line streamy nil)))
-		:do
-		(setf line (format nil "~a~%~a" line newy-line)))
-	     (shell-eval sh expr))))))
+  "Load a lish syntax file."
+  (with-open-file (stream file :direction :input)
+    (with-package *lish-user-package*
+      (loop :with line = nil :and new-line = t :and expr = nil
+	 :while (and (setf line (read-line stream nil))
+		     new-line)
+	 :do
+	 (loop :while (and (eql (setf expr (shell-read line))
+				*continue-symbol*)
+			   (setf new-line (read-line stream nil)))
+	    :do
+	    (setf line (format nil "~a~%~a" line new-line)))
+	 (shell-eval sh expr)))))
+      ;; (loop :while (setf line (read-line stream nil))
+      ;; 	 :do
+      ;; 	 (if (eql line *continue-symbol*)
+      ;; 	     (shell-read line
 
 (defun load-rc-file (sh)
-  "Load the users start up (a.k.a. run commands) file."
-;  (without-warning
-    (load-file sh (merge-pathnames
-		   (user-homedir-pathname)
-		   (make-pathname :name ".lishrc"))))
+  "Load the users start up (a.k.a. run commands) file, if it exists."
+;;;  (without-warning
+  (let ((file (merge-pathnames (user-homedir-pathname)
+			       (make-pathname :name ".lishrc"))))
+    (when (probe-file file)
+      (load-file sh file))))
 
 (defstruct suspended-job
   id
