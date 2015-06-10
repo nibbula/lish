@@ -10,13 +10,20 @@
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 ;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 
-;; This should be where anything that is designed to be settable by the operator
-;; should be put to separate it out from internal things in the shell object.
+#| OLD Way of doing options:
+
+;; This should be where anything that is designed to be settable by the
+;; operator should be put to separate it out from internal things in the
+;; shell object.
 (defclass shell-options ()
-  ((prompt
+  ((prompt-char
     :initarg :prompt-char
     :accessor lish-prompt-char
     :documentation "Normal prompt character.")
+   (prompt-string
+    :initarg :prompt-string
+    :accessor lish-prompt-string
+    :documentation "Normal prompt string.")
    (prompt-function
     :initarg :prompt-function
     :accessor lish-prompt-function
@@ -37,6 +44,7 @@
     :documentation "True to enter the debugger on errors in lish."))
   (:default-initargs
    :prompt-char #\@
+   :prompt-string nil
    :prompt-function #'make-prompt
    :sub-prompt "- "	; @@@ maybe we need sub-prompt-char & sub-prompt-func?
    :debug nil)
@@ -46,6 +54,7 @@
     ((o shell-options) &rest initargs &key &allow-other-keys)
   (declare (ignore initargs))
   )
+|#
 
 (defclass shell ()
   ((exit-flag
@@ -59,6 +68,9 @@
    (aliases
     :accessor lish-aliases
     :documentation "Hash table of aliases.")
+   (global-aliases
+    :accessor lish-global-aliases
+    :documentation "Hash table of global aliases.")
    (editor
     :accessor lish-editor
     :documentation "Line editor instance.")
@@ -74,7 +86,7 @@
     :accessor lish-suspended-jobs :initarg :suspended-jobs :initform nil
     :documentation "List of suspended jobs.")
    (options
-    :initarg :options :accessor lish-options
+    :initarg :options :accessor lish-options :initform nil
     :documentation "Operator configurable options.")
    )
   (:default-initargs
@@ -82,28 +94,77 @@
    :exit-values '())
   (:documentation "A lispy system command shell."))
 
+(defparameter *options* nil
+  "List of options defined.")
+
 (defmethod initialize-instance :after
     ((sh shell) &rest initargs &key &allow-other-keys)
-;  (declare (ignore initargs))
+  (declare (ignore initargs))
 ;  (setf (slot-value sh 'commands) (make-hash-table :test #'equal))
   (setf (slot-value sh 'aliases) (make-hash-table :test #'equal))
+  (setf (slot-value sh 'global-aliases) (make-hash-table :test #'equal))
+  #| OLD style
   (setf (slot-value sh 'options)
-	(apply #'make-instance 'shell-options initargs))
+	(apply #'make-instance 'shell-options initargs)) |#
+  ;; Copy the objecs from the defined option list, and set the default values.
+  (loop :with o :for opt :in *options* :do
+     (setf o (shallow-copy-object opt)
+	   (arg-value o) (arg-default o))
+     (push o (lish-options sh)))
   (init-commands))
 
-(defmacro defoption (name)
-  "Make an accessor for options."
-  `(progn
-     (defmethod ,name ((sh shell)) (,name (lish-options sh)))
-     (defmethod (setf ,name) (value (sh shell))
-       (setf (,name (lish-options sh)) value))))
+;; We think of options like they are arguments for the shell, and use
+;; the argument class to store them. That way we can use the same completion
+;; and conversion.
 
-;; Access options as if they were in the shell object.
-(defoption lish-prompt-char)
-(defoption lish-prompt-function)
-(defoption lish-sub-prompt)
-(defoption lish-ignore-eof)
-(defoption lish-debug)
+(defun find-option (sh name)
+  "Find the option of the shell SH, named NAME. Error if there is none."
+  (or (find name (lish-options sh) :key #'arg-name :test #'equalp)
+      (error "No such option ~w" name)))
+
+(defun set-option (sh name value)
+  "Set the option named NAME, for shell SH, to VALUE."
+  (setf (arg-value (find-option sh name)) value))
+
+(defun get-option (sh name)
+  "Get the option named NAME, for shell SH."
+  (arg-value (find-option sh name)))
+
+(defmacro defoption (name &rest arg)
+  "Define a shell option named NAME, with the properties in arg. The syntax
+is like Lish arguments, e.g.:
+  (defoption \"foo\" type :help \"Make sure to foo.\" :short-arg #\\f)"
+  (let ((sym (symbolify (s+ "LISH-" name)))
+	(name-string (string-downcase name)))
+    `(progn
+       ;; Access options as if they were in the shell object.
+       (defmethod ,sym ((sh shell)) (get-option sh ,name-string))
+       (defmethod (setf ,sym) (value (sh shell))
+	 (set-option sh ,name-string value))
+       (push (make-argument ',(cons name-string arg))
+	     *options*))))
+
+(defoption prompt-char character
+  :help "Normal prompt character. Output if there is no prompt string."
+  :default #\@)
+(defoption prompt-string string
+  :help "Normal prompt string. Output if there is no prompt function. Output
+with FORMAT-PROMPT, which see."
+  :default nil)
+(defoption prompt-function function
+  :help "Function which takes a SHELL and returns a string to output as the
+prompt."
+  :default #'make-prompt)
+(defoption sub-prompt string
+  :help "String to print when prompting for more input."
+  :default "- ")	; @@@ maybe we need sub-prompt-char & sub-prompt-func?
+(defoption ignore-eof integer
+  :help "If true, prevent the EOF (^D) character from exiting the shell. If a 
+number ignore it that many times before exiting."
+  :default nil)
+(defoption debug boolean
+  :help "True to enter the debugger when there is an error."
+  :default nil)
 
 (defvar *shell-path* '()
   "List of directories to autoload commands from.")
@@ -240,7 +301,7 @@ Not implemented yet:
 	       (#\s (write-string *shell-name* str))
 	       (#\v (write-string *major-version* str))
 	       (#\V (write-string *version* str))
-	       (#\u (write-string (nos:getlogin) str))
+	       (#\u (write-string (nos:user-name) str))
 	       (#\h (write-string dlib:*host* str))
 	       (#\H (write-string (machine-instance) str))
 	       (#\w (write-string (twiddlify (nos:current-directory)) str))
@@ -269,8 +330,11 @@ Not implemented yet:
   (:documentation "Return a string to prompt with."))
 (defmethod make-prompt ((sh shell))
   "Return a string to prompt with."
-  (format nil "~a " (make-string (+ 1 *lish-level*)
-				 :initial-element (lish-prompt-char sh))))
+  (or (and ;(slot-boundp (lish-options sh) 'prompt-string)
+       (lish-prompt-string sh)
+       (format-prompt sh (lish-prompt-string sh)))
+      (format nil "~a " (make-string (+ 1 *lish-level*)
+				     :initial-element (lish-prompt-char sh)))))
 
 (defparameter *real-eof-symbol* :Z-REAL-EOF)
 (defparameter *continue-symbol* :Z-CONTINUE)
@@ -342,6 +406,190 @@ the end and didn't get a close quote the third value is true.~
 (defun contains-whitespace-p (s)
   (position-if #'(lambda (x) (position x *whitespace*)) s))
 
+#|
+ 
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@ DREADFUL
+
+;;;;;;;;
+    (labels ((finish-word ()
+	       "Finish the current word."
+	       (when in-word
+		 (push (copy-seq w) args)
+		 (push i word-end)
+		 (push did-quote word-quoted)
+		 (setf (fill-pointer w) 0
+		       in-word nil
+		       did-quote nil)))
+	     (return-partial ()
+	       (push i word-start)
+	       (push (subseq line i) args)
+	       (push (length line) word-end)
+	       (push nil word-quoted)
+	       (return-from shell-read
+		 (make-shell-expr
+		  :line line
+		  :words (nreverse args)
+		  :word-start (reverse word-start)
+		  :word-end (nreverse word-end) 
+		  :word-end (nreverse word-quoted))))
+	     (do-continue ()
+	       "Handle when the expression is incomplete."
+	       (if partial
+		   (return-partial)
+		   (return-from shell-read *continue-symbol*)))
+	     (do-reader-error (c)
+	       "Handle when the expression has an error."
+	       (if partial
+		   (return-partial)
+		   (signal c)))
+	     (next-char ()
+	       "Return the next character or NIL."
+	       (when (< (+ i 1) len) (aref line (1+ i))))
+	     (reverse-things ()
+	       "Reverse the things we've been consing, so they're in order."
+	       (setf word-start  (reverse word-start)
+		     word-end    (nreverse word-end)
+		     word-quoted (nreverse word-quoted)
+		     words       (nreverse args)))
+	     (make-the-expr ()
+	       "Make an expression, with it's own copy of the lists."
+	       (make-shell-expr
+		:line line
+		:words (copy-seq words)
+		:word-start (copy-seq word-start)
+		:word-end (copy-seq word-end)
+		:word-quoted (copy-seq word-quoted)))
+	     (make-compound (key &optional (inc 2))
+	       "Make a compound expression with type KEY."
+	       (finish-word)
+	       (reverse-things)
+	       (let ((e (list key (make-the-expr))))
+		 (setf args (list e)))
+	       (setf word-start (list i))
+	       (incf i inc)
+	       (setf word-end (list i)
+		     word-quoted (list nil))))
+
+;;;;;;;;
+
+(defmacro with-words ((line) &body body)
+  "Do something for each word in the line."
+  (with-unique-names (word in-word do-quote did-quote i len)
+    `(let ((,word (make-stretchy-string 12))
+	 (,i 0)	(,len (length line)) ; index in line
+	 ,in-word ,do-quote ,did-quote ,c
+	 word)
+      (loop :while (< ,i ,len) :do
+	 (setf ,c (aref ,line ,i))
+	 (cond
+	   ;; quoted char
+	   (do-quote
+	       (vector-push-extend c ,word)
+	     (when (not in-word)
+	       (push (1- i) word-start))
+	   ;; a string
+	   ((eql c #\")
+	    (finish-word)
+	    ;; read a string as a separate word
+	    (multiple-value-bind (str ink cont)
+		(read-string (subseq line (1+ i)))
+	      (when (and cont (not partial))
+		(return-from shell-read *continue-symbol*))
+	      (push i word-start)
+	      (push str args)
+	      (incf i (+ 2 ink))
+	      (push i word-end)
+	      (push t word-quoted)))
+	   ;; a lisp function application
+	   ((eql c #\()
+	    (finish-word)
+	    (handler-case
+		;; read a form as a separate word
+		(multiple-value-bind (obj pos)
+		    (with-package package
+		      (read-from-string line nil *continue-symbol* :start i))
+		  (push i word-start)
+		  (setf i pos)
+		  (push obj args)
+		  (push i word-end)
+		  (push nil word-quoted))
+	      (end-of-file () (do-continue))
+	      (reader-error (c) (do-reader-error c))
+;	      (error () (do-continue))
+;	      (condition (c) (signal c))
+	      ))
+	   ;; a lisp expr
+	   ((eql c #\!)
+	    (finish-word)
+	    ;; read a form as a separate word
+	    (handler-case
+		(multiple-value-bind (obj pos)
+		    (with-package package
+		      (read-from-string line nil nil :start (+ i 1)))
+		  (push i word-start)
+		  (setf i pos)
+		  (push i word-end)
+		  (push nil word-quoted)
+		  (push obj args))
+	      (end-of-file () (do-continue))
+;	      (error () (do-continue))
+;	      (end-of-file () (do-continue))
+;	      (condition (c) (signal c))
+	      ))
+	   ;; quote char
+	   ((eql c #\\)
+	    (setf do-quote t)
+	    (incf i))
+	   ;; whitespace
+	   ((position c *whitespace*)
+	    (finish-word)
+	    (incf i))
+	   ;; comment
+	   ((eql c #\;)
+	    (finish-word)
+	    (loop :for j :from i :below len
+	       :while (not (eql (aref line j) #\newline))
+	       :do (incf i)))
+	   ;; pipe
+	   ((and (eql c #\|) (not (eql (next-char) #\|)))
+	    (make-compound :pipe 1))
+	   ;; redirect
+	   ((or (eql c #\<) (eql c #\>))
+	    (finish-word)
+	    (reverse-things)
+	    ;; @@@ need to get the file name as a word
+	    (let ((e (list :redirect (make-the-expr))))
+	      (setf args (list e)))
+	    (setf word-start (list i))
+	    (incf i)
+	    (setf word-end (list i)
+		  word-quoted (list nil)))
+	   ((and (eql c #\&) (eql (next-char) #\&))
+	    (make-compound :and))
+	   ((and (eql c #\|) (eql (next-char) #\|))
+	    (make-compound :or))
+	   ((eql c #\^)
+	    (make-compound :sequence 1))
+	   ;; any other character: add to word
+	   (t
+	    (when (not in-word)
+	      (push i word-start))
+	    (setf in-word t)
+	    (vector-push-extend c w)
+	    (incf i)))
+
+(defun expand-global-aliases (line)
+  "Expand global aliases in the line."
+  line)
+
+@@@@@@@@@ DREADFUL
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+|#
+
 (defun shell-read (line &key partial (package *lish-user-package*))
   "Read objects in shell syntax and return them. If PARTIAL is true, don't 
 signal an error if we can't read a full expression.
@@ -354,6 +602,7 @@ The syntax is vaguely like:
   command < file-name
   command > file-name
   ([lisp expressions...])"
+;  (setf line (expand-global-aliases line))
   (let (word-start word-end word-quoted words
 	(c nil)				; current char
 	(i 0)				; index in line
@@ -404,7 +653,7 @@ The syntax is vaguely like:
 		     word-quoted (nreverse word-quoted)
 		     words       (nreverse args)))
 	     (make-the-expr ()
-	       "Make an expression, with it's own copy the lists."
+	       "Make an expression, with it's own copy of the lists."
 	       (make-shell-expr
 		:line line
 		:words (copy-seq words)
@@ -667,10 +916,11 @@ read from."
        (and (shell-expr-word-quoted expr)
 	    (not (elt (shell-expr-word-quoted expr) i)))))
 
-(defun do-expansions (expr pos)
+(defun do-expansions (sh expr pos)
   "Perform shell syntax expansions / subsitutions on the expression."
+  (declare (ignore sh))
   (let ((new-words '()))
-    (loop
+    (loop :with v
        :for w :in (shell-expr-words expr)
        :for i = 0 :then (1+ i)
        :do
@@ -678,16 +928,21 @@ read from."
 	 (cond
 	   ;; $ environment variable expansion
 	   ((eql #\$ (aref w 0))
-	    (let ((v (nos:getenv (subseq w 1))))
-	      (push (or v "") new-words)))
+	    (setf v (nos:getenv (subseq w 1)))
+	    (push (or v "") new-words))
 	   ;; filename globbing, with ~ expansion on
 	   ((glob:pattern-p w nil t)
 	    (let ((g (glob:glob w :tilde t)))
 	      (if g
 		(dolist (x g) (push x new-words))
-		;; If there's no existing file expansions, but try just twiddle,
-		;; and also keep the glob expression if no matches.
+		;; There's no existing file expansions, but try just twiddle,
+		;; and also keep the literal glob expression if no matches.
 		(push (glob:expand-tilde w) new-words))))
+	   ;; global aliases
+	   #|((setf v (get-alias w :global t :shell sh))
+	    (loop :for a :in (shell-expr-words
+			      (shell-read v #| :package *junk-package* |#))
+	       :do (push (or v "") new-words))) |#
 	   (t (push w new-words)))
 	 ;; Quoted, so just push it verbatim
 	 (push w new-words)))
@@ -879,7 +1134,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
        (when (= (length (shell-expr-words expr)) 0)
 	 (return-from shell-eval (values nil nil nil)))
        (let ((w0 (elt (shell-expr-words expr) 0)))
-	 (do-expansions expr 0)
+	 (do-expansions sh expr 0)
 	 (dbug "~w~%" expr)
 	 (if (listp w0)
 	     ;; Compound command
@@ -971,11 +1226,14 @@ handling errors."
     (handler-case
 	(handler-bind
 	    (#+sbcl
+	     ;; So we can do something on ^C
 	     (sb-sys:interactive-interrupt
 	      #'(lambda (c)
 		  (declare (ignore c))
 		  (format t "~%") (finish-output)
 		  (invoke-restart (find-restart 'abort))))
+	     ;; So we can step through functions
+	     #+sbcl (sb-ext::step-condition 'tiny-rl::repple-stepper)
 	     (condition #'(lambda (c)
 			    (if (lish-debug sh)
 				(invoke-debugger c)
@@ -995,7 +1253,9 @@ handling errors."
 		       :prompt
 		       (if pre-str
 			   (lish-sub-prompt sh)
-			   (funcall (lish-prompt-function sh) sh)))))
+			   (if (lish-prompt-function sh)
+			       (funcall (lish-prompt-function sh) sh)
+			       (make-prompt sh))))))
 	  (cond
 	    ((and (stringp str) (equal 0 (length str))) *empty-symbol*)
 	    ((equal str *real-eof-symbol*)		*real-eof-symbol*)

@@ -89,7 +89,13 @@
     :documentation "Command line argument, long form."
     :initarg :long-arg
     :initform nil
-    :accessor arg-long-arg))
+    :accessor arg-long-arg)
+   (old-long-arg
+    :type (or string null)
+    :documentation "Command line argument, old long form, with a single dash."
+    :initarg :old-long-arg
+    :initform nil
+    :accessor arg-old-long-arg))
   (:documentation "Generic command parameter."))
 
 (defmethod initialize-instance :after
@@ -210,7 +216,10 @@
   ;; @@@ This could be better.
   value)
 
-(defclass arg-pathname (arg-string) () (:documentation "A file system path."))
+(defclass arg-pathname (arg-string) ()
+  (:default-initargs
+   :completion-function #'complete-filename)
+  (:documentation "A file system path."))
 (defmethod convert-arg ((arg arg-pathname) (value string))
   (declare (ignore arg))
   value)
@@ -278,6 +287,23 @@
      (funcall (arg-choice-func arg)))
     (t nil)))
 
+;; This is so if it's not provided, it can toggle.
+(defclass arg-boolean-toggle (arg-boolean)
+  ()
+  (:default-initargs
+   :default :toggle)
+  (:documentation "A true or false value, that can be toggled."))
+(defmethod initialize-instance
+    :after ((o arg-boolean-toggle) &rest initargs &key &allow-other-keys)
+  "Initialize a arg-boolean-toggle."
+  (declare (ignore initargs))
+  (setf (arg-default o) :toggle))
+;; (defmethod convert-arg ((arg arg-boolean-toggle) (value string))
+;;   (cond
+;;     ((position value +true-strings+ :test #'equalp) t)
+;;     ((position value +false-strings+ :test #'equalp) nil)
+;;     (t (error "Can't convert ~w to a boolean." value))))
+
 #| Actually I think these should just be in the base class
 (defclass arg-command-line (argument)
   ((short-arg	:type character
@@ -314,10 +340,16 @@ ARG-* class, it defaults to the generic ARGUMENT class."
 	   'argument))
       ((or (eq type t) (eq type 't) (and (stringp type) (equalp type "T")))
        'argument)
-      ((or (symbolp type) (stringp type))
+      ((symbolp type)
        (or (try-sym type :lish-user)
 	   (try-sym type :lish)
+	   (try-sym type (symbol-package type))
 	   (progn (warn "Defaulting argument type ~s" type) 'argument)))
+      ((stringp type)
+       (or (try-sym type :lish-user)
+	   (try-sym type :lish)
+	   (try-sym type *package*))
+       (progn (warn "Defaulting argument type ~s" type) 'argument))
       (t
        (error "Argument type is not a symbol, string or T.")))))
 
@@ -327,29 +359,31 @@ ARG-* class, it defaults to the generic ARGUMENT class."
     (and p (elt arglist (1+ p)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun make-argument (a &optional compile-time)
+    (let (name type)
+      (when (not (listp a))
+	(error "Argument list element must be a list."))
+      (setf name (first a)
+	    type (second a))
+      (when (not name)
+	(error "Arguments must have a name."))
+      (when (not type)
+	(error "Arguments must have a type."))
+      (setf a (append (list :name name :type type) (cddr a)))
+      (apply #'make-instance
+	     (if compile-time
+		 'argument
+		 (argument-type-class type))
+	     a)))
+
   (defun make-argument-list (arglist &optional compile-time)
     "Take an ARGLIST from DEFCOMMAND and turn it into a list of argument
 objects, like in the command object."
 ;;;  (declare (type list arglist))
     (when (not (listp arglist))
       (error "Command argument list must be a list."))
-    (loop :with name :and type
-       :for a :in arglist :do
-       (when (not (listp a))
-	 (error "Command argument list element must be a list."))
-       (setf name (first a)
-	     type (second a))
-       (when (not name)
-	 (error "Arguments must have a name."))
-       (when (not type)
-	 (error "Arguments must have a type."))
-       (setf a (append (list :name name :type type) (cddr a)))
-       :collect (apply #'make-instance
-		       (if compile-time
-			   'argument
-			   (argument-type-class type))
-		       a))))
-
+    (loop :for a :in arglist :collect (make-argument a compile-time))))
+       
 ;; You can just do you own defclass, but the problem is what package
 ;; it gets defined in, because we do snipping off of the ARG- prefix.
 ;; It seems like we could either:
@@ -499,6 +533,10 @@ value to be converted.
    (arglist
     :accessor command-arglist     :initarg :arglist
     :documentation "A list of arguments.")
+   (handle-unrecognized
+    :initarg :handle-unrecognized :accessor command-handle-unrecognized
+    :initform nil :type boolean
+    :documentation "True to pass unrecogized arguments to the command.")
    (built-in-p
     :accessor command-built-in-p  :initarg :built-in-p :initform nil
     :documentation "True if the command is considered ‘built in’.")
@@ -806,17 +844,20 @@ is a shell argument list. The BODY is the body of the function it calls."
 ;;;     (format t "(convert-arg ~s ~s) = ~s~%" ,arg (nth ,i ,old)
 ;;;	     (convert-arg ,arg (nth ,i ,old)))
 ;;;     (setf ,new (push (convert-arg ,arg (nth (1+ ,i) ,old)) ,new))
+     (dbug "before i=~s old=~s~%" ,i ,old)
+     (dbug "~s -> ~s~%" (nth (1+ ,i) ,old)
+	   (convert-arg ,arg (nth (1+ ,i) ,old)))
      (setf ,new (push (convert-arg ,arg (nth (1+ ,i) ,old)) ,new))
      (setf ,old (delete-nth ,i ,old)) ; flag
      (setf ,old (delete-nth ,i ,old)) ; arg
+     (dbug "after i=~s old=~s~%" ,i ,old)
      (setf possible-flags (delete ,arg possible-flags))))
 
 (defmacro move-boolean-2 (old new i arg)
   `(progn
      (setf ,new (push (arg-key ,arg) ,new))
      (setf ,new (push t ,new))
-     (setf ,old (delete-nth ,i ,old))  ; keyword
-     (setf ,old (delete-nth ,i ,old)))) ; arg
+     (setf ,old (delete-nth ,i ,old))))
 
 (defmacro move-boolean (old new i arg)
   (declare (ignore old i))
@@ -868,7 +909,8 @@ is a shell argument list. The BODY is the body of the function it calls."
 become keyword arguments, in a way specified in the command's arglist."
   ;; (when (= (length p-args) 0)
   ;;   (return-from new-posix-to-lisp-args nil))
-  (let ((i 0)
+  (let ((i 0)            ; Where we are in the old list, so effectively
+	                 ; a count of how many posix args we've skipped.
 ;	(new-list        '())
 	(old-list        (copy-list p-args)) ; so we don't modify it
 	(new-flags       '())
@@ -876,42 +918,66 @@ become keyword arguments, in a way specified in the command's arglist."
 	(new-optionals   '())
 	(new-repeating   '())
 	(keyworded (args-keyworded (command-arglist command)))
+	(flag-taken      nil)
+	(boolean-taken   nil)
 	(possible-flags  (loop :for a :in (command-arglist command)
 			    :if (or (arg-short-arg a)
 				    (arg-long-arg a))
 			    :collect a))
 	#| (optionals '()) |#)
     ;; Flagged arguments (optional or manditory)
-    (loop :for a :in p-args :do
+    (loop :with a
+       :while (< i (length old-list)) :do
+       #| (setf a (car old-list)) |#
+       (setf a (nth i old-list))
        (if (and (stringp a) (> (length a) 0)
 		(char= (char a 0) #\-))	; arg starts with dash
 	   (if (and (> (length a) 1) (eql (char a 1) #\-)) ; two dash arg
 	       ;; --long-arg
-	       (loop :for arg :in (command-arglist command) :do
-		  ;; @@@ have to deal with repeating?
-		  (if (equalp (subseq a 2) (arg-long-arg arg))
-		      (move-flag old-list new-flags i arg)
-		      (incf i)))
+	       (progn
+		 (setf flag-taken nil boolean-taken nil)
+		 (loop :for arg :in (command-arglist command) :do
+		    ;; @@@ have to deal with repeating?
+		    (when (equalp (subseq a 2) (arg-long-arg arg))
+		      (if (eq (arg-type arg) 'boolean)
+			  (progn
+			    (dbug "boolean long arg ~s~%" arg)
+			    (move-boolean-2 old-list new-flags i arg))
+			  (progn
+			    (dbug "long arg ~s~%" arg)
+			    (move-flag old-list new-flags i arg)))
+		      (setf flag-taken t)))
+		 (when (not flag-taken)
+		   (warn "Unrecognized long option ~a" a)
+		   (incf i)))
 	       ;; -abcxyz (short args)
-	       (prog (flag-taken boolean-taken)
-		  (loop :for cc :from 1 :below (length a) :do
-		     (setf flag-taken nil)
-		     (loop :for arg :in (command-arglist command) :do
-			(when (eql (arg-short-arg arg) (char a cc))
-			  (setf flag-taken t)
-			  ;; @@@ have to deal with repeating?
-			  (if (eq (arg-type arg) 'boolean)
-			      (progn
-				(move-boolean old-list new-flags i arg)
-				(setf boolean-taken t))
-			      (if (/= cc (1- (length a)))
-				  (error "Unrecognized flag ~a." a)
-				  (move-flag old-list new-flags i arg)))))
-		     (when (not flag-taken)
-		       (warn "Unrecognized option ~a" (char a cc))))
-		  (when boolean-taken
-		    (setf old-list (delete-nth i old-list)))))
-	   (incf i)))
+	       (progn
+		 (setf boolean-taken nil)
+		 (loop :for cc :from 1 :below (length a) :do
+		    (setf flag-taken nil)
+		    (loop :for arg :in (command-arglist command) :do
+		       (when (eql (arg-short-arg arg) (char a cc))
+			 (setf flag-taken t)
+			 ;; @@@ have to deal with repeating?
+			 (if (eq (arg-type arg) 'boolean)
+			     (progn
+			       (move-boolean old-list new-flags i arg)
+			       (setf boolean-taken t))
+			     (if (/= cc (1- (length a)))
+				 (error "Unrecognized flag ~a." a)
+				 (move-flag old-list new-flags i arg)))))
+		    (when (not flag-taken)
+		      (warn "Unrecognized option ~a" (char a cc))))
+		  (if boolean-taken
+		      (setf old-list (delete-nth i old-list))
+		      (progn
+			(dbug "skipping flag arg ~a ~w~%" i a)
+			;;(setf old-list (delete-nth i old-list))
+			(incf i)))))
+	   ;; Arg doesn't start with a dash, so skip it
+	   (progn
+	     (dbug "skipping arg ~a ~w~%" i a)
+	     (incf i))))
 #|    ;; Default any left over defaultable flags
     (loop :for a :in possible-flags :do
        (when (arg-default a)
@@ -919,17 +985,23 @@ become keyword arguments, in a way specified in the command's arglist."
 	 (push (arg-default a) new-flags))) |#
     (setf new-flags (nreverse new-flags))
     ;; Non-flagged mandatories.
+    (setf i 0)
+    (dbug "considering non-flagged: ~s~%" old-list)
     (loop
        :for arg :in (command-arglist command) :do
        (if (not (or (arg-optional arg)
 		    (arg-has-flag arg)
 		    (arg-repeating arg)))
 	   (if (> (length old-list) 0)
-	       (move-arg old-list new-mandatories 0 arg)
+	       (progn
+		 (dbug "found mandatory arg ~a~%" arg)
+		 (move-arg old-list new-mandatories 0 arg))
 	       (error "Missing mandatory argument ~a." (arg-name arg)))
+	   ;; skip
 	   (incf i)))
     (setf new-mandatories (nreverse new-mandatories))
     ;; Non-flagged optionals
+    (dbug "considering non-flagged optionals: ~s~%" old-list)
     (loop
        :for arg :in (command-arglist command) :do
        (if (and (arg-optional arg) (not (arg-repeating arg))
@@ -937,7 +1009,8 @@ become keyword arguments, in a way specified in the command's arglist."
 	   (if (> (length old-list) 0)
 	       (move-key old-list new-optionals 0 arg keyworded)
 	       #| (if (arg-default arg)
-		   (push-key new-optionals arg (arg-default arg) keyworded) |#
+	           (push-key new-optionals arg (arg-default arg) keyworded) |#
+	       ;; skip
 	       (incf i))))
     (setf new-optionals (nreverse new-optionals))
     ;; Repeating
@@ -1094,6 +1167,9 @@ become keyword arguments, in a way specified in the command's arglist."
 	 (when (arg-optional a)
 	   (format str "]"))))))
 
+;(defmacro defexternal 
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; These arguemnt types have to come after commands are defined.
 
@@ -1156,7 +1232,7 @@ become keyword arguments, in a way specified in the command's arglist."
     filename))
 
 (defun show-command-stats (&optional (all nil))
-  (declare (ignore all))
+  (declare (ignore all) #+sbcl (sb-ext:muffle-conditions sb-ext:compiler-note))
   (let ((table 
 	 (loop :with h
 	    :for k :being :the :hash-keys :of *command-stats* :do

@@ -34,6 +34,7 @@ spaces between every argument."
 	 (t
 	  (princ a str))))))
 
+#|
 ;; I suppose we could make this generic so that streams can do a special
 ;; things with it, but that might be sort of edging into the stream protocol,
 ;; which simple-streams and 
@@ -57,6 +58,7 @@ an EOF on SOURCE."
        (when (> pos 0)
 	 (write-sequence buf destination :end pos))
        :while (= pos *buffer-size*))))
+|#
 
 (defun run-with-output-to (file-or-stream commands &key supersede)
   "Run commands with output to a file or stream."

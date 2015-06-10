@@ -6,7 +6,7 @@
 
 (defpackage :lish-test
   (:documentation "Tests for Lish")
-  (:use :cl :test :lish)
+  (:use :cl #| :test |# :lish)
   (:export
    #:run-tests
    ))
@@ -90,12 +90,20 @@
   (vivi ":"
 	'("blah" "blah" "blah" "etc" "...")
 	'("blah" "blah" "blah" "etc" "..."))
+  ;; This was before adding the -g option:
+  ;; (vivi "alias" '("name") '("name"))
+  ;; (vivi "alias" '("name" "expansion") '("name" "expansion"))
+  ;; (vivi "alias"
+  ;; 	'("name" "expansion" "extra" "junk")
+  ;; 	'("name" "expansion"))
+
   (vivi "alias" '() '())
-  (vivi "alias" '("name") '("name"))
-  (vivi "alias" '("name" "expansion") '("name" "expansion"))
+  (vivi "alias" '("name") '(:name "name"))
+  (vivi "alias" '("name" "expansion") '(:name "name" :expansion "expansion"))
   (vivi "alias"
-	'("name" "expansion" "extra" "junk")
-	'("name" "expansion"))
+  	'("name" "expansion" "extra" "junk") ;; Is this really right?
+	'(:name "name" :expansion "expansion"))
+
   (vivi "bind" '() '())
   (vivi "bind" '("-p") '(:print-bindings t))
   (vivi "bind" '("-P") '(:print-readable-bindings t))
@@ -113,6 +121,8 @@
 )
 
 ;(with-dbug (lish::posix-to-lisp-args (lish::get-command "bind") '("-r" "foo")))
+;(with-dbug (lish::posix-to-lisp-args (lish::get-command "find") '("--name" "txt$")))
+
 
 (defun run-tests ()
   

@@ -22,10 +22,12 @@
    #:make-standalone
    ;; shell options
    #:lish-prompt-char
+   #:lish-prompt-string
    #:lish-prompt-function
    #:lish-sub-prompt
    #:lish-ignore-eof
    #:lish-debug
+   #:make-prompt
    ;; shell object
    #:shell
    #:lish-aliases
@@ -54,6 +56,7 @@
    #:!times #:!time #:!ulimit #:!wait #:!export #:!format
    #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash
    ;; convenience / scripting
+   #:set-alias #:unset-alias #:get-alias
    #:command-pathname
    #:command-paths
    #:input-line-words
@@ -64,6 +67,10 @@
    #:!and #:!or #:!bg
    #:!> #:!>> #:!>! #:!>>!
    #:!< #:!!<
+   ;; internal-ish
+   #:get-command
+   #:shell-to-lisp-args
+   #:posix-to-lisp-args
    ))
 
 ;; EOF

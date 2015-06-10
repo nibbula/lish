@@ -18,7 +18,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Command definitions
 
-(defbuiltin cd (("directory" pathname))
+(defbuiltin cd (("directory" pathname :help "Directory to change to."))
   "Usage: cd [directory]
 Change the current directory to DIRECTORY."
   (setf (lish-old-pwd *shell*) (nos:current-directory))
@@ -29,7 +29,8 @@ Change the current directory to DIRECTORY."
 Print the current working directory."
   (format t "~a~%" (nos:current-directory)))
 
-(defbuiltin pushd (("directory" pathname))
+(defbuiltin pushd (("directory" pathname
+				:help "Directory to push on the stack."))
   "Usage: pushd [dir]
 Change the current directory to DIR and push it on the the front of the
 directory stack."
@@ -38,7 +39,7 @@ directory stack."
   (push (nos:current-directory) (lish-dir-list *shell*))
   (!cd directory))
 
-(defbuiltin popd (("number" number))
+(defbuiltin popd (("number" number :help "Number of item to pop."))
   "Usage: popd [n]
 Change the current directory to the top of the directory stack and remove it
 from stack."
@@ -62,7 +63,8 @@ Suspend the shell."
   "A job descriptor."
   ())
 
-(defbuiltin resume (("job-descriptor" job-descriptor :optional t))
+(defbuiltin resume
+    (("job-descriptor" job-descriptor :optional t :help "Job to resume."))
   "Resume a suspended job."
   (let (job)
     (cond
@@ -87,7 +89,9 @@ Suspend the shell."
 	    (format t "The job doesn't have a resume function ~a.~%"
 		    job-descriptor)))))
 
-(defbuiltin jobs (("long" boolean :short-arg #\l))
+(defbuiltin jobs
+  (("long" boolean :short-arg #\l
+     :help "Show the longer output."))
   "Lists spawned processes that are active."
   ;; @@@ not working yet for system commands
   (loop :for j :in (lish-suspended-jobs *shell*)
@@ -104,14 +108,22 @@ Suspend the shell."
 	       long j ""))))
 
 (defbuiltin history
-    (("clear"	      boolean  :short-arg #\c)
-     ("write"	      boolean  :short-arg #\w)
-     ("read"	      boolean  :short-arg #\r)
-     ("append"	      boolean  :short-arg #\a)
-     ("read-not-read" boolean  :short-arg #\n)
-     ("filename"      pathname :short-arg #\f)
-     ("show-times"    boolean  :short-arg #\t)
-     ("delete"	      integer  :short-arg #\d))
+    (("clear"	      boolean  :short-arg #\c
+      :help "Clear the history.")
+     ("write"	      boolean  :short-arg #\w
+      :help "Write the history to the history file.")
+     ("read"	      boolean  :short-arg #\r
+      :help "Read the history from the history file.")
+     ("append"	      boolean  :short-arg #\a
+      :help "Append the history to the history file.")
+     ("read-not-read" boolean  :short-arg #\n
+      :help "Read history items not already read from the history file.")
+     ("filename"      pathname :short-arg #\f
+      :help "Use PATHNAME as the history file.")
+     ("show-times"    boolean  :short-arg #\t
+      :help "Show history times.")
+     ("delete"	      integer  :short-arg #\d
+      :help "Delete the numbered history entry."))
   "Show a list of the previously entered commands."
   ;; Check argument conflicts
   (cond ;; @@@ Could this kind of thing be done automatically?
@@ -139,7 +151,7 @@ Arguments are evaluated for side effects."
   (values))
 
 (defbuiltin echo
-    (("no-newline" boolean :short-arg #\n)
+    (("no-newline" boolean :short-arg #\n :help "Don't output a newline.")
      ("args" t :repeating t))
   "Usage: echo [-n] ...
 Output the arguments. If -n is given, then don't output a newline a the end."
@@ -198,7 +210,7 @@ Some notable keys are:
  <F9>         Switch back and forth between LISH and the lisp REPL.
 ")
 
-(defbuiltin help (("subject" help-subject))
+(defbuiltin help (("subject" help-subject :help "Subject to get help on."))
   "help [subject]         Show help on the subject.
 Without a subject show some subjects that are available."
   (if (not subject)
@@ -253,67 +265,75 @@ Without a subject show some subjects that are available."
       (format str "~%Loaded from ~a" (command-loaded-from b))) |#
     ))
 
-(defun set-alias (sh name expansion)
+(defun set-alias (name expansion &key global (shell *shell*))
   "Define NAME to be an alias for EXPANSION.
 NAME is replaced by EXPANSION before any other evaluation."
-  (setf (gethash name (lish-aliases sh)) expansion))
+  (setf (gethash name
+		 (if global
+		     (lish-global-aliases shell)
+		     (lish-aliases shell)))
+	expansion))
 
-(defun unset-alias (sh name)
+(defun unset-alias (name &key global (shell *shell*))
   "Remove the definition of NAME as an alias."
-  (remhash name (lish-aliases sh)))
+  (remhash name (if global
+		    (lish-global-aliases shell)
+		    (lish-aliases shell))))
 
-(defun get-alias (sh name)
-  (gethash name (lish-aliases sh)))
+(defun get-alias (name &key global (shell *shell*))
+  (if global
+      (gethash name (lish-global-aliases shell))
+      (gethash name (lish-aliases shell))))
 
 (defbuiltin alias
-    (("name" string)
-     ("expansion" string))
+    (("global"    boolean :short-arg #\g
+      :help "True to define a global alias.")
+     ("name"      string :help "Name of the alias.")
+     ("expansion" string :help "Text to expand to."))
   "Define NAME to expand to EXPANSION when starting a line."
   (if (not name)
-      (loop :for a :being :the :hash-keys :of (lish-aliases *shell*)
-	    :do
-	    (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
-		    a (get-alias *shell* a)))
+      (loop :for a :being :the :hash-keys
+	 :of (if global (lish-global-aliases *shell*) (lish-aliases *shell*))
+	 :do
+	 (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
+		 a (get-alias a :global global :shell *shell*)))
       (if (not expansion)
 	  (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
-		  name (get-alias *shell* name))
-	  (set-alias *shell* name expansion))))
+		  name (get-alias name :global global :shell *shell*))
+	  (set-alias name expansion :global global :shell *shell*))))
 
-(defbuiltin unalias (("name" string :optional nil))
+(defbuiltin unalias
+  (("global" boolean :short-arg #\g :help "True to define a global alias.")
+   ("name" string :optional nil     :help "Name of the alias to forget."))
   "Remove the definition of NAME as an alias."
-  (unset-alias *shell* name))
+  (unset-alias name :global global :shell *shell*))
 
-(defbuiltin exit (("values" string :repeating t))
+(defbuiltin exit (("values" string :repeating t :help "Values to return."))
   "Exit from the shell. Optionally return values."
   (when values
     (setf (lish-exit-values *shell*) (loop :for v :in values :collect v)))
   (setf (lish-exit-flag *shell*) t))
 
-(defbuiltin source (("filename" pathname :optional nil))
+(defbuiltin source (("filename" pathname :optional nil
+ 		     :help "Filename to read."))
   "Evalute lish commands in the given file."
   (without-warning (load-file *shell* filename)))
 
-;; This is so if it's not provided, it can toggle.
-(defclass arg-boolean-toggle (arg-boolean)
-  ()
-  (:default-initargs
-   :default :toggle)
-  (:documentation "A true or false value, that can be toggled."))
-;; (defmethod convert-arg ((arg arg-boolean-toggle) (value string))
-;;   (cond
-;;     ((position value +true-strings+ :test #'equalp) t)
-;;     ((position value +false-strings+ :test #'equalp) nil)
-;;     (t (error "Can't convert ~w to a boolean." value))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defbuiltin debug (("state" boolean-toggle :help "State of debugging."))
+    "Toggle shell debugging."
+    (format t "before state is ~s~%" state)
+    (setf (lish-debug *shell*)
+	  (if (eql state :toggle)
+	      (not (lish-debug *shell*))
+	      state))
+    (format t "after state is ~s~%" state)
+    (format t "Debugging is ~:[OFF~;ON~].~%" (lish-debug *shell*))))
 
-;(defvar howji (macroexpand-
-
-(defbuiltin debug (("state" boolean-toggle))
-  "Toggle shell debugging."
-  (setf (lish-debug *shell*)
-	(if (eql state :toggle)
-	    (not (lish-debug *shell*))
-	    state))
-  (format t "Debugging is ~:[OFF~;ON~].~%" (lish-debug *shell*)))
+;; WHY WHY WHY?
+;; (format t "----------> ~(~w~)~%"
+;;         (shell-to-lisp-args
+;;          (make-argument-list '(("state" boolean-toggle :help "me")))))
 
 #|
 ;; Just use the version from dlib-misc	;
@@ -330,7 +350,9 @@ NAME is replaced by EXPANSION before any other evaluation."
 :do (format t "~va ~30a~%" mv (car v) (cdr v)))))
   |#
 
-(defbuiltin export (("name" string) ("value" string))
+(defbuiltin export
+    (("name"  string :help "Name of the variable to export.")
+     ("value" string :help "Value of the variable to export."))
   "Set environment variable NAME to be VALUE. Omitting VALUE, just makes sure
 the current value of NAME is exported. Omitting both, prints all the exported
 environment variables. If NAME and VALUE are converted to strings if necessary."
@@ -344,10 +366,15 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 	  (nos:getenv name))		; Actually does nothing
       (printenv)))
 
-(defbuiltin env (("ignore-environment" boolean :short-arg #\i)
-		 ("variable-assignment" string :repeating t)
-		 ("shell-command" shell-command)
-		 ("arguments" object :repeating t))
+(defbuiltin env
+    (("ignore-environment" boolean :short-arg #\i
+      :help "Ignore the environment.")
+     ("variable-assignment" string :repeating t
+      :help "Assingment to make in the environment.")
+     ("shell-command" shell-command
+      :help "Command to execute with the possibly modified environment.")
+     ("arguments" object :repeating t
+      :help "Arguments to the command."))
   "Modify the command environment. If ignore-environment"
   (if (and (not shell-command) (not arguments))
       ;; Just print variables
@@ -396,9 +423,12 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 	(parse-integer value)))
 
 (defbuiltin kill
-    (("list-signals" boolean :short-arg #\l)
-     ("signal" 	     signal  :default   15)
-     ("pids" 	     integer :repeating t))
+    (("list-signals" boolean :short-arg #\l
+      :help "List available signals.")
+     ("signal" 	     signal  :default   15
+      :help "Signal number to send.")
+     ("pids" 	     integer :repeating t
+      :help "Process IDs to signal."))
   ;; @@@ pid should be job # type to support %job
   "Sends SIGNAL to PID."
   ;; @@@ totally faked & not working
@@ -414,8 +444,8 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 
 ;;; make printf an alias
 (defbuiltin format
-    (("format-string" string :optional nil)
-     ("args" t :repeating t))
+    (("format-string" string :optional nil :help "Format control string.")
+     ("args" t :repeating t :help "Format arguments."))
   "Formatted output."
   ;; @@@ totally faked & not working
   (apply #'format t format-string args))
@@ -423,17 +453,17 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 ;; Since this is for scripting in other shells, I think we don't need to worry
 ;; about it, since the user can just call READ-LINE-like functions directly.
 (defbuiltin read
-    (("name"    string)
-     ("prompt"  string  :short-arg #\p)
-     ("timeout" integer :short-arg #\t)
-     ("editing" boolean :short-arg #\e))
+    (("name"    string                 :help "Variable to read.")
+     ("prompt"  string  :short-arg #\p :help "Prompt to print.")
+     ("timeout" integer :short-arg #\t :help "Seconds before read times out.")
+     ("editing" boolean :short-arg #\e :help "True to use line editing."))
   "Read a line of input."
   ;; @@@ totally faked & not working
   (declare (ignore timeout name))
   (if editing (tiny-rl:tiny-rl :prompt prompt)
       (read-line nil nil)))
 
-(defbuiltin time (("command" string :repeating t))
+(defbuiltin time (("command" string :repeating t :help "Command to time."))
   "Usage: time command ...
 Shows some time statistics resulting from the execution of COMMNAD."
   (time (shell-eval *shell* (make-shell-expr :words command))))
@@ -470,9 +500,12 @@ Show accumulated times for the shell."
 	    (print-timeval (rusage-system children) nil))))
 
 (defbuiltin umask
-    (("print-command" boolean :short-arg #\p)
-     ("symbolic"      boolean :short-arg #\S)
-     ("mask"	     string))
+    (("print-command" boolean :short-arg #\p
+      :help "Print a command which sets the umask.")
+     ("symbolic"      boolean :short-arg #\S
+      :help "Output in symbolic mode.")
+     ("mask"	     string
+      :help "Mask to set."))
   "Set or print the default file creation mode mask (a.k.a. permission mask).
 If mode is not given, print the current mode. If PRINT-COMMAND is true, print
 the mode as a command that can be executed. If SYMBOLIC is true, output in
@@ -499,7 +532,8 @@ symbolic format, otherwise output in octal."
 (defbuiltin ulimit ())
 (defbuiltin wait ())
 
-(defbuiltin exec (("command-words" t :repeating t))
+(defbuiltin exec (("command-words" t :repeating t
+                    :help "Words of the command to execute."))
   "Replace the whole Lisp system with another program. This seems like a rather
 drastic thing to do to a running Lisp system. Wouldn't you prefer a nice game
 of chess?"
@@ -518,13 +552,20 @@ of chess?"
   ())
 
 (defbuiltin bind
-    (("print-bindings"		 boolean      :short-arg #\p)
-     ("print-readable-bindings"	 boolean      :short-arg #\P)
-     ("query"			 function     :short-arg #\q)
-     ("remove-function-bindings" function     :short-arg #\u)
-     ("remove-key-binding"	 key-sequence :short-arg #\r)
-     ("key-sequence"		 key-sequence)
-     ("function-name"		 function))
+    (("print-bindings"		 boolean      :short-arg #\p
+      :help "Print key bindings.")
+     ("print-readable-bindings"	 boolean      :short-arg #\P
+      :help "Print key bindings in a machine readable way.")
+     ("query"			 function     :short-arg #\q
+      :help "Ask what key invokes a function.")
+     ("remove-function-bindings" function     :short-arg #\u
+      :help "Remove the binding for FUNCTION.")
+     ("remove-key-binding"	 key-sequence :short-arg #\r
+      :help "Remove the binding for a KEY-SEQUENCE.")
+     ("key-sequence"		 key-sequence
+      :help "The key sequence to bind.")
+     ("function-name"		 function
+      :help "The function to bind the key sequence to."))
   "Manipulate key bindings."
   (when (> (count t (list print-bindings print-readable-bindings query
 			  remove-function-bindings remove-key-binding)) 1)
@@ -599,7 +640,7 @@ better just to use Lisp syntax.
   (get-command value))
 |#
 
-(defbuiltin undefcommand (("command" command))
+(defbuiltin undefcommand (("command" command :help "The command to forget."))
   "Undefine a command."
   (undefine-command (string-downcase command)))
 
@@ -666,8 +707,10 @@ if there isn't one."
     result))
 
 (defbuiltin hash
-    (("rehash" boolean :short-arg #\r)
-     ("commands" t :repeating t))
+    (("rehash" boolean :short-arg #\r
+      :help "Forget about command locations.")
+     ("commands" t :repeating t
+      :help "Command to operate on."))
   "Usage: hash [-r] [commands...]
 Show remembered full pathnames of commands. If -r is given, forget them all."
   (labels ((pr-cmd (c) (format t "~a~%" c)))
@@ -696,9 +739,10 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 (defun command-type (sh command)
   "Return a string representing the command type of command."
   (cond
-    ((gethash command (lish-commands))   "command")
-    ((gethash command (lish-aliases sh)) "alias")
-    ((get-command-path command)          "file")
+    ((gethash command (lish-commands))	        "command")
+    ((gethash command (lish-aliases sh))        "alias")
+    ((gethash command (lish-global-aliases sh)) "global alias")
+    ((get-command-path command)		        "file")
     (t "")))
 
 (defun describe-command (cmd)
@@ -707,6 +751,9 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
       ((setf x (gethash cmd (lish-aliases *shell*)))
        (when x
 	 (format t "~a is aliased to ~a~%" cmd x)))
+      ((setf x (gethash cmd (lish-global-aliases *shell*)))
+       (when x
+	 (format t "~a is a global alias for ~a~%" cmd x)))
       ((setf x (gethash cmd (lish-commands)))
        (when x
 	 (format t "~a is the command ~a~%" cmd x)))
@@ -718,10 +765,14 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	 (format t "~a is the function ~s~%" cmd (symbol-function x)))))))
 
 (defbuiltin type
-    (("type-only" boolean :short-arg #\t)
-     ("path-only" boolean :short-arg #\p)
-     ("all" 	  boolean :short-arg #\a)
-     ("names" 	  string  :repeating t))
+    (("type-only" boolean :short-arg #\t
+      :help "Show only the type of the name.")
+     ("path-only" boolean :short-arg #\p
+      :help "Show only the path of the name.")
+     ("all" 	  boolean :short-arg #\a
+      :help "Show all definitions of the name.")
+     ("names" 	  string  :repeating t
+      :help "Names to describe."))
   "Describe what kind of command the name is."
   (when names
     (loop :with args = names :and n = nil
@@ -736,6 +787,9 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	  (let ((x (gethash n (lish-aliases *shell*))))
 	    (when x
 	      (format t "~a is aliased to ~a~%" n x)))
+	  (let ((x (gethash n (lish-global-aliases *shell*))))
+	    (when x
+	      (format t "~a is globally aliased to ~s~%" n x)))
 	  (let ((x (gethash n (lish-commands))))
 	    (when x
 	      (format t "~a is the command ~a~%" n x)))
@@ -754,7 +808,9 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 		  (describe-command n))))))
 	 (setf args (cdr args)))))
 
-(defbuiltin stats (("command" choice :choices ("save" "show")))
+(defbuiltin stats
+    (("command" choice :choices ("save" "show")
+      :help "What to do with the statistics."))
   "Show command statistics."
   (cond
     ((equal command "save")
@@ -764,4 +820,21 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
     (t
      (show-command-stats))))
 
+(defbuiltin opt
+  (("readable" boolean :short-arg #\r
+    :help "True to output options that are re-readable by the shell.")
+   ("name"  option :help "Option to set.")
+   ("value" object :help "Value to set option to."))
+  (if name
+      (if value
+	  (set-option *shell* name value)
+	  (format t "~w~%" (get-option *shell* name)))
+      (if readable
+	  (loop :for o :in (lish-options *shell*) :do
+	     (format t "opt ~a ~w~%" (arg-name o) (arg-value o)))
+	  (print-properties
+	   (loop :for o :in (lish-options *shell*)
+	      :collect (list (arg-name o) (arg-value o)))
+	   :de-lispify nil :right-justify t))))
+      
 ;; EOF

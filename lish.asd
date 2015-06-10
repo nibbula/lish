@@ -17,12 +17,15 @@
     :licence            "GPL3 or something."
     :long-description   "I don't recommend using this yet."
     :entry-point	"lish:shell-toplevel"
-    :depends-on (:tiny-rl :cl-ppcre :opsys :dlib :dlib-misc :stretchy :glob)
+    :depends-on (:tiny-rl :cl-ppcre :opsys :dlib :dlib-misc :stretchy :glob :chipz)
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))
      (:file "commands"  :depends-on ("package" "vars"))
      (:file "complete"  :depends-on ("package" "vars" "commands"))
-     (:file "builtin"   :depends-on ("package" "vars" "commands" "complete"))
      (:file "lish"   	:depends-on ("package" "vars" "commands" "complete"))
-     (:file "piping"	:depends-on ("package" "vars" "commands" "lish"))))
+     (:file "builtin"   :depends-on ("package" "vars" "commands" "complete"
+				     "lish"))
+     (:file "piping"	:depends-on ("package" "vars" "commands" "lish"))
+     (:file "mine"      :depends-on ("package" "vars" "commands" "lish"
+				     "piping"))))

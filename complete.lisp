@@ -99,40 +99,128 @@ literally in shell syntax."
 	     (setf past (1+ i))))
     past))
 
+(defun list-arg-choices (command doc choices)
+  (let* ((cols
+	  (ansiterm:terminal-window-columns
+	   (tiny-rl::line-editor-terminal (lish-editor *shell*))))
+	 (out-str (s+ (posix-synopsis command) #\newline
+		      (or doc "") #\newline
+		      (or (and choices
+			       (with-output-to-string (str)
+				 (print-columns choices
+						:stream str
+						:columns cols)))
+			  ""))))
+    (when (eql (char out-str (1- (length out-str))) #\newline)
+      (setf out-str (subseq out-str 0 (1- (length out-str)))))
+    (list out-str)))
+
+(defun show-dash-arglist (arglist)
+  (list
+   (with-output-to-string (str)
+     (loop :with print-newline = nil
+	:for a :in arglist
+	:when (and (arg-short-arg a)
+		   (not (arg-hidden a)))
+	:do
+#|	(format str "~:[~;~%~]-~a ~:[~;[T] ~]~25a~@[ ~a~]"
+		print-newline
+		(arg-short-arg a) (arg-default a) (arg-name a)
+		(and (slot-boundp a 'help) (arg-help a))) |#
+	(format str "~:[~;~%~] -~a ~@[ ~a~] ~:[~;~1:*[~a] ~]"
+		print-newline
+		(arg-short-arg a)
+		(or (and (slot-boundp a 'help) (arg-help a))
+		    (arg-name a))
+		(arg-default a))
+	(when (not print-newline)
+	  (setf print-newline t))))))
+
+(defvar *long-double-dash-help* nil
+  "True to show longer help for double dash arguments.")
+
+(defun show-double-dash-arglist (arglist)
+  (let ((result (make-stretchy-string 200)))
+    (with-output-to-string (str result)
+      (table:nice-print-table
+       (loop :for a :in arglist
+	  :when (and (arg-long-arg a)
+		     (not (arg-hidden a)))
+	  :collect
+	  (if *long-double-dash-help*
+	      (list (s+ "--" (arg-long-arg a))
+		    (arg-default a)
+		    (string-downcase (arg-type a))
+		    (or (and (slot-boundp a 'help) (arg-help a))
+			(arg-name a)))
+	      (list (s+ "--" (arg-long-arg a))
+		    (or (and (slot-boundp a 'help) (arg-help a))
+			(format nil "~s ~(~a~)"
+				(arg-default a) (arg-type a))))))
+       nil :stream str :trailing-spaces nil))
+    ;; Get rid of the final newline
+    (when (char= #\newline (aref result (- (length result) 1)))
+      (setf (fill-pointer result) (- (length result) 2)))
+    (list result)))
+
+(defun complete-double-dash-arglist (word pos arglist)
+  (dbug "word = ~s pos = ~s~%" word pos)
+  (complete-list
+   ;; (subseq word 2) (- pos 2) nil
+   word pos nil
+   (loop :for a :in arglist
+      :if (arg-long-arg a)
+      :collect (s+ "--" (arg-long-arg a)))))
+
 ;; Note that this takes different args than a normal completion function.
-(defun complete-command-arg (command expr pos all &optional word-num word)
+(defun complete-command-arg (context command expr pos all
+			     &optional word-num word word-pos)
   "Complete a command argument."
   (let* ((past (words-past expr pos))
 	 (fake-word (or word ""))
 	 (arg (nth (1- past) (command-arglist command)))
-	 (doc (and arg (documentation (type-of arg) 'type)))
-	 (choices (and arg (argument-choices arg))))
-    (if all
-	(progn
-	  #| (print-values* (command expr pos all word-num word)) |#
-;;;	  (format t "ummm...~a~%" past)
-	  (if (and (= past 1) (not word-num))
-	      (progn
-;		(format t "snoo ~a? words-past ~a~%" command past)
-		(let* ((cols
-			(ansiterm:terminal-window-columns
-			 (tiny-rl::line-editor-terminal (lish-editor *shell*))))
-		       (out-str (s+ (posix-synopsis command) #\newline
-				    (or doc "") #\newline
-				    (or (and choices
-					     (with-output-to-string (str)
-					       (print-columns choices
-							      :stream str
-							      :columns cols)))
-					""))))
-		  (when (eql (char out-str (1- (length out-str))) #\newline)
-		    (setf out-str (subseq out-str 0 (1- (length out-str)))))
-		  (list out-str)))
-	      (progn
-		(complete-filename fake-word pos all))))
-	(if choices
-	    (complete-list fake-word (length fake-word) all choices)
-	    (complete-filename fake-word pos all)))))
+	 (func (and arg (arg-completion-function arg))))
+    (dbug "cmd arg ~s ~s ~s ~s ~s ~s~%"
+	  context pos fake-word word-pos arg func)
+    (cond
+      ((and word-pos (> word-pos 1)
+;;;	    (char= (char word (1- word-pos)) #\-)
+;;;	    (char= (char word (- word-pos 2)) #\-))
+	    (char= (char word 0) #\-)
+	    (char= (char word 1) #\-))
+       ;; double dash args
+       (if all
+	   (show-double-dash-arglist (command-arglist command))
+	   (progn
+	     (complete-double-dash-arglist word word-pos
+					   (command-arglist command)))))
+      ((and all word-pos
+	    (> word-pos 0)
+	    (char= (char word (1- (min word-pos (length word)))) #\-))
+       ;; dash arg enumeration
+       (show-dash-arglist (command-arglist command)))
+      (func
+       (dbug "---> (~a ~s ~s ~s )~%" func fake-word (length fake-word) all)
+       (funcall func fake-word (length fake-word) all :parsed-exp expr))
+      (t
+       (let ((doc (and arg (documentation (type-of arg) 'type)))
+	     (choices (and arg (argument-choices arg))))
+	 (dbug "wazzup? ~s choices ~s ~%" fake-word choices)
+	 (if all
+	     (progn
+	       #| (print-values* (command expr pos all word-num word)) |#
+	       (dbug "ummm...~a~%" past)
+	       (if (and (= past 1) (not word-num))
+		   (progn
+		     (dbug "snoo ~a? words-past ~a~%" command past)
+		     (list-arg-choices command doc choices))
+		   (progn
+		     (complete-filename fake-word pos all))))
+	     (progn
+	       (dbug "cmd arg fake-word ~s" fake-word)
+	       (if choices
+		   (complete-list fake-word (length fake-word) all choices)
+		   (complete-filename fake-word pos all)))))))))
 
 (defvar *junk-package*
   (progn
@@ -153,14 +241,19 @@ complete, and call the appropriate completion function."
 	cmd)
     (typecase exp
       (cons
-;;;       (format t "Hellow I am janky!~%")
+       (dbug "Hellow I am janky!~%")
        (complete-symbol context pos all))
       (shell-expr
        (let* ((word-num (shell-word-number exp pos))
-	      (word (if word-num
-			(elt (shell-expr-words exp) word-num)
-			nil)))
-;;;	 (format t "~%word-num = ~w word = ~w~%exp ~w~%" word-num word exp)
+	      word word-pos)
+	 ;; word-num is the index of the word in the shell expr
+	 ;; word is the text of the word
+	 ;; word-pos is the relative position in the word
+	 (when word-num
+	   (setf word (elt (shell-expr-words exp) word-num)
+		 word-pos (- pos (elt (shell-expr-word-start exp) word-num))))
+	 (dbug "~%word-num = ~w word = ~w word-pos = ~w~%exp ~w~%"
+	       word-num word word-pos exp)
 	 (flet ((simple-complete (func word wpos)
 		  (if all
 		      (let ((list (funcall func word all)))
@@ -169,22 +262,22 @@ complete, and call the appropriate completion function."
 	   (cond
 	     ((and (not word-num) (= pos 0))
 	      ;; no words
-;;;	      (format t "none~%")
+	      (dbug "none~%")
 	      (simple-complete #'complete-command "" 0))
 	     ((not word)
 	      (if (= 0 (length (shell-expr-words exp)))
 		  (progn
 		    ;; probably ()
-;;;		    (format t "bogo~%")
+		    (dbug "bogo~%")
 		    (complete-symbol context pos all))
 		  (let ((from-end (- (length context) pos))
 			(first-word (first (shell-expr-words exp))))
-;;;		    (format t "heyba~%")
+		    (dbug "heyba~%")
 		    (multiple-value-bind (result new-pos)
 			(if (setf cmd (get-command first-word))
 			    (progn
-;;;			      (format t "Baaa~%")
-			      (complete-command-arg cmd exp pos all))
+			      (dbug "Baaa~%")
+			      (complete-command-arg context cmd exp pos all))
 			    (complete-filename word (- (length word) from-end) all))
 		      (declare (ignore new-pos))
 		      (values (if (not all) (quotify result) result)
@@ -192,13 +285,13 @@ complete, and call the appropriate completion function."
 				       (elt (shell-expr-word-start exp) word-num))
 				  pos))))))
 	     ((symbolp word)
-;;;	      (format t "janky~%")
+	      (dbug "janky~%")
 	      (complete-bang-symbol context pos all))
 	     ((consp word)		; (foo)
-;;;	      (format t "junky~%")
+	      (dbug "junky~%")
 	      (complete-symbol context pos all))
 	     ((eql (aref word 0) #\()	; (foo
-;;;	      (format t "half baka~%")
+	      (dbug "half baka~%")
 	      (complete-symbol context pos all))
 	     ((eql (aref word 0) #\!)	; !foo
 	      (complete-bang-symbol context pos all))
@@ -215,7 +308,7 @@ complete, and call the appropriate completion function."
 					word-num))))
 	     ;; first word, when not starting with directory chars
 	     ((and (= word-num 0) (not (position (aref word 0) "/.~")))
-;;;	      (format t "jinky~%")
+	      (dbug "jinky~%")
 	      ;; try commands
 	      (multiple-value-bind (v1 v2)
 		  (simple-complete #'complete-command context
@@ -229,21 +322,25 @@ complete, and call the appropriate completion function."
 		(values v1 v2)))
 	     (t
 	      (let ((from-end (- (length context) pos)))
-;;;		(format t "hello ~a~%" word)
+		(dbug "hello ~a~%" word)
 		(multiple-value-bind (result new-pos)
 		    (if (setf cmd (get-command
 				   (elt (shell-expr-words exp) 0)))
 			(progn
-;;;			  (format t "blurgg~%")
+			  (dbug "blurgg~%")
 			  (complete-command-arg
-			   cmd exp pos #| (- (length word) from-end) |#
-			   all word-num word))
+			   context cmd exp pos #| (- (length word) from-end) |#
+			   all word-num word word-pos))
 			(progn
-;;;			  (format t "jorky~%")
+			  (dbug "jorky~%")
 			  (complete-filename word (- (length word) from-end)
 					     all)))
 		  (declare (ignore new-pos))
-		  (values (if (not all) (quotify result) result)
-			  (elt (shell-expr-word-start exp) word-num))))))))))))
+		  (dbug "result = ~s~%" result)
+		  (if all
+		      (values result (length result))
+		      (values
+		       (quotify result)
+		       (elt (shell-expr-word-start exp) word-num)))))))))))))
 
 ;; EOF
