@@ -13,6 +13,8 @@ Lish TODO list							     -*- org -*-
 ** piping from lisp command to system command
    gets no output, e.g.: grep defun *.lisp | /usr/bin/less
 ** completion interning of partial symbol, so completing doesn't work right
+** resume doesn't work
+   resume only works when one job, doesn't get jobs spec arguments right
 ** completion (globbing) doesn't work on non-ASCII file names? e.g. résumé
 *** need unicode normalizer (see char-util.lisp)
 ** parsing < in first word?
@@ -32,6 +34,9 @@ Lish TODO list							     -*- org -*-
    when completing in a pipeline, e.g.: cat file | grep 
    It doesn't seem to do anything, is probably trying to complete args
    for the first command, not the last command in the pipeline
+** some seemingly sbcl specific bug when reading a non existent symbol,
+   during load-file, like: no-exist:or-this
+   exhibited when loading .lishrc
 ** DONE fixed bugs
 *** DONE completion with absolute path and stuff following, e.g.:
     "/opt/local/share/man/<here> (foo bar)"
@@ -40,12 +45,25 @@ Lish TODO list							     -*- org -*-
 *** DONE lisp expressions after the first don't get evaluated?
 * TODO option setting?
 * Essential festures
+** EXTRACT COMMANDS!!
+   I know it seems crazy, but, I want to separate commands from lish,
+   so that other things can use commands, command argument completion,
+   etc. Should work for things bound to keys (keymaps) in apps, as well
+   as commmand line things, as well as imbedded app commands (like the
+   extended commands in pager), neox (of course), etc.
+   Think of other examples, like commands with sub comands, like macports
+   port, crap like dscl, openssl, old style ftp, etc.
+   Command sub-commands should somehow integrate seemlessly.
+   The shell specific things like posix-to-lisp args can stay in lish,
+   and other things specific to shell syntax.
 ** redirections: < > << <()
 ** give in and handle ENVVAR=value command -OR- make env builtin work
 ** at least handle ^Z of subprocess!
-*** must be able to run code (reset job signals) after fork
-*** -OR-
-*** make a spawn/fork/pipe in C which handles job signals
+*** code after fork
+**** must be able to run code (reset job signals) after fork
+**** -OR-
+**** make a spawn/fork/pipe in C which handles job signals
+*** make a small test to see which implementations support code after fork
 ** process stuff:
    see (defimplementation background-save-image in slime/swank/sbcl.lisp
 *** chains: || &&
@@ -53,7 +71,7 @@ Lish TODO list							     -*- org -*-
 *** jobs command
 ** test portability
 *** implementations
-**** clisp, cmu
+**** clisp, cmu, lispworks, abcl?
 *** linux
 *** cygwin?
 * Important features
@@ -63,11 +81,13 @@ Lish TODO list							     -*- org -*-
 *** scrape from zsh or bash_completion dbs
 *** scrape from [[https://github.com/mbrubeck/compleat][compleat]] ?
 ** objects (return values) as pipeline data
-   Perhaps generic streams which could be object streams or character streams.
-   But how to determine which one?
-   Perhaps the stream is multiple/paralell? aka there is always an object
-   stream, since there are always return values, AND there is a possible
-   output stream which . . .
+   - Perhaps generic streams which could be object streams or character
+     streams. But how to determine which one?
+   - Perhaps the stream is multiple/paralell? aka there is always an object
+     stream, since there are always return values, AND there is a possible
+     output stream which . . .
+   - Functions that take sequences or streams can marked with a special × mark
+     to indicate which argument the pipeline is input to.
 *** How About: implicit *shell-output* and *shell-input*
     that can be an sequence or and object-stream???
     Functions and commands can choose what they want to do:
@@ -92,6 +112,8 @@ Lish TODO list							     -*- org -*-
 *** M-o expand shell line (like bash)
 ** smarter completion, specifically:
 *** completion should use proper completion for command line argument types
+    need to implement posix arg list to shell arg list parsing
+    posix-to-shell-args
 *** just basically do the ‘right thing’ in any circumstance!!!
     completion should know what you can type in any circumstance and
     provide help.

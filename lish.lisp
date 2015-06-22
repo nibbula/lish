@@ -2,59 +2,11 @@
 ;; lish.lisp - Unix Shell & Lisp somehow smushed together
 ;;
 
-;; $Revision: 1.15 $
-
 (in-package :lish)
 
 ;(declaim (optimize (debug 3)))
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 ;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
-
-#| OLD Way of doing options:
-
-;; This should be where anything that is designed to be settable by the
-;; operator should be put to separate it out from internal things in the
-;; shell object.
-(defclass shell-options ()
-  ((prompt-char
-    :initarg :prompt-char
-    :accessor lish-prompt-char
-    :documentation "Normal prompt character.")
-   (prompt-string
-    :initarg :prompt-string
-    :accessor lish-prompt-string
-    :documentation "Normal prompt string.")
-   (prompt-function
-    :initarg :prompt-function
-    :accessor lish-prompt-function
-    :documentation "Function returning the prompt string.")
-   (sub-prompt
-    :initarg :sub-prompt
-    :accessor lish-sub-prompt
-    :documentation "Prompt for continuation lines.")
-   (ignore-eof
-    :initarg :ignore-eof
-    :accessor lish-ignore-eof :initform nil
-    :documentation
-    "True to ignore when the operator presses ^D. If a number, the count of how~
-     many times to ignore ^D before exiting.")
-   (debug
-    :initarg :debug
-    :accessor lish-debug
-    :documentation "True to enter the debugger on errors in lish."))
-  (:default-initargs
-   :prompt-char #\@
-   :prompt-string nil
-   :prompt-function #'make-prompt
-   :sub-prompt "- "	; @@@ maybe we need sub-prompt-char & sub-prompt-func?
-   :debug nil)
-  (:documentation "User options for the shell."))
-
-(defmethod initialize-instance :after
-    ((o shell-options) &rest initargs &key &allow-other-keys)
-  (declare (ignore initargs))
-  )
-|#
 
 (defclass shell ()
   ((exit-flag
@@ -94,18 +46,12 @@
    :exit-values '())
   (:documentation "A lispy system command shell."))
 
-(defparameter *options* nil
-  "List of options defined.")
-
 (defmethod initialize-instance :after
     ((sh shell) &rest initargs &key &allow-other-keys)
   (declare (ignore initargs))
 ;  (setf (slot-value sh 'commands) (make-hash-table :test #'equal))
   (setf (slot-value sh 'aliases) (make-hash-table :test #'equal))
   (setf (slot-value sh 'global-aliases) (make-hash-table :test #'equal))
-  #| OLD style
-  (setf (slot-value sh 'options)
-	(apply #'make-instance 'shell-options initargs)) |#
   ;; Copy the objecs from the defined option list, and set the default values.
   (loop :with o :for opt :in *options* :do
      (setf o (shallow-copy-object opt)
@@ -113,6 +59,11 @@
      (push o (lish-options sh)))
   (init-commands))
 
+;; Most things that are designed to be settable by the operator should likely
+;; be made into an option. Options defined by DEFOPTION are accessible like a
+;; typical class slot acessor method on the shell object, as well as being an
+;; easily accesible using the 'opt' command.
+;;
 ;; We think of options like they are arguments for the shell, and use
 ;; the argument class to store them. That way we can use the same completion
 ;; and conversion.
@@ -138,11 +89,17 @@ is like Lish arguments, e.g.:
 	(name-string (string-downcase name)))
     `(progn
        ;; Access options as if they were in the shell object.
+       (defgeneric ,sym (shell)
+	 (:documentation ,(s+ "Return the value of " name-string ".")))
        (defmethod ,sym ((sh shell)) (get-option sh ,name-string))
+       (defgeneric (setf ,sym) (value shell)
+	 (:documentation ,(s+ "Set the value of " name-string ".")))
        (defmethod (setf ,sym) (value (sh shell))
 	 (set-option sh ,name-string value))
        (push (make-argument ',(cons name-string arg))
 	     *options*))))
+
+(setf *options* nil)
 
 (defoption prompt-char character
   :help "Normal prompt character. Output if there is no prompt string."
@@ -336,20 +293,12 @@ Not implemented yet:
       (format nil "~a " (make-string (+ 1 *lish-level*)
 				     :initial-element (lish-prompt-char sh)))))
 
+;; @@@ I know how stupid and unnecessary this is
 (defparameter *real-eof-symbol* :Z-REAL-EOF)
 (defparameter *continue-symbol* :Z-CONTINUE)
 (defparameter *empty-symbol* :Z-EMPTY)
 (defparameter *error-symbol* :Z-ERROR)
 (defparameter *quit-symbol* :Z-QUIT)
-
-(defstruct shell-expr
-  "The result of the shell lexer. A sequence of words and their start and ~
-end points in the original string."
-  words
-  word-start
-  word-end
-  word-quoted
-  line)
 
 ;; (defstruct lisp-expression
 ;;   "Nothing fancy. Just a wrapper for a lisp value for now."
@@ -380,7 +329,7 @@ end points in the original string."
 Assumes the opening double quote has already been read. ~
 Read until a double quote. Backslash escapes the special meaning of ~
 the following character. Return the string and how long it is. If we got to ~
-the end and didn't get a close quote the third value is true.~
+the end and didn't get a close quote, the third value is true.~
 "
   (let ((v (make-stretchy-string 10))
 	(i 0)
@@ -871,7 +820,7 @@ The syntax is vaguely like:
 	;; failed
 	nil)))
 
-(defun do-system-command (command-line
+(defun do-system-command (words
 			  &optional in-pipe out-pipe
 			    (environment nil env-p))
   "Run a system command. IN-PIPE is an input stream to read from, if non-nil.
@@ -879,7 +828,8 @@ OUT-PIPE is T to return a input stream which the output of the command can be
 read from."
   ;; Since run-program can't throw an error when the program is not found, we
   ;; try to do it here.
-  (let* ((program (car command-line))
+  (let* ((command-line (mapcar #'shell-word-word words))
+	 (program (car command-line))
 	 (args    (cdr command-line))
 	 (path    (get-command-path program))
 	 result result-stream)
@@ -949,28 +899,65 @@ read from."
     (setf (shell-expr-words expr) (nreverse new-words)))
   pos)
 
+(defun expr-to-words (expr)
+  (loop
+     :for w :in (shell-expr-words expr)
+     :for s = (shell-expr-word-start expr) :then (cdr s)
+     :for e = (shell-expr-word-end expr) :then (cdr e)
+     :for q = (shell-expr-word-quoted expr) :then (cdr q)
+     :collect (make-shell-word :word w
+			       :start (car s) :end (car e) :quoted (car q))))
+
+(defun words-to-expr (words &optional line)
+  (let ((expr (make-shell-expr)))
+    (loop :for w :in words :do
+       (push (shell-word-word   w) (shell-expr-words       expr))
+       (push (shell-word-start  w) (shell-expr-word-start  expr))
+       (push (shell-word-end    w) (shell-expr-word-end    expr))
+       (push (shell-word-quoted w) (shell-expr-word-quoted expr)))
+    (setf
+     (shell-expr-words       expr) (nreverse (shell-expr-words       expr))
+     (shell-expr-word-start  expr) (nreverse (shell-expr-word-start  expr))
+     (shell-expr-word-end    expr) (nreverse (shell-expr-word-end    expr))
+     (shell-expr-word-quoted expr) (nreverse (shell-expr-word-quoted expr))
+     (shell-expr-line expr)        line)
+    expr))
+
+(defun append-words (w1 w2)
+  (let ((max (+ 2 (loop :for w :in w1 :maximize (shell-word-end w)))))
+    ;; Perhaps unnecessary, but move start and end over.
+    (loop :for w :in w2 :do
+       (when (shell-word-start w)
+	 (incf (shell-word-start w) max))
+       (when (shell-word-end w)
+	 (incf (shell-word-end w) max)))
+    (append w1 w2)))
+
 (defun lisp-exp-eval (words)
-  "Evaluate lisp expr in words."
-;  (format t "Evaling ~w~%" words)
+  "Evaluate Lisp expressions in the array of shell-words, return a possibly
+expanded array of shell-words."
   (loop :with results
-     :for e :in words
-     :if (or (consp e) (symbolp e))
-       :do (setf results (eval e))
-       :and :if (listp results)
-         :append results	      ; Spread list results into separate args
-       :else
-         :collect results
-     :else
-        :collect e))
+    :for w :in words
+    :if (or (consp (shell-word-word w)) (symbolp (shell-word-word w)))
+      :do (setf results (eval (shell-word-word w)))
+      :and :if (listp results)
+	;; Spread list results into separate args
+	:append (mapcar #'(lambda (x) (make-shell-word :word x))
+			results)
+      :else
+	:collect (make-shell-word :word results)
+    :else
+      :collect w))
 
 (defun expand-alias (sh alias words in-pipe out-pipe)
   (let* ((expr (shell-read alias))
-	 (new-expr
-	  ;; XXX This trashes the rest of the things in the expr, like
-	  ;; the quoted, etc. which could cause problems.
-	  (make-shell-expr
-	   :words (append (shell-expr-words expr) (cdr words))
-	   :line (format nil "~s ~{~s ~}" (shell-expr-line expr) words))))
+	 ;; XXX This could be problematic because things in expr get trashed
+	 ;; or are not set, or faked like the shell-expr-line below.
+	 (expr-words (expr-to-words expr))
+	 (new-words (append expr-words (subseq words 1)))
+	 (new-expr (words-to-expr new-words)))
+    (setf (shell-expr-line new-expr)
+	  (format nil "~{~a ~}" (shell-expr-words new-expr)))
     (shell-eval sh new-expr :no-alias t :in-pipe in-pipe :out-pipe out-pipe)))
 
 (defun call-command (command args &optional in-pipe out-pipe)
@@ -993,7 +980,7 @@ bound during command."
     (if out-pipe
 	(let ((out-str (make-stretchy-string 20)))
 	  (values
-	   ;; @@@ This is probably horribly inefficient.
+	   ;; @@@ This is probably inefficient.
 	   (list (with-output-to-string (*standard-output* out-str)
 		   (if in-pipe
 		       (let ((*standard-input* in-pipe))
@@ -1025,12 +1012,13 @@ If the first word is a symbol bound to a function, call it with the arguments,
 which are read like lisp code. This is like a ‘parenless’ function call.
 Otherwise just try to execute it with the system command executor, which will
 probably fail, but perhaps in similar way to other shells."
-  (let* ((cmd (elt (shell-expr-words expr) 0))
+  (let* ((words (expr-to-words expr))
+	 (cmd (shell-word-word (elt words 0)))
 	 #| (args (subseq (shell-expr-words expr) 1)) |#
 	 ;; (command (gethash cmd (lish-commands)))
 	 (command (get-command cmd))
 	 (alias (gethash cmd (lish-aliases sh)))
-	 (expanded-words (lisp-exp-eval (shell-expr-words expr)))
+	 (expanded-words (lisp-exp-eval words))
 	 result result-stream)
     (dbug "words = ~w~%" (shell-expr-words expr))
     (dbug "expanded words = ~w~%" expanded-words)
@@ -1054,7 +1042,7 @@ probably fail, but perhaps in similar way to other shells."
       (t
        (flet ((sys-cmd ()
 		"Do a system command."
-		(record-command-stats (first expanded-words) :system-command)
+		(record-command-stats cmd :system-command)
 		(setf (values result result-stream)
 		      (do-system-command expanded-words in-pipe out-pipe))
 		(dbug "result = ~w~%" result)
@@ -1063,14 +1051,14 @@ probably fail, but perhaps in similar way to other shells."
 		(force-output)	   ; @@@ is this really a good place for this?
 		(values result result-stream nil)))
 	 ;; If we can find a command in the path, try it first.
-	 (if (get-command-path (first expanded-words))
+	 (if (get-command-path cmd)
 	     (sys-cmd)
 	     ;; Otherwise try a parenless Lisp line.
 	     (multiple-value-bind (symb pos)
 		 (read-from-string (shell-expr-line expr) nil nil)
 	       (if (and (symbolp symb) (fboundp symb))
 		   (progn
-		     (record-command-stats (first expanded-words) :function)
+		     (record-command-stats cmd :function)
 		     (values
 		      (multiple-value-list
 		       (apply (symbol-function symb)
@@ -1134,6 +1122,8 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
        (when (= (length (shell-expr-words expr)) 0)
 	 (return-from shell-eval (values nil nil nil)))
        (let ((w0 (elt (shell-expr-words expr) 0)))
+	 ;; (when (equalp w0 "opt") ;; <<<
+	 ;;   (break))
 	 (do-expansions sh expr 0)
 	 (dbug "~w~%" expr)
 	 (if (listp w0)
@@ -1160,11 +1150,15 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	 :while (and (setf line (read-line stream nil))
 		     new-line)
 	 :do
-	 (loop :while (and (eql (setf expr (shell-read line))
-				*continue-symbol*)
-			   (setf new-line (read-line stream nil)))
+	 (loop :with i = 0
+	    :while (and (eql (setf expr (shell-read line))
+			     *continue-symbol*)
+			(setf new-line (read-line stream nil)))
 	    :do
-	    (setf line (format nil "~a~%~a" line new-line)))
+	    (setf line (s+ line #\newline new-line))
+	    ;; (when (> i 100)
+	    ;;   (break))
+	    (incf i))
 	 (shell-eval sh expr)))))
       ;; (loop :while (setf line (read-line stream nil))
       ;; 	 :do
@@ -1178,12 +1172,6 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			       (make-pathname :name ".lishrc"))))
     (when (probe-file file)
       (load-file sh file))))
-
-(defstruct suspended-job
-  id
-  name
-  command-line
-  resume-function)
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
@@ -1233,11 +1221,11 @@ handling errors."
 		  (format t "~%") (finish-output)
 		  (invoke-restart (find-restart 'abort))))
 	     ;; So we can step through functions
-	     #+sbcl (sb-ext::step-condition 'tiny-rl::repple-stepper)
-	     (condition #'(lambda (c)
+#|	     #+sbcl (sb-ext::step-condition 'tiny-rl::repple-stepper) |#
+#|	     (condition #'(lambda (c)
 			    (if (lish-debug sh)
 				(invoke-debugger c)
-				(format t "~&~a" c))))
+				(format t "~&~a" c)))) |#
 	     (error #'(lambda (c)
 			(if (lish-debug sh)
 			    (invoke-debugger c)
@@ -1245,6 +1233,7 @@ handling errors."
 			      #| (format t "~&~a" c) |#
 			      (signal c))))))
 	  (progn
+;	    (break)
 	    (setf str (tiny-rl
 		       :eof-value *real-eof-symbol*
 		       :quit-value *quit-symbol*

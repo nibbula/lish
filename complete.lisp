@@ -172,13 +172,34 @@ literally in shell syntax."
       :if (arg-long-arg a)
       :collect (s+ "--" (arg-long-arg a)))))
 
+(defun first-mandatory-or-non-flag-arg (past arglist)
+  (or (loop :with i = 0
+	 :for a :in arglist :do
+;;;	 (format t "~a ~a ~s~%" i (>= i (1- past)) a)
+	 (when (and (>= i (1- past))
+		    (not (arg-optional a)))
+	   (return-from first-mandatory-or-non-flag-arg a))
+	 (incf i))
+      (loop :with i = 0
+	 :for a :in arglist :do
+;;;	 (format t "~a ~a ~s~%" i (>= i (1- past)) a)
+	 (when (and (>= i (1- past))
+		    (not (and (or (arg-short-arg a)
+				  (arg-long-arg a)
+				  (arg-old-long-arg a))
+			      (eq (arg-type a) 'boolean))))
+	   (return-from first-mandatory-or-non-flag-arg a))
+	 (incf i))
+      (nth (1- past) arglist)))
+
 ;; Note that this takes different args than a normal completion function.
 (defun complete-command-arg (context command expr pos all
 			     &optional word-num word word-pos)
   "Complete a command argument."
   (let* ((past (words-past expr pos))
 	 (fake-word (or word ""))
-	 (arg (nth (1- past) (command-arglist command)))
+;;;	 (arg (nth (1- past) (command-arglist command)))
+	 (arg (first-mandatory-or-non-flag-arg past (command-arglist command)))
 	 (func (and arg (arg-completion-function arg))))
     (dbug "cmd arg ~s ~s ~s ~s ~s ~s~%"
 	  context pos fake-word word-pos arg func)

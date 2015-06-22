@@ -178,7 +178,8 @@ This means the 0 is T and anything else is NIL."
     (and (numberp result) (zerop result))))
 
 (defun !$ (&rest command)
-  "Return lines output from command as a string of words. This is basically like $(command) in bash."
+  "Return lines output from command as a string of words. This is basically
+like $(command) in bash."
   (command-output-words (lisp-args-to-command command)))
 
 (defun !$$ (&rest command)

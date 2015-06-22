@@ -62,6 +62,15 @@
     :initarg :hidden
     :initform nil
     :accessor arg-hidden)
+   (use-supplied-flag
+    :type boolean
+    :documentation
+    "True to set the argument supplied flag when calling functions. The flag
+     will be named <name>-SUPPLIED-P. Can your function handle the truth about
+     non-existence?"
+    :initarg :use-supplied-flag
+    :initform nil
+    :accessor arg-use-supplied-flag)
    (prompt
     :type string
     :documentation "Show when asking user for value."
@@ -118,10 +127,11 @@
 	    (arg-short-arg o)
 	    (arg-long-arg o))))
 
-(defgeneric convert-arg (arg value)
+(defgeneric convert-arg (arg value &optional quoted)
   (:documentation "Convert an argument value from one type to another.")
-  (:method ((arg argument) value)
+  (:method ((arg argument) value &optional quoted)
     "The base default conversion just returns the value."
+    (declare (ignore quoted))
     value))
 
 (defgeneric argument-choices (arg)
@@ -134,7 +144,8 @@
 (defclass arg-boolean (argument) () (:documentation "A true or false value."))
 (define-constant +true-strings+ '("T" "TRUE" "YES" "ON" "1"))
 (define-constant +false-strings+ '("NIL" "FALSE" "NO" "OFF" "0"))
-(defmethod convert-arg ((arg arg-boolean) (value string))
+(defmethod convert-arg ((arg arg-boolean) (value string) &optional quoted)
+  (declare (ignore quoted))
   (cond
     ((position value +true-strings+ :test #'equalp) t)
     ((position value +false-strings+ :test #'equalp) nil)
@@ -143,7 +154,8 @@
 ;;   (concatenate 'list +true-strings+ +false-strings+))
 
 (defclass arg-number (argument) () (:documentation "A number."))
-(defmethod convert-arg ((arg arg-number) (value string))
+(defmethod convert-arg ((arg arg-number) (value string) &optional quoted)
+  (declare (ignore quoted))
   (let* ((*read-eval* nil)
 	 (num (read-from-string value nil nil)))
     (if (and num (numberp num))
@@ -151,7 +163,8 @@
 	(error "Can't convert ~w to a number." value))))
 
 (defclass arg-integer (arg-number) () (:documentation "An integer."))
-(defmethod convert-arg ((arg arg-integer) (value string))
+(defmethod convert-arg ((arg arg-integer) (value string) &optional quoted)
+  (declare (ignore quoted))
   (let ((int (parse-integer value :junk-allowed nil)))
     (if (and int (integerp int))
 	int
@@ -159,7 +172,8 @@
 
 (defclass arg-float (arg-number) ()
   (:documentation "An floating point number."))
-(defmethod convert-arg ((arg arg-float) (value string))
+(defmethod convert-arg ((arg arg-float) (value string) &optional quoted)
+  (declare (ignore quoted))
   (let* ((*read-eval* nil)
 	 (num (read-from-string value nil nil)))
     (if (and num (floatp num))
@@ -167,52 +181,55 @@
 	(error "Can't convert ~w to a float." value))))
 
 (defclass arg-character (argument) () (:documentation "A character."))
-(defmethod convert-arg ((arg arg-character) (value character))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-character) (value character) &optional quoted)
+  (declare (ignore arg quoted))
   value)
 
-(defmethod convert-arg ((arg arg-character) (value string))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-character) (value string) &optional quoted)
+  (declare (ignore arg quoted))
   (if (= (length value) 1)
       (char value 0)
       (or (name-char value)
 	  (error "Can't convert character arg from string: ~s" value))))
 
 (defclass arg-string (argument) () (:documentation "A string."))
-(defmethod convert-arg ((arg arg-string) (value string))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-string) (value string) &optional quoted)
+  (declare (ignore arg quoted))
   value)
 
-(defmethod convert-arg ((arg arg-string) (value t))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-string) (value t) &optional quoted)
+  (declare (ignore arg quoted))
   (princ-to-string value))
 
 (defclass arg-symbol (argument) () (:documentation "A symbol."))
-(defmethod convert-arg ((arg arg-symbol) (value string))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-symbol) (value string) &optional quoted)
+  (declare (ignore arg quoted))
   value)
 
-(defmethod convert-arg ((arg arg-symbol) (value t))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-symbol) (value t) &optional quoted)
+  (declare (ignore arg quoted))
   (princ-to-string value))
 
 (defclass arg-keyword (argument) () (:documentation "A Lisp keyword."))
-(defmethod convert-arg ((arg arg-keyword) (value string))
-   (if (char/= (char arg 0) #\:)
-       (intern (string-upcase (subseq value 1)) (find-package :keyword))
-       value))
+(defmethod convert-arg ((arg arg-keyword) (value string) &optional quoted)
+  (declare (ignore quoted))
+  (if (char/= (char arg 0) #\:)
+      (intern (string-upcase (subseq value 1)) (find-package :keyword))
+      value))
 
 (defclass arg-object (argument) () (:documentation "A Lisp object."))
-(defmethod convert-arg ((arg arg-object) (value string))
-  (multiple-value-bind (obj end) (safe-read-from-string value)
-    ;; If the whole string wasn't an object, just treat as a string.
-    (if (= end (length value))
-	obj
-	value)))
+(defmethod convert-arg ((arg arg-object) (value string) &optional quoted)
+  (if quoted
+      value
+      (multiple-value-bind (obj end) (safe-read-from-string value)
+	;; If the whole string wasn't an object, just treat as a string.
+	(if (= end (length value))
+	    obj
+	    value))))
 
 (defclass arg-date (argument) () (:documentation "A date."))
-(defmethod convert-arg ((arg arg-date) (value string))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-date) (value string) &optional quoted)
+  (declare (ignore arg quoted))
   ;; @@@ This could be better.
   value)
 
@@ -220,19 +237,32 @@
   (:default-initargs
    :completion-function #'complete-filename)
   (:documentation "A file system path."))
-(defmethod convert-arg ((arg arg-pathname) (value string))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-pathname) (value string) &optional quoted)
+  (declare (ignore arg quoted))
   value)
 
-(defmethod argument-choices ((arg arg-pathname))
-  "Return the possible path names."
-  ;; @@@ Perhaps we should just use opsys:read-directory ?
-  (completion::filename-completion-list ""))
+;; (defmethod argument-choices ((arg arg-pathname))
+;;   "Return the possible path names."
+;;   ;; @@@ Perhaps we should just use opsys:read-directory ?
+;;   (completion::filename-completion-list ""))
+
+(defclass arg-directory (arg-pathname) ()
+  (:default-initargs
+   :completion-function #'complete-directory)
+  (:documentation "A file system directory."))
+(defmethod convert-arg ((arg arg-directory) (value string) &optional quoted)
+  (declare (ignore arg quoted))
+  value)
+
+;; (defmethod argument-choices ((arg arg-directory))
+;;   "Return the possible directory names."
+;;   ;; @@@ Perhaps we should just use opsys:read-directory ?
+;;   (completion::filename-completion-list ""))
 
 (defclass arg-stream (argument)
   () (:documentation "An stream of some sort."))
-(defmethod convert-arg ((arg arg-pathname) (value symbol))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-pathname) (value symbol) &optional quoted)
+  (declare (ignore arg quoted))
   (symbol-value value))
 
 (defclass arg-input-stream (arg-stream)
@@ -266,7 +296,8 @@
 		:accessor arg-choice-func))
   (:documentation "An argument whose value must be one of a list of choices."))
 
-(defmethod convert-arg ((arg arg-choice) (value string))
+(defmethod convert-arg ((arg arg-choice) (value string) &optional quoted)
+  (declare (ignore quoted))
   (let (choice
 	(choices (argument-choices arg)))
     (unless choices
@@ -298,27 +329,21 @@
   "Initialize a arg-boolean-toggle."
   (declare (ignore initargs))
   (setf (arg-default o) :toggle))
-;; (defmethod convert-arg ((arg arg-boolean-toggle) (value string))
+;; (defmethod convert-arg ((arg arg-boolean-toggle) (value string) &optional quoted)
+;;   (declare (ignore quoted))
 ;;   (cond
 ;;     ((position value +true-strings+ :test #'equalp) t)
 ;;     ((position value +false-strings+ :test #'equalp) nil)
 ;;     (t (error "Can't convert ~w to a boolean." value))))
 
-#| Actually I think these should just be in the base class
-(defclass arg-command-line (argument)
-  ((short-arg	:type character
-		:documentation "Command line argument, short form."
-		:initarg :short-arg
-		:accessor arg-short-arg)
-   (long-arg	:type string
-		:documentation "Command line argument, long form."
-		:initarg :long-arg
-		:accessor arg-long-arg))
-  (:documentation "A parameter from a command line."))
+(defun option-name-list ()
+  (loop :for o :in *options* :collect (arg-name o)))
 
-(defclass arg-cmd-boolean (arg-boolean arg-command-line) ()
-  (:documentation "A true or false value from the command line."))
-|#
+(defclass arg-option (arg-choice)
+  ()
+  (:default-initargs
+   :choice-func #'option-name-list)
+  (:documentation "A shell option."))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun argument-class-name (symbol)
@@ -418,7 +443,9 @@ objects, like in the command object."
 	       (pop bod)
 	       (pop bod)
 	       (push
-		`(defmethod convert-arg ((arg ,class-name) (value ,val-type))
+		`(defmethod convert-arg ((arg ,class-name) (value ,val-type)
+					 &optional quoted)
+		   (declare (ignorable arg value quoted))
 		   ,@conv-body)
 		conversions)))
 	    (otherwise
@@ -469,21 +496,21 @@ value to be converted.
 
 ;; Thankfully this is nowhere near as hairy as posix-to-lisp-args.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun shell-to-lisp-args (shell-args)
+  (defun command-to-lisp-args (command-args)
     "Return a Lisp argument list for the given lish argument list."
     (let ((mandatories
-	   (loop :for a :in shell-args
+	   (loop :for a :in command-args
 	      :if (not (arg-optional a))
 	      :collect a))
 	  (optionals
-	   (loop :for a :in shell-args
+	   (loop :for a :in command-args
 	      :if (arg-optional a)
 	      :collect a))
 	  (repeating
-	   (loop :for a :in shell-args
+	   (loop :for a :in command-args
 	      :if (arg-repeating a)
 	      :collect a))
-	  (keyworded (args-keyworded shell-args))
+	  (keyworded (args-keyworded command-args))
 	  (new-list '()))
       ;; Mandatory arguments
       (loop :for a :in mandatories :do
@@ -501,8 +528,15 @@ value to be converted.
 	    (loop :for a :in optionals :do
 	       (push
 		(if (arg-default a)
-		    (list (symbolify (arg-name a)) (arg-default a))
-		    (symbolify (arg-name a)))
+		    (if (arg-use-supplied-flag a)
+			(list (symbolify (arg-name a)) (arg-default a)
+			      (symbolify (s+ (arg-name a) "-supplied-p")))
+			(list (symbolify (arg-name a)) (arg-default a)))
+		    (if (arg-use-supplied-flag a)
+			;; The default is NIL then.
+			(list (symbolify (arg-name a)) NIL
+			      (symbolify (s+ (arg-name a) "-supplied-p")))
+			(symbolify (arg-name a))))
 		new-list)))
 	  (cond
 	    ;; If both optional and repeating, do repeating (i.e. &rest)
@@ -637,7 +671,7 @@ shell."
 	 (name-string (string-downcase name))
 	 #| (name-string (concatenate 'string "\"" (string-downcase name) "\"")) |#
 ;;;	 (evaled-arglist (eval-defaults arglist))
-	 (params (shell-to-lisp-args (make-argument-list arglist t))))
+	 (params (command-to-lisp-args (make-argument-list arglist t))))
     `(progn
        (defun ,func-name ,params
 	 ,@body)
@@ -698,7 +732,7 @@ is a shell argument list. The BODY is the body of the function it calls."
   (let ((func-name (command-function-name name))
 ;;;	(command-name (intern (string name)))
 	(name-string (string-downcase name))
-	(params (shell-to-lisp-args (make-argument-list arglist t))))
+	(params (command-to-lisp-args (make-argument-list arglist t))))
     `(progn
        (defun ,func-name ,params
 	 ,@body)
@@ -816,7 +850,10 @@ is a shell argument list. The BODY is the body of the function it calls."
 (defmacro move-arg (old new i arg)
   "Move the I'th item from the OLD to the NEW list, and return both."
   `(progn
-     (setf ,new (push (convert-arg ,arg (nth ,i ,old)) ,new)
+     (setf ,new (push (convert-arg ,arg
+				   (shell-word-word (nth ,i ,old))
+				   (shell-word-quoted (nth ,i ,old)))
+		      ,new)
 	   ,old (delete-nth ,i ,old))))
 
 (defun arg-key (arg)
@@ -827,7 +864,10 @@ is a shell argument list. The BODY is the body of the function it calls."
   `(progn
      (when ,keyworded
        (setf ,new (push (arg-key ,arg) ,new)))
-     (setf ,new (push (convert-arg ,arg (nth ,i ,old)) ,new))
+     (setf ,new (push (convert-arg ,arg
+				   (shell-word-word (nth ,i ,old))
+				   (shell-word-quoted (nth ,i ,old)))
+		      ,new))
      (setf ,old (delete-nth ,i ,old))))
 
 (defmacro push-key (new arg value keyworded)
@@ -835,7 +875,10 @@ is a shell argument list. The BODY is the body of the function it calls."
   `(progn
      (when ,keyworded
        (setf ,new (push (arg-key ,arg) ,new)))
-     (setf ,new (push (convert-arg ,arg ,value) ,new))))
+     (setf ,new (push (convert-arg ,arg
+				   (shell-word-word ,value)
+				   (shell-word-quoted ,value)))
+	   ,new)))
 
 (defmacro move-flag (old new i arg)
   `(progn
@@ -847,7 +890,10 @@ is a shell argument list. The BODY is the body of the function it calls."
      (dbug "before i=~s old=~s~%" ,i ,old)
      (dbug "~s -> ~s~%" (nth (1+ ,i) ,old)
 	   (convert-arg ,arg (nth (1+ ,i) ,old)))
-     (setf ,new (push (convert-arg ,arg (nth (1+ ,i) ,old)) ,new))
+     (setf ,new (push (convert-arg ,arg
+				   (shell-word-word (nth (1+ ,i) ,old))
+				   (shell-word-quoted (nth (1+ ,i) ,old)))
+		      ,new))
      (setf ,old (delete-nth ,i ,old)) ; flag
      (setf ,old (delete-nth ,i ,old)) ; arg
      (dbug "after i=~s old=~s~%" ,i ,old)
@@ -877,13 +923,21 @@ is a shell argument list. The BODY is the body of the function it calls."
 	       (if ,keyworded
 		   (progn
 		     (setf ,new (push (arg-key ,arg) ,new))
-		     (setf ,new (push (mapcar #'(lambda (x)
-						  (convert-arg ,arg x))
+		     (setf ,new (push (mapcar
+				       #'(lambda (x)
+					   (convert-arg
+					    ,arg
+					    (shell-word-word x)
+					    (shell-word-quoted x)))
 					      (nthcdr ,start ,old)) ,new))
 		     (when (length (nthcdr ,start ,old))
 		       (setf ,did-one t)))
 		   (loop :for ,e :in (nthcdr ,start ,old) :do
-		      (setf ,new (push (convert-arg ,arg ,e) ,new)
+		      (setf ,new
+			    (push (convert-arg
+				   ,arg
+				   (shell-word-word ,e)
+				   (shell-word-quoted ,e)) ,new)
 			    ,did-one t)))
 	       (setf ,old (subseq ,old 0 ,start))
 	       ;; Push default if we have one and didn't get any values.
@@ -911,8 +965,142 @@ become keyword arguments, in a way specified in the command's arglist."
   ;;   (return-from new-posix-to-lisp-args nil))
   (let ((i 0)            ; Where we are in the old list, so effectively
 	                 ; a count of how many posix args we've skipped.
-;	(new-list        '())
+;;;	(new-list        '())
 	(old-list        (copy-list p-args)) ; so we don't modify it
+;;;	(old-list        (mapcar #'shell-word-word p-args))
+	(new-flags       '())
+	(new-mandatories '())
+	(new-optionals   '())
+	(new-repeating   '())
+	(keyworded (args-keyworded (command-arglist command)))
+	(flag-taken      nil)
+	(boolean-taken   nil)
+	(possible-flags  (loop :for a :in (command-arglist command)
+			    :if (or (arg-short-arg a)
+				    (arg-long-arg a))
+			    :collect a))
+	#| (optionals '()) |#)
+    ;; Flagged arguments (optional or manditory)
+    (loop :with a
+       :while (< i (length old-list)) :do
+       #| (setf a (car old-list)) |#
+       (setf a (shell-word-word (nth i old-list)))
+       (if (and (stringp a) (> (length a) 0)
+		(char= (char a 0) #\-))	; arg starts with dash
+	   (if (and (> (length a) 1) (eql (char a 1) #\-)) ; two dash arg
+	       ;; --long-arg
+	       (progn
+		 (setf flag-taken nil boolean-taken nil)
+		 (loop :for arg :in (command-arglist command) :do
+		    ;; @@@ have to deal with repeating?
+		    (when (equalp (subseq a 2) (arg-long-arg arg))
+		      (if (eq (arg-type arg) 'boolean)
+			  (progn
+			    (dbug "boolean long arg ~s~%" arg)
+			    (move-boolean-2 old-list new-flags i arg))
+			  (progn
+			    (dbug "long arg ~s~%" arg)
+			    (move-flag old-list new-flags i arg)))
+		      (setf flag-taken t)))
+		 (when (not flag-taken)
+		   (warn "Unrecognized long option ~a" a)
+		   (incf i)))
+	       ;; -abcxyz (short args)
+	       (progn
+		 (setf boolean-taken nil)
+		 (loop :for cc :from 1 :below (length a) :do
+		    (setf flag-taken nil)
+		    (loop :for arg :in (command-arglist command) :do
+		       (when (eql (arg-short-arg arg) (char a cc))
+			 (setf flag-taken t)
+			 ;; @@@ have to deal with repeating?
+			 (if (eq (arg-type arg) 'boolean)
+			     (progn
+			       (move-boolean old-list new-flags i arg)
+			       (setf boolean-taken t))
+			     (if (/= cc (1- (length a)))
+				 (error "Unrecognized flag ~a." a)
+				 (move-flag old-list new-flags i arg)))))
+		    (when (not flag-taken)
+		      (warn "Unrecognized option ~a" (char a cc))))
+		  (if boolean-taken
+		      (setf old-list (delete-nth i old-list))
+		      (progn
+			(dbug "skipping flag arg ~a ~w~%" i a)
+			;;(setf old-list (delete-nth i old-list))
+			(incf i)))))
+	   ;; Arg doesn't start with a dash, so skip it
+	   (progn
+	     (dbug "skipping arg ~a ~w~%" i a)
+	     (incf i))))
+#|    ;; Default any left over defaultable flags
+    (loop :for a :in possible-flags :do
+       (when (arg-default a)
+	 (push (arg-key a) new-flags)
+	 (push (arg-default a) new-flags))) |#
+    (setf new-flags (nreverse new-flags))
+    ;; Non-flagged mandatories.
+    (setf i 0)
+    (dbug "considering non-flagged: ~s~%" old-list)
+    (loop
+       :for arg :in (command-arglist command) :do
+       (if (not (or (arg-optional arg)
+		    (arg-has-flag arg)
+		    (arg-repeating arg)))
+	   (if (> (length old-list) 0)
+	       (progn
+		 (dbug "found mandatory arg ~a~%" arg)
+		 (move-arg old-list new-mandatories 0 arg))
+	       (error "Missing mandatory argument ~a." (arg-name arg)))
+	   ;; skip
+	   (incf i)))
+    (setf new-mandatories (nreverse new-mandatories))
+    ;; Non-flagged optionals
+    (dbug "considering non-flagged optionals: ~s~%" old-list)
+    (loop
+       :for arg :in (command-arglist command) :do
+       (if (and (arg-optional arg) (not (arg-repeating arg))
+		(not (arg-has-flag arg)))
+	   (if (> (length old-list) 0)
+	       (move-key old-list new-optionals 0 arg keyworded)
+	       #| (if (arg-default arg)
+	           (push-key new-optionals arg (arg-default arg) keyworded) |#
+	       ;; skip
+	       (incf i))))
+    (setf new-optionals (nreverse new-optionals))
+    ;; Repeating
+    (loop #| :with i = 0 :and did-one = nil :and end-flag |#
+       :for arg :in (command-arglist command) :do
+       (if (arg-repeating arg)
+	   (cond
+	     ((and (>= i (length old-list)) (not (arg-optional arg)))
+	      (error "Missing mandatory argument ~a." (arg-name arg)))
+;	     ((setf end-flag (arg-end-flag arg command))
+;	      ;; collect until end flag
+;	      (move-repeating (old-list new-list 0 arg keyworded end-flag)))
+;	     (check-for-multipe-repeats
+;	      ;; error
+;	      )
+	     (t
+	      ;; collect
+	      (move-repeating old-list new-repeating 0 arg keyworded)))))
+    (setf new-repeating (nreverse new-repeating))
+    (when (> (length old-list) 0)
+      (warn "Extra arguments: ~w" old-list))
+    (concatenate
+     'list new-mandatories new-optionals new-repeating new-flags)))
+
+#|
+(defun OLD-posix-to-lisp-args (command p-args)
+  "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
+become keyword arguments, in a way specified in the command's arglist."
+  ;; (when (= (length p-args) 0)
+  ;;   (return-from new-posix-to-lisp-args nil))
+  (let ((i 0)            ; Where we are in the old list, so effectively
+	                 ; a count of how many posix args we've skipped.
+;;;	(new-list        '())
+;;;	(old-list        (copy-list p-args)) ; so we don't modify it
+	(old-list        (mapcar #'shell-word-word p-args))
 	(new-flags       '())
 	(new-mandatories '())
 	(new-optionals   '())
@@ -1035,8 +1223,7 @@ become keyword arguments, in a way specified in the command's arglist."
     (concatenate
      'list new-mandatories new-optionals new-repeating new-flags)))
 
-#|
-(defun OLD-posix-to-lisp-args (command p-args)
+(defun OLDER-posix-to-lisp-args (command p-args)
   "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
 become keyword arguments, in a way specified in the command's arglist."
   ;; (when (= (length p-args) 0)
@@ -1174,8 +1361,8 @@ become keyword arguments, in a way specified in the command's arglist."
 ;; These arguemnt types have to come after commands are defined.
 
 (defclass arg-command (arg-choice) () (:documentation "A lish command name."))
-(defmethod convert-arg ((arg arg-command) (value string))
-  (declare (ignore arg))
+(defmethod convert-arg ((arg arg-command) (value string) &optional quoted)
+  (declare (ignore arg quoted))
   (get-command value))
 
 (defmethod argument-choices ((arg arg-command))

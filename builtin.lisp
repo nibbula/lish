@@ -15,24 +15,24 @@
 
 (in-package :lish)
 
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 1)
+		   (compilation-speed 0)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Command definitions
 
-(defbuiltin cd (("directory" pathname :help "Directory to change to."))
-  "Usage: cd [directory]
-Change the current directory to DIRECTORY."
+(defbuiltin cd (("directory" directory :help "Directory to change to."))
+  "Change the current directory to DIRECTORY."
   (setf (lish-old-pwd *shell*) (nos:current-directory))
   (nos:change-directory (or directory (nos:getenv "HOME"))))
 
 (defbuiltin pwd ()
-  "Usage: pwd
-Print the current working directory."
+  "Print the current working directory."
   (format t "~a~%" (nos:current-directory)))
 
-(defbuiltin pushd (("directory" pathname
+(defbuiltin pushd (("directory" directory
 				:help "Directory to push on the stack."))
-  "Usage: pushd [dir]
-Change the current directory to DIR and push it on the the front of the
+  "Change the current directory to DIR and push it on the the front of the
 directory stack."
   (when (not directory)
     (setf directory (pop (lish-dir-list *shell*))))
@@ -40,8 +40,7 @@ directory stack."
   (!cd directory))
 
 (defbuiltin popd (("number" number :help "Number of item to pop."))
-  "Usage: popd [n]
-Change the current directory to the top of the directory stack and remove it
+  "Change the current directory to the top of the directory stack and remove it
 from stack."
   (declare (ignore number))
   (let ((dir (pop (lish-dir-list *shell*))))
@@ -49,13 +48,11 @@ from stack."
     dir))
 
 (defbuiltin dirs ()
-  "Usage: dirs
-Show the directory stack."
+  "Show the directory stack."
   (format t "~a~%" (lish-dir-list *shell*)))
 
 (defbuiltin suspend ()
-  "Usage: suspend
-Suspend the shell."
+  "Suspend the shell."
 ;  (opsys:kill (opsys:getpid) opsys:sigstop))
   (opsys:kill (opsys:getpid) 17))	; SIGSTOP
 
@@ -145,22 +142,20 @@ Suspend the shell."
      (tiny-rl:show-history :lish))))
 
 (defbuiltin #:|:| (("args" t :repeating t))
-  "Usage: : [args]
-Arguments are evaluated for side effects."
+  "Arguments are evaluated for side effects."
   (declare (ignore args))
   (values))
 
 (defbuiltin echo
     (("no-newline" boolean :short-arg #\n :help "Don't output a newline.")
      ("args" t :repeating t))
-  "Usage: echo [-n] ...
-Output the arguments. If -n is given, then don't output a newline a the end."
+  "Output the arguments. If -n is given, then don't output a newline a the end."
   (format t "~{~a~#[~:; ~]~}" args)
   (when (not no-newline)
     (format t "~%")))
 
 (defparameter *help-subjects*
-  '("commands" "builtins" "editor" "keys")
+  '("commands" "builtins" "editor" "keys" "syntax")
   "Subjects we have help about.")
 
 (defun help-choices ()
@@ -181,7 +176,7 @@ Output the arguments. If -n is given, then don't output a newline a the end."
       #-clisp #'help-choices)
   (:documentation "Something which we can get help on."))
 
-(defvar *basic-help*
+(defparameter *basic-help*
 "~
 Lish version ~a help:
   command [arg*...]   Run a program in your path with the given ARGs.
@@ -189,13 +184,15 @@ Lish version ~a help:
   help [subject]      Show help on the subject.
   exit                Exit the shell.
 Subjects:
-  help commands       Show help on built-in commands.
+  help builtins       Show help on built-in commands.
+  help commands       Show help on added commands.
   help editor         Show help on the line editor.
   help keys           Show help on key bindings.
+  help syntax         Show help on shell syntax.
   help <command>      Show help for the command.
 ")
 
-(defvar *editor-help*
+(defparameter *editor-help*
 "You can use some Emacs-like commands to edit the command line.
 
 Some notable keys are:
@@ -210,34 +207,89 @@ Some notable keys are:
  <F9>         Switch back and forth between LISH and the lisp REPL.
 ")
 
+(defparameter *syntax-help*
+"The syntax is a combination of POSIX shell and Lisp, hopefully in a way that
+is familiar and not too surprising to those who know either.
+It is vaguely like:
+  ; comment
+  command [arg...]
+  command \"string\" !*lisp-object* (lisp-code) $ENV_VAR 
+  command *.glob ?ooba[rz]
+  command word\ with\ spaces \"string \\\" with a double quote\"
+  command | command | ...
+  command < file-name
+  command > file-name
+  ([lisp expressions...])
+
+Basically, inside parentheses you get Lisp reader syntax. Outside parentheses,
+you get a very simplified shell syntax with Lisp strings and comments.
+Some typical shell expansions are done in command arguments, such as shell
+globbing with *,?,and [], environment variable expansions with $VAR, and
+home directory expansions with ~~user. Pipeline and redirections should work
+nearly as expected.
+
+Commands can be:
+  - System executables in your standard PATH
+  - Built-in or later defined commands, defined with DEFCOMMAND
+  - Names of systems in your ASDF \"path\" which are expected to define a
+    command with the same name as the system, which is then invoked.
+  - Lisp functions or methods
+")
+
+(defun print-command-help (commands &key (built-in t))
+  (let ((rows
+	 (loop :with b :and doc :and pos
+	    :for k :in commands :do
+	    (setf b (get-command k)
+		 doc (documentation (command-function b) 'function)
+		 pos (position #\. doc))
+	    :when (and b (or (and built-in (command-built-in-p b))
+			     (and (not built-in) (not (command-built-in-p b)))))
+	    :collect
+	    (list
+	     (command-name b)
+	     ;; Only the first sentance, i.e. up to the first period,
+	     ;; without newlines.
+	     (substitute #\space #\newline
+			 (if pos
+			     (subseq doc 0 (1+ pos))
+			     doc))))))
+    (with-input-from-string
+	(in-str (with-output-to-string (str)
+		  (table:nice-print-table
+		   rows nil :trailing-spaces nil
+		   :stream str)))
+      (with-lines (l in-str)
+	;; add spaces in front and clip to screen columns
+	(format t "  ~a~%" (subseq l 0 (min (length l)
+					    (- (get-cols) 2))))))))
+
 (defbuiltin help (("subject" help-subject :help "Subject to get help on."))
-  "help [subject]         Show help on the subject.
-Without a subject show some subjects that are available."
+  "Show help on the subject. Without a subject show some subjects that are
+available."
   (if (not subject)
       (progn
 	(format t *basic-help* *version*))
       ;; topics
       (cond
-	((or (equalp subject "commands") (equalp subject "builtins"))
-;	 (format t "  ~c[4mName~14t~c[0m  ~c[4mSynopsis~80t~c[0m~%"
-;		 #\escape #\escape #\escape #\escape)
+	((equalp subject "builtins")
 	 (let ((commands
 		(sort
 		 (loop :for k :being :the :hash-keys :of (lish-commands)
 		    :collect k)
 		 #'string-lessp)))
 	   (format t "Built-in commands:~%")
-	   (loop :for k :in commands :do
-	      (let ((b (get-command k)))
-		  (when (and b (command-built-in-p b))
-		    (format t "  ~a~%" (posix-synopsis b)))))
-	   (format t "Added commands:~%")
-	   (loop :for k :in commands :do
-	      (let ((b (get-command k)))
-		  (when (and b (not (command-built-in-p b)))
-		    (format t "  ~a~%" (posix-synopsis b)))))))
-	((or (equalp subject "editor"))
-	 (format t *editor-help*))
+	   (print-command-help commands :built-in t)))
+	((equalp subject "commands")
+	 (let ((commands
+		(sort
+		 (loop :for k :being :the :hash-keys :of (lish-commands)
+		    :collect k)
+		 #'string-lessp)))
+	   (format t "Defined commands:~%")
+	   (print-command-help commands :built-in nil)))
+	((or (equalp subject "editor"))	 (format t *editor-help*))
+	((or (equalp subject "syntax"))	 (format t *syntax-help*))
 	((or (equalp subject "keys"))
 	 (format t "Here are the keys active in the editor:~%")
 	 (!bind :print-bindings t))
@@ -332,7 +384,7 @@ NAME is replaced by EXPANSION before any other evaluation."
 
 ;; WHY WHY WHY?
 ;; (format t "----------> ~(~w~)~%"
-;;         (shell-to-lisp-args
+;;         (command-to-lisp-args
 ;;          (make-argument-list '(("state" boolean-toggle :help "me")))))
 
 #|
@@ -464,8 +516,7 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
       (read-line nil nil)))
 
 (defbuiltin time (("command" string :repeating t :help "Command to time."))
-  "Usage: time command ...
-Shows some time statistics resulting from the execution of COMMNAD."
+  "Shows some time statistics resulting from the execution of COMMNAD."
   (time (shell-eval *shell* (make-shell-expr :words command))))
 
 (defun print-timeval (tv &optional (stream t))
@@ -488,8 +539,7 @@ Shows some time statistics resulting from the execution of COMMNAD."
             secs)))
 
 (defbuiltin times ()
-  "Usage: times
-Show accumulated times for the shell."
+  "Show accumulated times for the shell."
   (let ((self (getrusage :SELF))
 	(children (getrusage :CHILDREN)))
     (format t "Self     User: ~a~32tSys: ~a~%"
@@ -529,8 +579,13 @@ symbolic format, otherwise output in octal."
 	    (error err))
 	  (nos:umask real-mask)))))
 
-(defbuiltin ulimit ())
-(defbuiltin wait ())
+(defbuiltin ulimit ()
+  "Examine or set process resource limits."
+  (values))
+
+(defbuiltin wait ()
+  "Wait for commands to terminate."
+  (values))
 
 (defbuiltin exec (("command-words" t :repeating t
                     :help "Words of the command to execute."))
@@ -545,7 +600,8 @@ of chess?"
 (define-builtin-arg-type function (arg-symbol)
   "A function name."
   ()
-  :convert string (find-symbol (string-upcase value)))
+  :convert string
+  (find-symbol (string-upcase value)))
 
 (define-builtin-arg-type key-sequence (arg-string)
   "A key sequence."
@@ -635,7 +691,7 @@ better just to use Lisp syntax.
   (:default-initargs
    :choice-func #'verb-list)
   (:documentation "The name of a lish command."))
-(defmethod convert-arg ((arg arg-command) (value string))
+(defmethod convert-arg ((arg arg-command) (value string) &optional quoted)
   "Convert a string to a command."
   (get-command value))
 |#
@@ -711,8 +767,7 @@ if there isn't one."
       :help "Forget about command locations.")
      ("commands" t :repeating t
       :help "Command to operate on."))
-  "Usage: hash [-r] [commands...]
-Show remembered full pathnames of commands. If -r is given, forget them all."
+  "Show or forget remembered full pathnames of commands."
   (labels ((pr-cmd (c) (format t "~a~%" c)))
     (if rehash
 	(if commands
@@ -824,9 +879,10 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
   (("readable" boolean :short-arg #\r
     :help "True to output options that are re-readable by the shell.")
    ("name"  option :help "Option to set.")
-   ("value" object :help "Value to set option to."))
+   ("value" object :help "Value to set option to." :use-supplied-flag t))
+  "Examine or set shell options."
   (if name
-      (if value
+      (if value-supplied-p
 	  (set-option *shell* name value)
 	  (format t "~w~%" (get-option *shell* name)))
       (if readable
@@ -834,7 +890,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	     (format t "opt ~a ~w~%" (arg-name o) (arg-value o)))
 	  (print-properties
 	   (loop :for o :in (lish-options *shell*)
-	      :collect (list (arg-name o) (arg-value o)))
+	      :collect (list (arg-name o) (format nil "~s" (arg-value o))))
 	   :de-lispify nil :right-justify t))))
       
 ;; EOF

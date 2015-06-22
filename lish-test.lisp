@@ -13,7 +13,7 @@
 (in-package :lish-test)
 
 (defun vuvu (str l-args)
-  (let ((aa (shell-to-lisp-args (command-arglist (get-command str)))))
+  (let ((aa (command-to-lisp-args (command-arglist (get-command str)))))
     (format t "~w ~{~w ~}~%~w~%~%" str (command-arglist (get-command str)) aa)
     (assert (equalp aa l-args))))
 

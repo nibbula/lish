@@ -69,7 +69,7 @@
    #:!< #:!!<
    ;; internal-ish
    #:get-command
-   #:shell-to-lisp-args
+   #:command-to-lisp-args
    #:posix-to-lisp-args
    ))
 

@@ -70,4 +70,29 @@ means every dumped executable.")
 (defvar *buffer-size* (nos:getpagesize)
   "General buffer size for file or stream operations.")
 
+(defparameter *options* nil
+  "List of options defined.")
+
+(defstruct shell-expr
+  "The result of the shell lexer. A sequence of words and their start and ~
+end points in the original string."
+  words
+  word-start
+  word-end
+  word-quoted
+  line)
+
+(defstruct shell-word
+  "Used for temporarily splicing a shell-expr."
+  word
+  start
+  end
+  quoted)
+
+(defstruct suspended-job
+  id
+  name
+  command-line
+  resume-function)
+
 ;; EOF
