@@ -290,8 +290,12 @@ Not implemented yet:
   (or (and ;(slot-boundp (lish-options sh) 'prompt-string)
        (lish-prompt-string sh)
        (format-prompt sh (lish-prompt-string sh)))
-      (format nil "~a " (make-string (+ 1 *lish-level*)
-				     :initial-element (lish-prompt-char sh)))))
+      (if (and (lish-prompt-char sh)
+	       (characterp (lish-prompt-char sh)))
+	  (format nil "~a "
+		  (make-string (+ 1 *lish-level*)
+			       :initial-element (lish-prompt-char sh)))
+	  "")))
 
 ;; @@@ I know how stupid and unnecessary this is
 (defparameter *real-eof-symbol* :Z-REAL-EOF)
@@ -1243,7 +1247,9 @@ handling errors."
 		       (if pre-str
 			   (lish-sub-prompt sh)
 			   (if (lish-prompt-function sh)
-			       (funcall (lish-prompt-function sh) sh)
+			       (or (ignore-errors
+				     (funcall (lish-prompt-function sh) sh))
+				   "Your prompt function failed> ")
 			       (make-prompt sh))))))
 	  (cond
 	    ((and (stringp str) (equal 0 (length str))) *empty-symbol*)

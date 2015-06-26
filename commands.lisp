@@ -460,6 +460,7 @@ objects, like in the command object."
 
 (defmacro defargtype (name (&rest superclasses) &body body)
   "Define a command argument type. The syntax is something like:
+
 (defargtype foo (superclasses...)
   \"doc\"
   ((slot :blah blah))
@@ -470,10 +471,10 @@ objects, like in the command object."
       (zabble arg)
       (zibble arg value)))
 
-This defines a class ARG-FOO with superclasses SUPERS, with slot
-definitions suitable for DEFCLASS. DOC is optional class documentation.
-The optional :CONVERT clauses define ARG-CONVERT methods for
-the new argument class and the given type, e.g.:
+This defines a class ARG-FOO with SUPERCLASSES, with slot definitions suitable
+for DEFCLASS. DOC is optional class documentation. The optional :CONVERT
+clauses define ARG-CONVERT methods for the new argument class and the given
+type, e.g.:
   (arg-convert ((arg arg-foo) (value zoo-type)))
 where ARG is the name of the argument and VALUE is the name of the
 value to be converted.
