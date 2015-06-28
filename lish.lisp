@@ -283,13 +283,85 @@ Not implemented yet:
 	       )))
 	 (write-char c str)))))
 
+(defun symbolic-prompt-to-string (symbolic-prompt &optional ts-in)
+  ;; (when (not (consp symbolic-prompt))
+  ;;   (return-from symbolic-prompt-to-string symbolic-prompt))
+  (with-output-to-string (str)
+    (let ((ts (or ts-in (make-terminal-stream str))))
+      (loop :for s :in symbolic-prompt :do
+	 (typecase s
+	   (string (tt-write-string ts s))
+	   (character (tt-write-char ts s))
+	   (cons
+	    (cond
+	      ((keywordp (car s))
+	       (case (car s)
+		 (:normal
+		  (tt-normal ts)
+		  (symbolic-prompt-to-string (cdr s) ts))
+		 (:bold
+		  (tt-bold ts t)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-bold ts nil))
+		 (:underline
+		  (tt-underline ts t)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-underline ts nil))
+		 (:inverse
+		  (tt-inverse ts t)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-inverse ts nil))
+		 ((:black :fg-black)
+		  (tt-color ts :black :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 ((:red :fg-red)
+		  (tt-color ts :red :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 ((:green :fg-green)
+		  (tt-color ts :green :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 ((:yellow :fg-yellow)
+		  (tt-color ts :yellow :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 ((:blue :fg-blue)
+		  (tt-color ts :blue :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 ((:magenta :fg-magenta)
+		  (tt-color ts :magenta :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 ((:cyan :fg-cyan)
+		  (tt-color ts :cyan :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 ((:white :fg-white)
+		  (tt-color ts :white :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 ((:default :fg-default)
+		  (tt-color ts :default :default)
+		  (symbolic-prompt-to-string (cdr s) ts)
+		  (tt-color ts :default :default))
+		 (otherwise
+		  (error "Unrecognized attribute ~a" (car s)))))
+	      (t
+	       (error "Unrecognized thing in attribute list ~a" (car s)))))
+	   (t
+	    (princ s str))))
+      (tt-finish-output ts))))
+
 (defgeneric make-prompt (shell)
   (:documentation "Return a string to prompt with."))
 (defmethod make-prompt ((sh shell))
   "Return a string to prompt with."
-  (or (and ;(slot-boundp (lish-options sh) 'prompt-string)
-       (lish-prompt-string sh)
-       (format-prompt sh (lish-prompt-string sh)))
+  (or (and (lish-prompt-string sh)
+	   (format-prompt
+	    sh (symbolic-prompt-to-string (lish-prompt-string sh))))
       (if (and (lish-prompt-char sh)
 	       (characterp (lish-prompt-char sh)))
 	  (format nil "~a "

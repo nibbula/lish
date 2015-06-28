@@ -7,7 +7,7 @@
 (defpackage :lish
   (:documentation "Unix Shell & Lisp somehow smushed together.")
   (:use :cl :dlib :dlib-misc :opsys :stretchy :glob :completion :tiny-rl
-	:cl-ppcre)
+	:cl-ppcre :ansiterm)
   (:export
    ;; Main entry point(s)
    #:lish

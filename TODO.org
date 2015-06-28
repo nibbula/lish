@@ -21,9 +21,6 @@ Lish TODO list							     -*- org -*-
 ** argument defaults don't work in lish commands? (see wc)
 ** newly defined commands don't get recognized in completion
 ** tiny-rl display bugs
-** fix arg-option
-*** fix help
-*** arg completion
 ** argument parsing for commands
 *** fix edge cases, more testing for posix-to-lisp-args
 ** time should work for whole pipelines
@@ -36,14 +33,16 @@ Lish TODO list							     -*- org -*-
    for the first command, not the last command in the pipeline
 ** some seemingly sbcl specific bug when reading a non existent symbol,
    during load-file, like: no-exist:or-this
-   exhibited when loading .lishrc
+   exhibited when loading .lishrc doc command?
 ** DONE fixed bugs
 *** DONE completion with absolute path and stuff following, e.g.:
     "/opt/local/share/man/<here> (foo bar)"
 *** DONE glob expansion of filenames with quoted spaces?
 *** DONE cd to dir with spaces?
 *** DONE lisp expressions after the first don't get evaluated?
-* TODO option setting?
+*** DONE fix arg-option
+**** fix help
+**** arg completion
 * Essential festures
 ** EXTRACT COMMANDS!!
    I know it seems crazy, but, I want to separate commands from lish,
@@ -117,6 +116,8 @@ Lish TODO list							     -*- org -*-
 *** just basically do the ‘right thing’ in any circumstance!!!
     completion should know what you can type in any circumstance and
     provide help.
+*** other completion types
+**** #\character_name completion
 *** try git completion for example (compare to zsh)
 *** consider whole path expansion, eg.: /u/l/b -> /usr/local/bin
 **** also /u/s/b -> /usr/sX/b  (cursor is placed at X)
