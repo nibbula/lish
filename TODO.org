@@ -101,6 +101,9 @@ Lish TODO list							     -*- org -*-
 *** recursive globbing: **
     but please let's not do too much crazy globbing, like zsh
     let's just make find-file good with symbolic query syntax
+** add shell errors and restarts
+*** appropriate errors should be continuable, restartable
+*** all errors should be with shell-error or something
 * Non-essential features
 ** port to windows
 ** syntax colorization

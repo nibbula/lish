@@ -19,6 +19,40 @@
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
 		   (compilation-speed 0)))
 
+(define-condition shell-error (error)
+  ((format
+    :accessor shell-error-format
+    :initarg :format
+    :type string
+    :documentation "Format control for error reporting.")
+   (arguments
+    :accessor shell-error-arguments
+    :initarg :arguments
+    :type list
+    :documentation "Format arguments for error reporting."))
+  (:report (lambda (c s)
+	     (when (shell-error-format c)
+	       (format s "~?"
+		       (shell-error-format c)
+		       (shell-error-arguments c)))))
+  (:documentation "An error ocurring in the shell."))
+
+(define-condition unknown-command-error (error)
+  ((command-string
+    :accessor unknown-command-error-command-string
+    :initarg :command-string
+    :type string
+    :documentation "Name of the unknown command."))
+  (:report (lambda (c s)
+	     (if (shell-error-format c)
+		 (format s "~a ~?"
+			 (unknown-command-error-command-string c)
+			 (shell-error-format c)
+			 (shell-error-arguments c))
+		 (format s "~a not found"
+			 (unknown-command-error-command-string c)))))
+  (:documentation "Tried to execute an unknown command."))
+
 (deftype function-designator ()
   "Something that denotes a function."
   `(or function symbol null))

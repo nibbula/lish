@@ -38,7 +38,7 @@ clean_%:	%
 
 .PHONY:	lish
 lish:
-	echo "(l :tiny-repl) (l :lish) (lish:make-standalone)" \
+	echo "(l :tiny-repl) (l :tiny-debug) (l :lish) (lish:make-standalone)" \
 	 | $(LISP) -- -norl
 
 # plain, aka without my (or your) startup

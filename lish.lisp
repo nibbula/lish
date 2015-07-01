@@ -220,6 +220,7 @@ So far we support:
 %W	The basename of `$PWD', tildified.
 %$	If the effective UID is 0, `#', otherwise `$'.
 %i      The lisp implementation nickname.
+%p      The current value of *package*.
 %d      <3 char weekday> <3 char month name> <date>.
 %t	24 hour HH:MM:SS
 %T	12 hour HH:MM:SS
@@ -266,6 +267,8 @@ Not implemented yet:
 		     (twiddlify (basename (nos:current-directory))) str))
 	       (#\$ (write-char (if (= (nos:geteuid) 0) #\# #\$) str))
 	       (#\i (write-string *lisp-implementation-nickname* str))
+	       (#\p (write-string (s+ (shortest-package-nick)) str))
+	       (#\P (write-string (package-name *package*) str))
 	       (#\d (write-string
 		     (format-date "~3a ~3a ~2d"
 				  (:day-abbrev :month-abbrev :date)) str))
@@ -284,76 +287,113 @@ Not implemented yet:
 	 (write-char c str)))))
 
 (defun symbolic-prompt-to-string (symbolic-prompt &optional ts-in)
-  ;; (when (not (consp symbolic-prompt))
-  ;;   (return-from symbolic-prompt-to-string symbolic-prompt))
   (with-output-to-string (str)
-    (let ((ts (or ts-in (make-terminal-stream str))))
-      (loop :for s :in symbolic-prompt :do
-	 (typecase s
-	   (string (tt-write-string ts s))
-	   (character (tt-write-char ts s))
-	   (cons
-	    (cond
-	      ((keywordp (car s))
-	       (case (car s)
-		 (:normal
-		  (tt-normal ts)
-		  (symbolic-prompt-to-string (cdr s) ts))
-		 (:bold
-		  (tt-bold ts t)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-bold ts nil))
-		 (:underline
-		  (tt-underline ts t)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-underline ts nil))
-		 (:inverse
-		  (tt-inverse ts t)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-inverse ts nil))
-		 ((:black :fg-black)
-		  (tt-color ts :black :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 ((:red :fg-red)
-		  (tt-color ts :red :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 ((:green :fg-green)
-		  (tt-color ts :green :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 ((:yellow :fg-yellow)
-		  (tt-color ts :yellow :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 ((:blue :fg-blue)
-		  (tt-color ts :blue :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 ((:magenta :fg-magenta)
-		  (tt-color ts :magenta :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 ((:cyan :fg-cyan)
-		  (tt-color ts :cyan :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 ((:white :fg-white)
-		  (tt-color ts :white :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 ((:default :fg-default)
-		  (tt-color ts :default :default)
-		  (symbolic-prompt-to-string (cdr s) ts)
-		  (tt-color ts :default :default))
-		 (otherwise
-		  (error "Unrecognized attribute ~a" (car s)))))
-	      (t
-	       (error "Unrecognized thing in attribute list ~a" (car s)))))
-	   (t
-	    (princ s str))))
-      (tt-finish-output ts))))
+    (if (not (consp symbolic-prompt))
+	(princ symbolic-prompt str)
+	(let ((ts (or ts-in (make-terminal-stream str))))
+	  (loop :for s :in symbolic-prompt :do
+	     (typecase s
+	       (string (tt-write-string ts s))
+	       (character (tt-write-char ts s))
+	       (cons
+		(cond
+		  ((keywordp (car s))
+		   (case (car s)
+		     (:normal
+		      (tt-normal ts)
+		      (symbolic-prompt-to-string (cdr s) ts))
+		     (:bold
+		      (tt-bold ts t)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-bold ts nil))
+		     (:underline
+		      (tt-underline ts t)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-underline ts nil))
+		     (:inverse
+		      (tt-inverse ts t)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-inverse ts nil))
+		     ((:black :fg-black)
+		      (tt-color ts :black nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ((:red :fg-red)
+		      (tt-color ts :red nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ((:green :fg-green)
+		      (tt-color ts :green nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ((:yellow :fg-yellow)
+		      (tt-color ts :yellow nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ((:blue :fg-blue)
+		      (tt-color ts :blue nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ((:magenta :fg-magenta)
+		      (tt-color ts :magenta nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ((:cyan :fg-cyan)
+		      (tt-color ts :cyan nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ((:white :fg-white)
+		      (tt-color ts :white nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ((:default :fg-default)
+		      (tt-color ts :default nil)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts :default nil))
+		     ;; background
+		     ((:bg-black)
+		      (tt-color ts nil :black)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     ((:bg-red)
+		      (tt-color ts nil :red)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     ((:bg-green)
+		      (tt-color ts nil :green)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     ((:bg-yellow)
+		      (tt-color ts nil :yellow)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     ((:bg-blue)
+		      (tt-color ts nil :blue)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     ((:bg-magenta)
+		      (tt-color ts nil :magenta)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     ((:bg-cyan)
+		      (tt-color ts nil :cyan)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     ((:bg-white)
+		      (tt-color ts nil :white)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     ((:bg-default)
+		      (tt-color ts nil :default)
+		      (symbolic-prompt-to-string (cdr s) ts)
+		      (tt-color ts nil :default))
+		     (otherwise
+		      (error "Unrecognized attribute ~a" (car s)))))
+		  (t
+		   (error "Unrecognized thing in attribute list ~a" (car s)))))
+	       (t
+		(princ s str))))
+	  (tt-finish-output ts)))))
 
 (defgeneric make-prompt (shell)
   (:documentation "Return a string to prompt with."))
@@ -367,7 +407,7 @@ Not implemented yet:
 	  (format nil "~a "
 		  (make-string (+ 1 *lish-level*)
 			       :initial-element (lish-prompt-char sh)))
-	  "")))
+	  "> ")))
 
 ;; @@@ I know how stupid and unnecessary this is
 (defparameter *real-eof-symbol* :Z-REAL-EOF)
@@ -1274,6 +1314,15 @@ suspend itself."
     #\- #\$ #\~ #\! #\&)
   "Characters that are not considered to be part of a word in the shell.")
 
+(defun safety-prompt (sh)
+  "Return a prompt, in a manner unlikely to fail."
+  (if (lish-prompt-function sh)
+      (or (ignore-errors
+	    (funcall (lish-prompt-function sh) sh))
+	  "Your prompt function failed> ")
+      (or (ignore-errors (make-prompt sh))
+	  "Your prompt is broken> ")))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
 
@@ -1318,11 +1367,7 @@ handling errors."
 		       :prompt
 		       (if pre-str
 			   (lish-sub-prompt sh)
-			   (if (lish-prompt-function sh)
-			       (or (ignore-errors
-				     (funcall (lish-prompt-function sh) sh))
-				   "Your prompt function failed> ")
-			       (make-prompt sh))))))
+			   (safety-prompt sh)))))
 	  (cond
 	    ((and (stringp str) (equal 0 (length str))) *empty-symbol*)
 	    ((equal str *real-eof-symbol*)		*real-eof-symbol*)

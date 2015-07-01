@@ -798,7 +798,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
     ((gethash command (lish-aliases sh))        "alias")
     ((gethash command (lish-global-aliases sh)) "global alias")
     ((get-command-path command)		        "file")
-    (t "")))
+    (t nil)))
 
 (defun describe-command (cmd)
   (let (x)
@@ -830,9 +830,10 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
       :help "Names to describe."))
   "Describe what kind of command the name is."
   (when names
-    (loop :with args = names :and n = nil
+    (loop :with args = names :and n = nil :and did-one
        :while args :do
-       (setf n (car args))
+       (setf n (car args)
+	     did-one nil)
        (cond
 	 (path-only
 	  (let ((paths (command-paths n)))
@@ -841,26 +842,34 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	 (all
 	  (let ((x (gethash n (lish-aliases *shell*))))
 	    (when x
-	      (format t "~a is aliased to ~a~%" n x)))
+	      (format t "~a is aliased to ~a~%" n x)
+	      (setf did-one t)))
 	  (let ((x (gethash n (lish-global-aliases *shell*))))
 	    (when x
-	      (format t "~a is globally aliased to ~s~%" n x)))
+	      (format t "~a is globally aliased to ~s~%" n x)
+	      (setf did-one t)))
 	  (let ((x (gethash n (lish-commands))))
 	    (when x
-	      (format t "~a is the command ~a~%" n x)))
+	      (format t "~a is the command ~a~%" n x)
+	      (setf did-one t)))
 	  (let ((paths (command-paths n)))
 	    (when paths
 	      (format t (format nil "~~{~a is ~~a~~%~~}" n)
-		      paths)))
+		      paths)
+	      (setf did-one t)))
 	  (let* ((obj (read-from-string n)))
 	    (when (and (symbolp obj) (fboundp obj))
-	      (format t "~a is the function ~s~%" n (symbol-function obj)))))
+	      (format t "~a is the function ~s~%" n (symbol-function obj))
+	      (setf did-one t)))
+	  (when (not did-one)
+	    (format t "~a in unknown~%" n)))
 	 (t
 	  (let ((tt (command-type *shell* n)))
-	    (when tt
+	    (if tt
 	      (if type-only
 		  (format t "~a~%" tt)
-		  (describe-command n))))))
+		  (describe-command n))
+	      (format t "~a is unknown~%" n)))))
 	 (setf args (cdr args)))))
 
 (defbuiltin stats
