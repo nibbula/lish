@@ -77,8 +77,6 @@ Lish TODO list							     -*- org -*-
 ** add argument specs for external programs
 *** defexternal?
 *** scrape --help output or man pages?
-*** scrape from zsh or bash_completion dbs
-*** scrape from [[https://github.com/mbrubeck/compleat][compleat]] ?
 ** objects (return values) as pipeline data
    - Perhaps generic streams which could be object streams or character
      streams. But how to determine which one?
