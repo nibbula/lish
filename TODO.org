@@ -5,11 +5,14 @@ Lish TODO list							     -*- org -*-
 ** do essential features
 ** deal with library / utils issue
 * BUGS:
+** env command fails because of inadequate arg processing
 ** fix find -d ~/ -n foo
-   Be more explicit when stating bugs!!
-   What is wrong?
-   But it seems to fail when taking a long time and going to a pipe.
-   e.g.:    find -d ~/ -n foo | less  OR even: | pager
+   1. Prints all files, should only print matching foo,
+      but find --dir ~/ --name foo, works.
+   2. Gets a permission error, then fails to report it:
+      "There is no slot named SB-KERNEL:FORMAT-CONTROL in #<SB-KERNEL::CONDITION-CLASSOID OPSYS:POSIX-ERROR>"
+   3. ?Seems to fail when taking a long time and going to a pipe.
+      e.g.: find -d ~/ -n foo | less  OR even: | pager
 ** piping from lisp command to system command
    gets no output, e.g.: grep defun *.lisp | /usr/bin/less
 ** completion interning of partial symbol, so completing doesn't work right
@@ -34,6 +37,7 @@ Lish TODO list							     -*- org -*-
 ** some seemingly sbcl specific bug when reading a non existent symbol,
    during load-file, like: no-exist:or-this
    exhibited when loading .lishrc doc command?
+** should probabbaly unset $PWD if we're not going to update it
 ** DONE fixed bugs
 *** DONE completion with absolute path and stuff following, e.g.:
     "/opt/local/share/man/<here> (foo bar)"
@@ -55,6 +59,9 @@ Lish TODO list							     -*- org -*-
    Command sub-commands should somehow integrate seemlessly.
    The shell specific things like posix-to-lisp args can stay in lish,
    and other things specific to shell syntax.
+** Better argument specification
+*** operators and grouping in argument lists: :or :opt :and :repeat :case
+*** something like docargs
 ** redirections: < > << <()
 ** give in and handle ENVVAR=value command -OR- make env builtin work
 ** at least handle ^Z of subprocess!

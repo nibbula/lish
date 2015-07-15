@@ -226,7 +226,8 @@ literally in shell syntax."
       (t
        (let ((doc (and arg (documentation (type-of arg) 'type)))
 	     (choices (and arg (argument-choices arg))))
-	 (dbug "wazzup? ~s choices ~s ~%" fake-word choices)
+	 (let ((*print-lines* 20))
+	   (dbug "wazzup? ~s choices ~w ~%" fake-word choices))
 	 (if all
 	     (progn
 	       #| (print-values* (command expr pos all word-num word)) |#
@@ -236,7 +237,10 @@ literally in shell syntax."
 		     (dbug "snoo ~a? words-past ~a~%" command past)
 		     (list-arg-choices command doc choices))
 		   (progn
-		     (complete-filename fake-word pos all))))
+		     (if (and fake-word choices)
+			 (complete-list fake-word
+					(length fake-word) all choices)
+			 (complete-filename fake-word pos all)))))
 	     (progn
 	       (dbug "cmd arg fake-word ~s" fake-word)
 	       (if choices

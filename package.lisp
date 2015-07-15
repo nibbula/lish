@@ -45,6 +45,7 @@
    #:arg-boolean #:arg-number #:arg-integer #:arg-float #:arg-string
    #:arg-keyword #:arg-object #:arg-date #:arg-pathname
    #:arg-choice #:arg-choices #:arg-choice-labels
+   #:arg-lenient-choice
    ;; argument generics
    #:convert-arg
    ;; commands

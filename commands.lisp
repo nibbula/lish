@@ -27,7 +27,7 @@
     :documentation "Format control for error reporting.")
    (arguments
     :accessor shell-error-arguments
-    :initarg :arguments
+    :initarg :arguments :initform nil
     :type list
     :documentation "Format arguments for error reporting."))
   (:report (lambda (c s)
@@ -37,7 +37,7 @@
 		       (shell-error-arguments c)))))
   (:documentation "An error ocurring in the shell."))
 
-(define-condition unknown-command-error (error)
+(define-condition unknown-command-error (shell-error)
   ((command-string
     :accessor unknown-command-error-command-string
     :initarg :command-string
@@ -351,6 +351,27 @@
 	  (arg-choice-func arg))
      (funcall (arg-choice-func arg)))
     (t nil)))
+
+(defclass arg-lenient-choice (arg-choice)
+  ()
+  (:documentation
+   "An argument with known choices, but accepting anything."))
+  
+(defmethod convert-arg ((arg arg-lenient-choice) (value string)
+			&optional quoted)
+  (declare (ignore quoted))
+  (let (choice
+	(choices (argument-choices arg)))
+    (if (not choices)
+	(warn "Choice argument has no choices ~a." (arg-name arg))
+	(if (setf choice (find value choices
+			       :test #'(lambda (a b)
+					 (equalp a (princ-to-string b)))))
+	    choice
+	    (progn
+	      (warn "~s is not one of the choices for the argument ~:@(~a~)."
+		    value (arg-name arg))
+	      value)))))
 
 ;; This is so if it's not provided, it can toggle.
 (defclass arg-boolean-toggle (arg-boolean)
@@ -801,16 +822,51 @@ is a shell argument list. The BODY is the body of the function it calls."
   (defmethod args-help (arg-list))
   |#
 
+#|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||#
+#|| 									||#
+#|| Let's try something different.					||#
+#|| 									||#
+#|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||#
+
+;; [ ]     optional
+;; ( )     mandatory (not optional)
+;; ...     repeating
+;; a | b   or
+;; foo     literal string "foo", not optional
+;; --foo   option "foo"
+;; <foo>   type foo : arg-<foo>
+;; --      start of positional only
+
+;; We already have :optional and :repeating on individual items.
+;; We don't have grouping, which we need for mandatory ( ), and "or".
+;; We should implement "--".
+
+;; (:or a b c)                          a | b | c
+;; (:opt a b c)                         [ a b c ]
+;; (:and a b c)                         ( a b c )
+;; (:repeat a b c)                      ( a b c )...
+;; (:repeat a)                          a...
+;; (:opt (:repeat a))                   [a...]
+;; --a :positional b c                  --a -- --a
+;; (:or ("foo" (:opt x y z))            foo [x] [y] [z]
+;;      ("bar" (:opt a b c)))           bar [a] [b] [c]
+;; (:case <foo-cmd>			So we can have type based completion.
+;;  (foo (x y z))		        foo [x] [y] [z]
+;;  (bar (a b c)))		        bar [a] [b] [c]
+
+#|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||#
+
+
 #|
 
-  The rules for converting POSIX arguments to lambda lists are fairly complicated.
-  Here we try to examine some of the possiblities. We use a letter to denote the
-  category of argument:
+  The rules for converting POSIX arguments to lambda lists are fairly
+  complicated. Here we try to examine some of the possiblities. We use a
+  letter to denote the category of argument:
   m = manditory  o = optional  r = repeating  f = flagged
 
   When only manditory and optional are present, we don't need keywords.
-  The order of manditories vs optionals doesn't matter to lambda lists, but does
-  to POSIX.
+  The order of manditories vs optionals doesn't matter to lambda lists,
+  but does to POSIX.
   Non-flagged optionals must come after manditories.
 
   m1 m2		(m1 m2)				m1 m2
@@ -844,8 +900,8 @@ is a shell argument list. The BODY is the body of the function it calls."
   o1 of2	(&key of1 of2)			[-2] [o1]
   of1 o2	(&key of1 of2)			[-1] [o2]
 
-  Flagged manditory must be done as keywords, which DOES'T make other manditories
-  keywords.
+  Flagged manditory must be done as keywords, which DOES'T make other
+  manditories keywords.
   Manditory flagged treated as optional flagged, except error afterward if
   not present.
 
@@ -856,7 +912,8 @@ is a shell argument list. The BODY is the body of the function it calls."
   of1 of2 m1 mf2 	(m1 &key of1 of2 mf2)	[-of1] [-of2] [-mf2] m1
   mf1 mf2		(&key mf1 mf2)		[-mf1] [-mf2]
 
-  Repeating flagged: can have more than one, but values can't start with dashes!
+  Repeating flagged: can have more than one, but values can't start with
+  dashes!
   Repeating flagged manditory and optional are treated the same.
   rf1		(&rest rf1)			[-rf1 foo] [...]
   (*stupid but legal)
@@ -998,6 +1055,8 @@ is a shell argument list. The BODY is the body of the function it calls."
 become keyword arguments, in a way specified in the command's arglist."
   ;; (when (= (length p-args) 0)
   ;;   (return-from new-posix-to-lisp-args nil))
+  (when (equal (command-name command) "env")
+    (break))
   (let ((i 0)            ; Where we are in the old list, so effectively
 	                 ; a count of how many posix args we've skipped.
 ;;;	(new-list        '())

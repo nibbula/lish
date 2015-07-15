@@ -71,7 +71,7 @@
 (defun find-option (sh name)
   "Find the option of the shell SH, named NAME. Error if there is none."
   (or (find name (lish-options sh) :key #'arg-name :test #'equalp)
-      (error "No such option ~w" name)))
+      (error 'shell-error :format "No such option ~w" :arguments name)))
 
 (defun set-option (sh name value)
   "Set the option named NAME, for shell SH, to VALUE."
@@ -950,11 +950,16 @@ read from."
 	 (path    (get-command-path program))
 	 result result-stream)
     (if (not path)
-	(error "~a not found." program)
+	(error 'unknown-command-error
+	       :command-string program :format "not found.")
 	(progn
 	  (set-default-job-sigs)
 	  (if (or in-pipe out-pipe)
 	      (progn
+		(when in-pipe
+		  (format t "thingy: ~s~%would have been: ~a~%"
+			  in-pipe
+			  (slurp in-pipe)))
 		(setf result-stream
 		      (apply #'nos:popen
 			     `(,path ,args
@@ -1102,6 +1107,7 @@ bound during command."
 		       (let ((*standard-input* in-pipe))
 			 (runky command args))
 		       (runky command args))))
+;	   (format t "out-str = ~a~%" out-str)
 	   (make-string-input-stream out-str)
 	   nil))
 	(if in-pipe
