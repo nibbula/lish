@@ -2,12 +2,10 @@
 ;; package.lisp - Package definition for Lish
 ;;
 
-;; $Revision$
-
 (defpackage :lish
   (:documentation "Unix Shell & Lisp somehow smushed together.")
   (:use :cl :dlib :dlib-misc :opsys :stretchy :glob :completion :tiny-rl
-	:cl-ppcre :ansiterm)
+	:cl-ppcre :terminal :terminal-ansi)
   (:export
    ;; Main entry point(s)
    #:lish

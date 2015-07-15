@@ -456,8 +456,8 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 
 (defun get-cols ()
   (let ((tty (tiny-rl::line-editor-terminal (lish::lish-editor *shell*))))
-    (ansiterm:terminal-get-size tty)
-    (ansiterm:terminal-window-columns tty)))
+    (terminal-get-size tty)
+    (terminal-window-columns tty)))
 
 (defparameter *signal-names* (make-array
 			      (list nos:*signal-count*)

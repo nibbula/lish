@@ -290,7 +290,7 @@ Not implemented yet:
   (with-output-to-string (str)
     (if (not (consp symbolic-prompt))
 	(princ symbolic-prompt str)
-	(let ((ts (or ts-in (make-terminal-stream str))))
+	(let ((ts (or ts-in (make-terminal-stream str 'terminal-ansi))))
 	  (loop :for s :in symbolic-prompt :do
 	     (typecase s
 	       (string (tt-write-string ts s))

@@ -2,8 +2,6 @@
 ;;; lish.asd -- System definition for LISH package
 ;;;
 
-;;; $Revision: 1.6 $
-
 (defpackage :lish-system
     (:use :common-lisp :asdf))
 
@@ -14,10 +12,11 @@
     :description        "Lispy system command shell."
     :version            "0.1.0"
     :author             "Nibby Nebbulous <nibbula -(. @ .)- gmail.com>"
-    :licence            "GPL3 or something."
+    :licence            "GPLv3 or something."
     :long-description   "I don't recommend using this yet."
     :entry-point	"lish:shell-toplevel"
-    :depends-on (:tiny-rl :cl-ppcre :opsys :dlib :dlib-misc :stretchy :glob :chipz)
+    :depends-on (:dlib :opsys :dlib-misc :stretchy :glob :tiny-rl :cl-ppcre
+		 :chipz)
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))

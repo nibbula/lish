@@ -101,7 +101,7 @@ literally in shell syntax."
 
 (defun list-arg-choices (command doc choices)
   (let* ((cols
-	  (ansiterm:terminal-window-columns
+	  (terminal-window-columns
 	   (tiny-rl::line-editor-terminal (lish-editor *shell*))))
 	 (out-str (s+ (posix-synopsis command) #\newline
 		      (or doc "") #\newline
