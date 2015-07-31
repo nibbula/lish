@@ -20,11 +20,17 @@
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))
-     (:file "commands"  :depends-on ("package" "vars"))
-     (:file "complete"  :depends-on ("package" "vars" "commands"))
-     (:file "lish"   	:depends-on ("package" "vars" "commands" "complete"))
-     (:file "builtin"   :depends-on ("package" "vars" "commands" "complete"
-				     "lish"))
-     (:file "piping"	:depends-on ("package" "vars" "commands" "lish"))
-     (:file "mine"      :depends-on ("package" "vars" "commands" "lish"
-				     "piping"))))
+     (:file "args"      :depends-on ("package" "vars"))
+     (:file "commands"  :depends-on ("package" "vars" "args"))
+     (:file "shell"     :depends-on ("package" "vars" "args" "commands"))
+     (:file "complete"  :depends-on ("package" "vars" "args" "commands"))
+     (:file "stats"     :depends-on ("package" "vars" "args" "commands"
+				     "shell"))
+     (:file "lish"   	:depends-on ("package" "vars" "args" "commands"
+				     "shell" "complete" "stats"))
+     (:file "builtin"   :depends-on ("package" "vars" "args" "commands"
+				     "shell" "complete" "stats" "lish"))
+     (:file "piping"	:depends-on ("package" "vars" "args" "commands"
+				     "shell" "lish"))
+     (:file "mine"      :depends-on ("package" "vars" "args" "commands"
+				     "shell" "lish" "piping"))))

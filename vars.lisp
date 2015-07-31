@@ -2,8 +2,6 @@
 ;; vars.lisp - Variables for Lish
 ;;
 
-;; $Revision$
-
 (in-package :lish)
 
 (defvar *version-file* "version.lisp")
@@ -23,6 +21,9 @@
 |#
 
 (defun read-version ()
+  (when (not (probe-file *version-file*))
+    (setf *version-file* (tiny-rl:read-filename
+			  :prompt "Where is version.lisp? ")))
   (with-open-file (str *version-file*)
     (safe-read-from-string (read-line str))))
 

@@ -2,8 +2,6 @@
 ;; builtin.lisp - Lish built-in commands.
 ;;
 
-;; $Revision$
-
 ;; Here we define the commands that are built in to Lish.
 
 ;; Most of these are really just for compatability with a POSIX shell, so
@@ -371,21 +369,24 @@ NAME is replaced by EXPANSION before any other evaluation."
   "Evalute lish commands in the given file."
   (without-warning (load-file *shell* filename)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defbuiltin debug (("state" boolean-toggle :help "State of debugging."))
-    "Toggle shell debugging."
-    (format t "before state is ~s~%" state)
-    (setf (lish-debug *shell*)
-	  (if (eql state :toggle)
-	      (not (lish-debug *shell*))
-	      state))
-    (format t "after state is ~s~%" state)
-    (format t "Debugging is ~:[OFF~;ON~].~%" (lish-debug *shell*))))
+;; XXX I wish this would work without using the :use-supplied-flag, just using
+;; the default value of :toggle in boolean-toggle, but there is some kind of
+;; bug or something about class default args at compile time that I don't
+;; understand.
+
+(defbuiltin debug
+  (("state" boolean-toggle :help "State of debugging." :use-supplied-flag t))
+  "Toggle shell debugging."
+  (setf (lish-debug *shell*)
+	(if (or (not state-supplied-p) (eql state :toggle))
+	    (not (lish-debug *shell*))
+	    state))
+  (format t "Debugging is ~:[OFF~;ON~].~%" (lish-debug *shell*)))
 
 ;; WHY WHY WHY?
 ;; (format t "----------> ~(~w~)~%"
 ;;         (command-to-lisp-args
-;;          (make-argument-list '(("state" boolean-toggle :help "me")))))
+;;          (make-argument-list '(("state" boolean-toggle)))))
 
 #|
 ;; Just use the version from dlib-misc	;
