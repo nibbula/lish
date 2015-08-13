@@ -139,10 +139,42 @@
 	num
 	(error "Can't convert ~w to a number." value))))
 
+;; @@@ This should probably support the same args as PARSE-INTEGER and be
+;; put somewhere else.
+(defun parse-integer-with-radix (str)
+  "Parse an integer from a string, allowing for a Lisp radix prefix."
+  (cond
+    ((and str (> (length str) 2)
+	  (char= (char str 0) #\#))
+     (cond
+       ((position (char str 1) #(#\b #\o #\x) :test #'char-equal)
+	(parse-integer str :junk-allowed nil :start 2
+		       :radix (cond
+				((char-equal (char str 1) #\b) 2)
+				((char-equal (char str 1) #\o) 8)
+				((char-equal (char str 1) #\x) 16))))
+       ((digit-char-p (char str 1))
+	(let (radix start)
+	  (cond
+	    ((char-equal #\r (char str 2))
+	     (setf radix (parse-integer str :start 1 :end 2 :junk-allowed nil)
+		   start 3))
+	    ((and (digit-char-p (char str 2))
+		  (char-equal #\r (char str 3)))
+	     (setf radix (parse-integer str :start 1 :end 3 :junk-allowed nil)
+		   start 4))
+	    (t
+	     (error "Malformed radix in integer ~a." str)))
+	  (parse-integer str :junk-allowed nil :start start :radix radix)))
+       (t
+	(error "Malformed integer ~a." str))))
+    (t
+     (parse-integer str :junk-allowed nil))))
+
 (defclass arg-integer (arg-number) () (:documentation "An integer."))
 (defmethod convert-arg ((arg arg-integer) (value string) &optional quoted)
   (declare (ignore quoted))
-  (let ((int (parse-integer value :junk-allowed nil)))
+  (let ((int (parse-integer-with-radix value)))
     (if (and int (integerp int))
 	int
 	(error "Can't convert ~w to an integer." value))))

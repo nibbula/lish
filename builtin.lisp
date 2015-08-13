@@ -139,10 +139,11 @@ from stack."
     (t
      (tiny-rl:show-history :lish))))
 
-(defbuiltin #:|:| (("args" t :repeating t))
-  "Arguments are evaluated for side effects."
-  (declare (ignore args))
-  (values))
+;; This seems stupid and unnecessary. 
+;; (defbuiltin #:|:| (("args" t :repeating t))
+;;   "Arguments are evaluated for side effects."
+;;   (declare (ignore args))
+;;   (values))
 
 (defbuiltin echo
     (("no-newline" boolean :short-arg #\n :help "Don't output a newline.")
@@ -699,7 +700,14 @@ better just to use Lisp syntax.
 
 (defbuiltin undefcommand (("command" command :help "The command to forget."))
   "Undefine a command."
-  (undefine-command (string-downcase command)))
+  (typecase command
+    ((or string symbol)
+     (undefine-command (string-downcase command)))
+    (command
+     (undefine-command (command-name command)))
+    (t
+     (error "I don't know how to undefine a command of type ~a."
+	    (type-of command)))))
 
 (defun is-executable (s)
   (logand (file-status-mode s) S_IXUSR))

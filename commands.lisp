@@ -97,8 +97,8 @@
     ;; 				(format stream "<unnamed>"))))))
     (format stream "~a" (posix-synopsis o))))
 
-(defparameter *initial-commands* nil
-  "List of initial commands.")
+;; (defparameter *initial-commands* nil
+;;   "List of initial commands.")
 
 (defparameter *command-list* nil
   "List of command names")
@@ -122,11 +122,14 @@ instances.")
   (gethash name (lish-commands)))
 
 (defun init-commands ()
-  "Set up the *LISH-COMMANDS* hash table, and load it with the commands from
-*INITIAL-COMMANDS*, which is likely whatever commands were defined with
-DEFBUILTIN."
-  (loop :for (k v) :in *initial-commands*
-     :do (set-command k v)))
+  "This doesn't really do anything anymore, we're just keeping it in case
+we want to use it for something in the future."
+  (values))
+;;   "Set up the *LISH-COMMANDS* hash table, and load it with the commands from
+;; *INITIAL-COMMANDS*, which is likely whatever commands were defined with
+;; DEFBUILTIN."
+;;   (loop :for (k v) :in *initial-commands*
+;;      :do (set-command k v)))
 
 (eval-when (:compile-toplevel :load-toplevel) ; needed by defcommand macro
   (defun command-function-name (n)
@@ -162,29 +165,25 @@ DEFBUILTIN."
 ;; There should be little distinction between a user defined command and
 ;; "built-in" command, except perhaps for a warning if you redefine a
 ;; pre-defined command, and the fact that things defined in here are
-;; considered "built-in" and listed in help.
+;; considered "built-in" and listed in help that way.
 
-(defmacro defbuiltin (name (&rest arglist) &body body)
-  "This is like defcommand, but for things that are considered built in to the
-shell."
-  (let* ((func-name (command-function-name name))
-	 #| (command-name (intern (string name) :lish)) |#
-	 (name-string (string-downcase name))
-	 #| (name-string (concatenate 'string "\"" (string-downcase name) "\"")) |#
-;;;	 (evaled-arglist (eval-defaults arglist))
-	 (params (command-to-lisp-args (make-argument-list arglist t))))
-    `(progn
-       (defun ,func-name ,params
-	 ,@body)
-;;;       (export (quote ,func-name))
-;;;       (push (quote ,command-name) *command-list*)
-       (pushnew ,name-string *command-list* :test #'equal)
-       (push (list ,name-string (make-instance
-				 'command :name ,name-string
-				 :arglist (make-argument-list ',arglist)
-				 :loaded-from *load-pathname*
-				 :built-in-p t))
-	     *initial-commands*))))
+;; (defmacro defbuiltin (name (&rest arglist) &body body)
+;;   "This is like defcommand, but for things that are considered built in to the
+;; shell."
+;;   (let* ((func-name (command-function-name name))
+;; 	 (name-string (string-downcase name))
+;; ;;;	 (evaled-arglist (eval-defaults arglist))
+;; 	 (params (command-to-lisp-args (make-argument-list arglist t))))
+;;     `(progn
+;;        (defun ,func-name ,params
+;; 	 ,@body)
+;;        (pushnew ,name-string *command-list* :test #'equal)
+;;        (push (list ,name-string (make-instance
+;; 				 'command :name ,name-string
+;; 				 :arglist (make-argument-list ',arglist)
+;; 				 :loaded-from *load-pathname*
+;; 				 :built-in-p t))
+;; 	     *initial-commands*))))
 
 ;; This is differs from DEFBUILTIN in that:
 ;;   - It doesn't push to *initial-commands*
@@ -227,27 +226,36 @@ shell."
 ;;   See Also
 ;;   Notes
 
-(defmacro defcommand (name (&rest arglist) &body body)
+;; Don't export stuff because it causes package variance on reloading.
+;; @@@ Perhaps we should define commands in the LISH-USER package
+;; instead, so they can be exported and used by other packages?
+
+(defmacro %defcommand (name built-in-p (&rest arglist) &body body)
   "Define a command for the shell. NAME is the name it is invoked by. ARGLIST
 is a shell argument list. The BODY is the body of the function it calls."
   (let ((func-name (command-function-name name))
-;;;	(command-name (intern (string name)))
 	(name-string (string-downcase name))
 	(params (command-to-lisp-args (make-argument-list arglist t))))
     `(progn
        (defun ,func-name ,params
 	 ,@body)
-       ;; Don't export stuff because it causes package variance on reloading.
-       ;; @@@ Perhaps we should define commands in the LISH-USER package
-       ;; instead, so they can be exported and used by other packages?
-;;;       (push (quote ,command-name) lish::*command-list*)
        (pushnew ,name-string lish::*command-list* :test #'equal)
-;;;       (set (find-symbol "*COMMAND-LIST*" :lish) (quote ,command-name))
        (set-command ,name-string
 		    (make-instance (find-symbol "COMMAND" :lish)
 				   :name ,name-string
 				   :loaded-from *load-pathname*
+				   :built-in-p ,built-in-p
 				   :arglist (make-argument-list ',arglist))))))
+
+(defmacro defcommand (name (&rest arglist) &body body)
+  "Define a command for the shell. NAME is the name it is invoked by. ARGLIST
+is a shell argument list. The BODY is the body of the function it calls."
+  `(%defcommand ,name nil (,@arglist) ,@body))
+
+(defmacro defbuiltin (name (&rest arglist) &body body)
+  "Define a command for the shell. NAME is the name it is invoked by. ARGLIST
+is a shell argument list. The BODY is the body of the function it calls."
+  `(%defcommand ,name t (,@arglist) ,@body))
 
 (defun undefine-command (name)
   (unset-command name)
@@ -895,6 +903,19 @@ become keyword arguments, in a way specified in the command's arglist."
 
 ;(defmacro defexternal 
 
+#|
+(defmacro call-with-keywords (command-name func &rest kw)
+  (with-unique-names (args)
+    `(let ((,args (loop :with arg-kw
+		     :for a :in (lish:command-arglist
+				 (lish:get-command ,command-name))
+		     :do
+		     (setf arg-kw (keywordify (lish:arg-name a)))
+		     :if (or (not ,kw) (position arg-kw ,kw))
+		     :collect arg-kw
+		     :collect (symbolify (lish:arg-name a)))))
+       (apply ,func ,args))))
+|#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; These arguemnt types have to come after commands are defined.
