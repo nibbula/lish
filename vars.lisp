@@ -4,8 +4,6 @@
 
 (in-package :lish)
 
-(defvar *version-file* "version.lisp")
-
 #|
 (eval-when (:compile-toplevel)
   (format t "compile ~a~%"
@@ -20,12 +18,18 @@
 	  (merge-pathnames (pathname "version.lisp") (or *load-pathname* ""))))
 |#
 
+(defvar *version-file* "version.lisp")
+
 (defun read-version ()
   (when (not (probe-file *version-file*))
     (setf *version-file* (tiny-rl:read-filename
 			  :prompt "Where is version.lisp? ")))
   (with-open-file (str *version-file*)
     (safe-read-from-string (read-line str))))
+
+(eval-when (:compile-toplevel)
+  (declaim (sb-ext:muffle-conditions warning))
+  (defconstant +version-flie+ *version-file*))
 
 (defun write-version (version)
   (with-open-file (str *version-file*
