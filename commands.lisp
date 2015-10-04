@@ -72,6 +72,15 @@
     :initarg :handle-unrecognized :accessor command-handle-unrecognized
     :initform nil :type boolean
     :documentation "True to pass unrecogized arguments to the command.")
+   (accepts
+    :initarg :accepts :accessor command-accepts :initform :unspecified
+    :documentation
+    "Sequence of things the command accepts. Probably one of:
+     :STREAM		An output stream.
+     :GROTTY-STREAM	An output stream which can have terminal decorations.
+     :SEQUENCE		A sequnce of objects.
+     :UNSPECIFIED	We don't know. This is the default.
+     NIL		Doesn't accept anything.")
    (built-in-p
     :accessor command-built-in-p  :initarg :built-in-p :initform nil
     :documentation "True if the command is considered ‘built in’.")
@@ -232,19 +241,28 @@ we want to use it for something in the future."
 
 (defmacro %defcommand (name built-in-p (&rest arglist) &body body)
   "Define a command for the shell. NAME is the name it is invoked by. ARGLIST
-is a shell argument list. The BODY is the body of the function it calls."
+is a shell argument list. The BODY is the body of the function it calls.
+BODY can have :ACCEPTS followed by a single or list of accept keywords to
+indicate what kind of things the command accepts from a pipeline."
   (let ((func-name (command-function-name name))
 	(name-string (string-downcase name))
-	(params (command-to-lisp-args (make-argument-list arglist t))))
+	(params (command-to-lisp-args (make-argument-list arglist t)))
+	(accepts :unspecified)
+	fixed-body)
+    (if (eq (car body) :accepts)
+	(setf accepts (cadr body)
+	      fixed-body (cddr body))
+	(setf fixed-body body))
     `(progn
        (defun ,func-name ,params
-	 ,@body)
+	 ,@fixed-body)
        (pushnew ,name-string lish::*command-list* :test #'equal)
        (set-command ,name-string
 		    (make-instance (find-symbol "COMMAND" :lish)
 				   :name ,name-string
 				   :loaded-from *load-pathname*
 				   :built-in-p ,built-in-p
+				   :accepts ,accepts
 				   :arglist (make-argument-list ',arglist))))))
 
 (defmacro defcommand (name (&rest arglist) &body body)

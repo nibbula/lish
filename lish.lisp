@@ -1038,7 +1038,7 @@ probably fail, but perhaps in similar way to other shells."
        ;; re-read and re-eval the line with the alias expanded
        (expand-alias sh alias expanded-words in-pipe out-pipe))
       ;; Autoload
-      ((and (in-lisp-path cmd)	
+      ((and (in-lisp-path cmd)
 	    (setf command (load-lisp-command cmd)))
        ;; now try it as a command
        (record-command-stats cmd :command)
@@ -1077,12 +1077,39 @@ probably fail, but perhaps in similar way to other shells."
 		   ;; Just try a system command anyway, which will likely fail.
 		   (sys-cmd)))))))))
 
+(defvar *input* nil
+  "The output of the previous command in pipeline.")
+
+(defvar *output* nil
+  "The output of the current command.")
+
+(defvar *accepts* nil
+  "What the next command in the pipeline accepts.")
+
+(defun get-accepts (expr)
+  (typecase expr
+    (shell-expr
+     ;;(format t "shell-expr ~s~%" expr)
+     (get-accepts (elt (shell-expr-words expr) 0)))
+    (list
+     ;;(format t "list ~s~%" expr)
+     (get-accepts (if (keywordp (car expr))
+		      (cdr expr)
+		      (car expr))))
+    (string
+     ;;(format t "string ~s~%" expr)
+     (let ((cmd (get-command expr)))
+       (and cmd (command-accepts cmd))))
+    (t
+     ;;(format t "-T- ~s ~s~%" (type-of expr) expr)
+     :unspecified)))
+
 (defun successful (obj)
   "Return true if the object represents a successful command result."
   (or
    ;; Zero return value from a system command?
    (and obj (and (numberp obj) (zerop obj)))
-   t)) ;; Any other value from lisp code or commands/
+   t)) ;; Any other value from lisp code or commands.
 
 (defun shell-eval (sh expr &key no-alias in-pipe out-pipe)
   "Evaluate the shell expression EXPR. If NO-ALIAS is true, don't expand
@@ -1137,7 +1164,11 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	 (if (listp w0)
 	     ;; Compound command
 	     (case (first w0)
-	       (:pipe     (eval-compound (successful vals) t))
+	       (:pipe
+		(let ((*accepts* (get-accepts (elt (shell-expr-words expr) 1)))
+		      (*input* *output*)
+		      (*output* nil))
+		  (eval-compound (successful vals) t)))
 	       (:and      (eval-compound (successful vals) nil))
 	       (:or       (eval-compound (not (successful vals)) nil))
 	       (:sequence (eval-compound t nil)))
