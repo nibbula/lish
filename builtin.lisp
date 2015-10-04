@@ -728,15 +728,16 @@ if there isn't one."
   (when (has-directory-p cmd)
     (return-from command-pathname cmd))
   (loop :for dir :in (split-sequence *path-separator* (getenv "PATH")) :do
-	(when (probe-directory dir)
-	  (loop :with full = nil
-		:for f :in (read-directory :dir dir) :do
-		(when (and (equal f cmd)
-			   (is-regular-executable
-			    (setf full
-				  (format nil "~a~c~a"
-					  dir *directory-separator* cmd))))
-		  (return-from command-pathname full)))))
+     (handler-case
+       (when (probe-directory dir)
+	 (loop :with full = nil
+	    :for f :in (read-directory :dir dir) :do
+	    (when (and (equal f cmd)
+		       (is-regular-executable
+			(setf full (format nil "~a~c~a"
+					   dir *directory-separator* cmd))))
+	      (return-from command-pathname full))))
+       (error (c) (declare (ignore c)))))
   nil)
 
 (defun command-paths (cmd)
