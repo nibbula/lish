@@ -16,6 +16,9 @@
    #:*old-pwd*
    #:*dir-list*
    #:*shell-path*
+   #:*accepts*
+   #:*output*
+   #:*input*
    ;; (installation)
    #:make-standalone
    ;; shell options
@@ -48,7 +51,7 @@
    #:convert-arg
    ;; commands
    #:command #:command-name #:command-function #:command-arglist
-   #:command-built-in-p #:command-loaded-from
+   #:command-built-in-p #:command-loaded-from #:command-accepts
    #:defcommand
    #:!cd #:!pwd #:!pushd #:!popd #:!dirs #:!suspend #:!history #:!echo
    #:!help #:!alias #:!unalias #:!type #:!exit #:!source #:!debug #:!bind
@@ -66,10 +69,15 @@
    #:!and #:!or #:!bg
    #:!> #:!>> #:!>! #:!>>!
    #:!< #:!!<
-   ;; internal-ish
+   ;; internal-ish things that might want to be used
    #:get-command
    #:command-to-lisp-args
    #:posix-to-lisp-args
+   #:shell-read
+   #:shell-eval
+   #:format-prompt
+   #:load-file
+   #:suspend-job
    ))
 
 ;; EOF
