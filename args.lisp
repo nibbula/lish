@@ -152,7 +152,8 @@
 		       :radix (cond
 				((char-equal (char str 1) #\b) 2)
 				((char-equal (char str 1) #\o) 8)
-				((char-equal (char str 1) #\x) 16))))
+				((char-equal (char str 1) #\x) 16)
+				(t 10))))
        ((digit-char-p (char str 1))
 	(let (radix start)
 	  (cond
