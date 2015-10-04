@@ -5,7 +5,8 @@ Lish TODO list							     -*- org -*-
 ** do essential features
 ** deal with library / utils issue
 * BUGS:
-** env command fails because of inadequate arg processing
+** env builtin fails because of inadequate arg processing
+** kill builtin arg processing
 ** fix find -d ~/ -n foo
    1. Prints all files, should only print matching foo,
       but find --dir ~/ --name foo, works.
@@ -148,7 +149,7 @@ Lish TODO list							     -*- org -*-
 *** ulimit
 *** umask
 *** wait
-* org
+* COMMENT org
 #+SEQ_TODO: TODO DONE
 #+SEQ_TODO: LATER NO
 * COMMENT MeTaDaTa
