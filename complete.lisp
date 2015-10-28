@@ -2,8 +2,6 @@
 ;; complete.lisp - Completion for Lish
 ;;
 
-;; $Revision$
-
 (in-package :lish)
 
 ; (defun quoted-start (str pos)
@@ -36,6 +34,20 @@ commands are added.")
 (defun probe-file-or-dir (p)
   (or (probe-directory p) (probe-file p)))
 
+;; Perhaps, this should be in OPSYS, but of course there's also access(2).
+(defun is-executable (pathname)
+  "Given a pathname, return true if it's likely to be executable, which
+probably means it's a regular file and we have execute permission on it."
+  (let* ((stat (stat pathname))
+	 (mode (file-status-mode stat)))
+    (and (is-regular-file mode)
+	 (or (is-other-executable mode)
+	     (and (is-user-executable mode)
+		  (eql (file-status-uid stat) (geteuid)))
+	     (and (is-group-executable mode)
+		  (or (eql (file-status-gid stat) (getegid)))
+		  (position (file-status-gid stat) (get-groups)))))))
+
 (defun verb-list (shell)
   "Return the command list for the current shell: *shell*."
   (if (not *verb-list*)
@@ -48,8 +60,11 @@ commands are added.")
 		 :collect k)
 	      (loop :for dir :in (split-sequence #\: (nos:getenv "PATH"))
 		 :if (probe-directory dir)
-		 :append (loop :for f :in (nos:read-directory :dir dir :full t)
-			    :if (eql (nos:dir-entry-type f) :regular)
+		 :append (loop :for f :in (nos:read-directory :dir dir :full t
+							      :omit-hidden t)
+			    :if (without-access-errors
+				  (is-executable (s+ dir *directory-separator*
+						     (nos:dir-entry-name f))))
 			    :collect (nos:dir-entry-name f))))
 	     :test #'equal))
       *verb-list*))
@@ -270,6 +285,7 @@ complete, and call the appropriate completion function."
        (complete-symbol context pos all))
       (shell-expr
        (let* ((word-num (shell-word-number exp pos))
+	      (first-word (first (shell-expr-words exp)))
 	      word word-pos)
 	 ;; word-num is the index of the word in the shell expr
 	 ;; word is the text of the word
@@ -295,19 +311,20 @@ complete, and call the appropriate completion function."
 		    ;; probably ()
 		    (dbug "bogo~%")
 		    (complete-symbol context pos all))
-		  (let ((from-end (- (length context) pos))
-			(first-word (first (shell-expr-words exp))))
+		  (let ((from-end (- (length context) pos)))
 		    (dbug "heyba~%")
 		    (multiple-value-bind (result new-pos)
 			(if (setf cmd (get-command first-word))
 			    (progn
 			      (dbug "Baaa~%")
 			      (complete-command-arg context cmd exp pos all))
-			    (complete-filename word (- (length word) from-end) all))
+			    (complete-filename word
+					       (- (length word) from-end) all))
 		      (declare (ignore new-pos))
 		      (values (if (not all) (quotify result) result)
 			      (or (and word-num
-				       (elt (shell-expr-word-start exp) word-num))
+				       (elt (shell-expr-word-start exp)
+					    word-num))
 				  pos))))))
 	     ((symbolp word)
 	      (dbug "janky~%")
@@ -349,8 +366,7 @@ complete, and call the appropriate completion function."
 	      (let ((from-end (- (length context) pos)))
 		(dbug "hello ~a~%" word)
 		(multiple-value-bind (result new-pos)
-		    (if (setf cmd (get-command
-				   (elt (shell-expr-words exp) 0)))
+		    (if (setf cmd (get-command first-word))
 			(progn
 			  (dbug "blurgg~%")
 			  (complete-command-arg
@@ -358,8 +374,14 @@ complete, and call the appropriate completion function."
 			   all word-num word word-pos))
 			(progn
 			  (dbug "jorky~%")
-			  (complete-filename word (- (length word) from-end)
-					     all)))
+			  ;; But it could be a command which isn't loaded yet.
+			  (if (load-lisp-command first-word)
+			      (complete-command-arg
+			       context (get-command first-word) exp pos
+			       all word-num word word-pos)
+			      (complete-filename word
+						 (- (length word) from-end)
+						 all))))
 		  (declare (ignore new-pos))
 		  (dbug "result = ~s~%" result)
 		  (if all
