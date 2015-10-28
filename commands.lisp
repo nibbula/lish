@@ -109,8 +109,8 @@
 ;; (defparameter *initial-commands* nil
 ;;   "List of initial commands.")
 
-(defparameter *command-list* nil
-  "List of command names")
+(defvar *command-list* nil
+  "List of command names.")
 
 (defvar *lish-commands* nil
   "Hash table of commands. This means that commands are shared by all shell
