@@ -22,7 +22,9 @@
 (defbuiltin cd (("directory" directory :help "Directory to change to."))
   "Change the current directory to DIRECTORY."
   (setf (lish-old-pwd *shell*) (nos:current-directory))
-  (nos:change-directory (or directory (nos:getenv "HOME"))))
+  (nos:change-directory (or directory (nos:getenv "HOME")))
+  ;; Update $PWD like traditional Unix shells.
+  (nos:setenv "PWD" (nos:current-directory)))
 
 (defbuiltin pwd ()
   "Print the current working directory."
@@ -709,6 +711,7 @@ better just to use Lisp syntax.
      (error "I don't know how to undefine a command of type ~a."
 	    (type-of command)))))
 
+#|
 (defun is-executable (s)
   (logand (file-status-mode s) S_IXUSR))
 
@@ -718,6 +721,7 @@ better just to use Lisp syntax.
 (defun is-regular-executable (p)
   (let ((st (stat p)))
     (and st (is-executable st) (is-regular st))))
+|#
 
 (defun has-directory-p (p)
   (position *directory-separator* p))
@@ -733,7 +737,7 @@ if there isn't one."
 	 (loop :with full = nil
 	    :for f :in (read-directory :dir dir) :do
 	    (when (and (equal f cmd)
-		       (is-regular-executable
+		       (is-executable
 			(setf full (format nil "~a~c~a"
 					   dir *directory-separator* cmd))))
 	      (return-from command-pathname full))))
@@ -749,7 +753,7 @@ if there isn't one."
 	      (loop :with full = nil
 		    :for f :in (read-directory :dir dir)
 		    :when (and (equal f cmd)
-			       (is-regular-executable
+			       (is-executable
 				(setf full
 				      (format nil "~a~c~a"
 					      dir *directory-separator* cmd))))
