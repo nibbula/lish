@@ -7,29 +7,37 @@
 #|
 (eval-when (:compile-toplevel)
   (format t "compile ~a~%"
-	  (merge-pathnames (pathname "version.lisp") (or *load-pathname* ""))))
+	  (merge-pathnames (pathname "version.lisp") (or *compile-file-truename* ""))))
 
 (eval-when (:load-toplevel)
   (format t "load ~a~%"
-	  (merge-pathnames (pathname "version.lisp") (or *load-pathname* ""))))
+	  (merge-pathnames (pathname "version.lisp") (or *load-truename* ""))))
 
 (eval-when (:execute)
   (format t "execute ~a~%"
-	  (merge-pathnames (pathname "version.lisp") (or *load-pathname* ""))))
+	  (merge-pathnames (pathname "version.lisp") (or *load-truename* ""))))
 |#
 
-(defvar *version-file* "version.lisp")
+;; This is such a lame hack. But what would be a better way?
+
+(define-constant +version-file-name+ "version.lisp")
+
+(defparameter *version-file*
+  (or (probe-file (s+ (dirname
+		       (or *compile-file-truename* *load-truename*))
+		      *directory-separator* +version-file-name+))
+      (probe-file (s+ (dirname (or *compile-file-truename* *load-truename*))
+		      *directory-separator* ".."
+		      *directory-separator* +version-file-name+))
+      +version-file-name+))
 
 (defun read-version ()
   (when (not (probe-file *version-file*))
+    (format t "I thought it might be in ~s, but...~%" *version-file*)
     (setf *version-file* (tiny-rl:read-filename
 			  :prompt "Where is version.lisp? ")))
   (with-open-file (str *version-file*)
     (safe-read-from-string (read-line str))))
-
-(eval-when (:compile-toplevel)
-  (declaim (sb-ext:muffle-conditions warning))
-  (defconstant +version-flie+ *version-file*))
 
 (defun write-version (version)
   (with-open-file (str *version-file*
