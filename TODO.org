@@ -5,8 +5,13 @@ Lish TODO list							     -*- org -*-
 ** do essential features
 ** deal with library / utils issue
 * BUGS:
-** env builtin fails because of inadequate arg processing
-** kill builtin arg processing
+** aliases get double expanded, e.g. bug with filenames with "[]" in it
+** arg processing related:
+*** env builtin fails because of inadequate arg processing
+*** kill builtin arg processing
+*** argument defaults don't work in lish commands? (see wc)
+*** argument parsing for commands
+**** fix edge cases, more testing for posix-to-lisp-args
 ** fix find -d ~/ -n foo
    1. Prints all files, should only print matching foo,
       but find --dir ~/ --name foo, works.
@@ -21,12 +26,11 @@ Lish TODO list							     -*- org -*-
    resume only works when one job, doesn't get jobs spec arguments right
 ** completion (globbing) doesn't work on non-ASCII file names? e.g. résumé
 *** need unicode normalizer (see char-util.lisp)
+*** WORKAROUND: use C-x 9 to type un-normalized combining version
+    e.g. '_ for combining COMBINING_ACUTE_ACCENT
 ** parsing < in first word?
-** argument defaults don't work in lish commands? (see wc)
 ** newly defined commands don't get recognized in completion
 ** tiny-rl display bugs
-** argument parsing for commands
-*** fix edge cases, more testing for posix-to-lisp-args
 ** time should work for whole pipelines
    time just times the first command in the pipeline
    e.g. time cat /usr/share/dict/words | snip -a bogus
@@ -38,8 +42,8 @@ Lish TODO list							     -*- org -*-
 ** some seemingly sbcl specific bug when reading a non existent symbol,
    during load-file, like: no-exist:or-this
    exhibited when loading .lishrc doc command?
-** should probabbaly unset $PWD if we're not going to update it
 ** DONE fixed bugs
+*** DONE should probabbaly unset $PWD if we're not going to update it
 *** DONE completion with absolute path and stuff following, e.g.:
     "/opt/local/share/man/<here> (foo bar)"
 *** DONE glob expansion of filenames with quoted spaces?
@@ -86,20 +90,7 @@ Lish TODO list							     -*- org -*-
 *** defexternal?
 *** scrape --help output or man pages?
 ** objects (return values) as pipeline data
-   - Perhaps generic streams which could be object streams or character
-     streams. But how to determine which one?
-   - Perhaps the stream is multiple/paralell? aka there is always an object
-     stream, since there are always return values, AND there is a possible
-     output stream which . . .
-   - Functions that take sequences or streams can marked with a special × mark
-     to indicate which argument the pipeline is input to.
-*** How About: implicit *shell-output* and *shell-input*
-    that can be an sequence or and object-stream???
-    Functions and commands can choose what they want to do:
-    objects, text i/o, or both.
-*** have shell-eval return a value: for external commands return the
-    old shell exit status (from wait), otherwise the command function
-    return value, or lisp return value
+   see doing
 ** figure out a syntax for multiple commands on a line (like posix ;)
 ** process substitution <(foo) >(foo)
 ** add more features to globbing (all the ignored arguments of glob)

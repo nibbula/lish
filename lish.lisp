@@ -70,15 +70,15 @@ LISH_LEVEL environment variable.")
 
 (defun fixed-homedir ()
   "(user-homedir-pathname) with a trailing slash removed if there was one."
-  (let ((h (namestring (user-homedir-pathname))))
+  (let ((h (safe-namestring (user-homedir-pathname))))
     (if (equal #\/ (aref h (1- (length h))))
 	(subseq h 0 (1- (length h)))
 	h)))
 
 (defun twiddlify (name)
   "Turn (user-homedir-pathname) occuring in name into a tilde."
-  (replace-subseq (namestring (fixed-homedir)) "~"
-		  (namestring name) :count 1))
+  (replace-subseq (safe-namestring (fixed-homedir)) "~"
+		  (safe-namestring name) :count 1))
 
 ;; I personally favor the prompt function, so this is basically a ploy to get
 ;; people that just want their bash prompt to work, to use my shell.
@@ -579,7 +579,7 @@ The syntax is vaguely like:
 		  :words (nreverse args)
 		  :word-start (reverse word-start)
 		  :word-end (nreverse word-end) 
-		  :word-end (nreverse word-quoted))))
+		  :word-quoted (nreverse word-quoted))))
 	     (do-continue ()
 	       "Handle when the expression is incomplete."
 	       (if partial
@@ -874,7 +874,7 @@ read from."
   "Perform shell syntax expansions / subsitutions on the expression."
   (declare (ignore sh))
   (let ((new-words '()))
-    (loop :with v
+    (loop :with value
        :for w :in (shell-expr-words expr)
        :for i = 0 :then (1+ i)
        :do
@@ -882,8 +882,8 @@ read from."
 	 (cond
 	   ;; $ environment variable expansion
 	   ((eql #\$ (aref w 0))
-	    (setf v (nos:getenv (subseq w 1)))
-	    (push (or v "") new-words))
+	    (setf value (nos:getenv (subseq w 1)))
+	    (push (or value "") new-words))
 	   ;; filename globbing, with ~ expansion on
 	   ((glob:pattern-p w nil t)
 	    (let ((g (glob:glob w :tilde t)))
@@ -1185,20 +1185,21 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
   "Load a lish syntax file."
   (with-open-file (stream file :direction :input)
     (with-package *lish-user-package*
-      (loop :with line = nil :and new-line = t :and expr = nil
-	 :while (and (setf line (read-line stream nil))
-		     new-line)
-	 :do
-	 (loop :with i = 0
-	    :while (and (eql (setf expr (shell-read line))
-			     *continue-symbol*)
-			(setf new-line (read-line stream nil)))
-	    :do
-	    (setf line (s+ line #\newline new-line))
-	    ;; (when (> i 100)
-	    ;;   (break))
-	    (incf i))
-	 (shell-eval sh expr)))))
+      (let ((*load-pathname* file))
+	(loop :with line = nil :and new-line = t :and expr = nil
+	   :while (and (setf line (read-line stream nil))
+		       new-line)
+	   :do
+	   (loop :with i = 0
+	      :while (and (eql (setf expr (shell-read line))
+			       *continue-symbol*)
+			  (setf new-line (read-line stream nil)))
+	      :do
+	      (setf line (s+ line #\newline new-line))
+	      ;; (when (> i 100)
+	      ;;   (break))
+	      (incf i))
+	   (shell-eval sh expr))))))
       ;; (loop :while (setf line (read-line stream nil))
       ;; 	 :do
       ;; 	 (if (eql line *continue-symbol*)

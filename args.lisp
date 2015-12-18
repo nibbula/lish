@@ -4,6 +4,9 @@
 
 (in-package :lish)
 
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+		   (compilation-speed 0)))
+
 (defclass argument ()
   ((name
     :documentation "Name"
@@ -528,7 +531,7 @@ value to be converted.
 
 ;; Thankfully this is nowhere near as hairy as posix-to-lisp-args.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun command-to-lisp-args (command-args)
+  (defun command-to-lisp-args (command-args &key pass-keys-as)
     "Return a Lisp argument list for the given lish argument list."
     (let ((mandatories
 	   (loop :for a :in command-args
@@ -556,6 +559,10 @@ value to be converted.
 			  (> (length repeating) 1)))
       (if keyworded
 	  (progn
+	    ;; Put in a rest argument to catch all the keys.
+	    (when pass-keys-as
+	      (push '&rest new-list)
+	      (push pass-keys-as new-list))
 	    (push '&key new-list)
 	    (loop :for a :in optionals :do
 	       (push

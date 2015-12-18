@@ -232,7 +232,8 @@ literally in shell syntax."
 					   (command-arglist command)))))
       ((and all word-pos
 	    (> word-pos 0)
-	    (char= (char word (1- (min word-pos (length word)))) #\-))
+	    (char= (char word (1- (min word-pos (length word)))) #\-)
+	    (char= (char word 0) #\-))
        ;; dash arg enumeration
        (show-dash-arglist (command-arglist command)))
       (func

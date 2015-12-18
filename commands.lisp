@@ -72,6 +72,11 @@
     :initarg :handle-unrecognized :accessor command-handle-unrecognized
     :initform nil :type boolean
     :documentation "True to pass unrecogized arguments to the command.")
+   (pass-keys-as
+    :initarg :pass-keys-as :accessor command-pass-keys-as
+    :initform nil :type symbol
+    :documentation
+    "Argument name to pass all keyword arguments as. NIL if we don't need it.")
    (accepts
     :initarg :accepts :accessor command-accepts :initform :unspecified
     :documentation
@@ -173,31 +178,9 @@ we want to use it for something in the future."
 
 ;; There should be little distinction between a user defined command and
 ;; "built-in" command, except perhaps for a warning if you redefine a
-;; pre-defined command, and the fact that things defined in here are
+;; pre-defined command, and the fact that things defined in the shell are
 ;; considered "built-in" and listed in help that way.
 
-;; (defmacro defbuiltin (name (&rest arglist) &body body)
-;;   "This is like defcommand, but for things that are considered built in to the
-;; shell."
-;;   (let* ((func-name (command-function-name name))
-;; 	 (name-string (string-downcase name))
-;; ;;;	 (evaled-arglist (eval-defaults arglist))
-;; 	 (params (command-to-lisp-args (make-argument-list arglist t))))
-;;     `(progn
-;;        (defun ,func-name ,params
-;; 	 ,@body)
-;;        (pushnew ,name-string *command-list* :test #'equal)
-;;        (push (list ,name-string (make-instance
-;; 				 'command :name ,name-string
-;; 				 :arglist (make-argument-list ',arglist)
-;; 				 :loaded-from *load-pathname*
-;; 				 :built-in-p t))
-;; 	     *initial-commands*))))
-
-;; This is differs from DEFBUILTIN in that:
-;;   - It doesn't push to *initial-commands*
-;;   - It doesn't set BUILT-IN-P
-;;   - It doesn't automatically export
 ;;
 ;; I would wish that defcommand could provide enough documentation to make a
 ;; man page, or an info page, or a CLHS like page.
@@ -239,20 +222,29 @@ we want to use it for something in the future."
 ;; @@@ Perhaps we should define commands in the LISH-USER package
 ;; instead, so they can be exported and used by other packages?
 
+(defparameter *special-body-tags* #(:accepts :keys-as)
+  "Keywords with special meanings appearing first in the command body.")
+
 (defmacro %defcommand (name built-in-p (&rest arglist) &body body)
-  "Define a command for the shell. NAME is the name it is invoked by. ARGLIST
-is a shell argument list. The BODY is the body of the function it calls.
-BODY can have :ACCEPTS followed by a single or list of accept keywords to
-indicate what kind of things the command accepts from a pipeline."
+  "See the documentation for DEFCOMMAND."
   (let ((func-name (command-function-name name))
 	(name-string (string-downcase name))
-	(params (command-to-lisp-args (make-argument-list arglist t)))
 	(accepts :unspecified)
-	fixed-body)
-    (if (eq (car body) :accepts)
-	(setf accepts (cadr body)
-	      fixed-body (cddr body))
-	(setf fixed-body body))
+	(pass-keys-as nil)
+	(fixed-body body)
+	params)
+    ;; Pull out special body tags:
+    (loop :with tag
+       :while (setf tag (find (car fixed-body) *special-body-tags*)) :do
+       (case tag
+	 (:accepts
+	  (setf accepts (cadr fixed-body)
+		fixed-body (cddr fixed-body)))
+	 (:keys-as
+	  (setf pass-keys-as (cadr fixed-body)
+		fixed-body (cddr fixed-body)))))
+    (setf params (command-to-lisp-args (make-argument-list arglist t)
+				       :pass-keys-as pass-keys-as))
     `(progn
        (defun ,func-name ,params
 	 ,@fixed-body)
@@ -263,17 +255,29 @@ indicate what kind of things the command accepts from a pipeline."
 				   :loaded-from *load-pathname*
 				   :built-in-p ,built-in-p
 				   :accepts ,accepts
+				   :pass-keys-as ,pass-keys-as
 				   :arglist (make-argument-list ',arglist))))))
 
 (defmacro defcommand (name (&rest arglist) &body body)
-  "Define a command for the shell. NAME is the name it is invoked by. ARGLIST
-is a shell argument list. The BODY is the body of the function it calls."
+  "Define a command for the shell.
+NAME is the name it is invoked by.
+ARGLIST is a shell argument list.
+BODY is the body of the function it calls.
+BODY recognizes some special keywords:
+  :ACCEPTS followed by a single or list of accept keywords to indicate what
+           kind of things the command accepts from a pipeline.
+  :KEYS-AS followed by a symbol which will be a list of the keywords and values
+           given to the command function. "
   `(%defcommand ,name nil (,@arglist) ,@body))
 
 (defmacro defbuiltin (name (&rest arglist) &body body)
-  "Define a command for the shell. NAME is the name it is invoked by. ARGLIST
-is a shell argument list. The BODY is the body of the function it calls."
+  "Just like DEFCOMMAND, except it sets BUILT-IN-P to T."
   `(%defcommand ,name t (,@arglist) ,@body))
+
+(defmacro defexternal (name (&rest arglist))
+  "Define an external command for the shell. NAME is the name it is invoked by and the name of the external program. ARGLIST is a shell argument list."
+  `(%defcommand ,name t (,@arglist)
+     (! (string name))))
 
 (defun undefine-command (name)
   (unset-command name)
@@ -329,6 +333,13 @@ is a shell argument list. The BODY is the body of the function it calls."
 
 
 #|
+  @@@ Perhaps we could make this whole thing simpler by just specifying
+  @@@ that all command functions take only keyword arguments, and if you
+  @@@ want a lispy-er interface, make it call a different function.
+  @@@ In other words, how useful is it to have simple/nice command functions,
+  @@@ conviently usable from Lisp, since a Lisp API to the command's
+  @@@ functionality will likely be more complicated and/or better served by a
+  @@@ separate function. ???
 
   The rules for converting POSIX arguments to lambda lists are fairly
   complicated. Here we try to examine some of the possiblities. We use a

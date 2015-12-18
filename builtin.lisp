@@ -24,6 +24,7 @@
   (setf (lish-old-pwd *shell*) (nos:current-directory))
   (nos:change-directory (or directory (nos:getenv "HOME")))
   ;; Update $PWD like traditional Unix shells.
+  ;; @@@ Maybe someday we can get rid of this.
   (nos:setenv "PWD" (nos:current-directory)))
 
 (defbuiltin pwd ()
