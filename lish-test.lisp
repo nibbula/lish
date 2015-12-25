@@ -2,8 +2,6 @@
 ;; lish-test.lisp - Tests for Lish
 ;;
 
-;; $Revision$
-
 (defpackage :lish-test
   (:documentation "Tests for Lish")
   (:use :cl #| :test |# :lish)
@@ -59,7 +57,9 @@
 	  (posix-to-lisp-args (get-command str) args)))
 
 (defun vivi (str p-args l-args)
-  (let ((aa (posix-to-lisp-args (get-command str) p-args)))
+  (let ((aa (posix-to-lisp-args
+	     (get-command str)
+	     (lish::expr-to-words (lish:shell-read p-args)))))
     (format t "~w ~{~w ~}~%~w~%~%" str p-args aa)
     (assert (equalp aa l-args))))
 
@@ -83,13 +83,13 @@
   (format t "entry = ~s section = ~s~%" entry section))
 
 (defun test-ptla ()
-  (vivi ":" '() '())
-  (vivi ":"
-	'("(format t \"egg~a~%\" (lisp-implementation-type))")
-	'("(format t \"egg~a~%\" (lisp-implementation-type))"))
-  (vivi ":"
-	'("blah" "blah" "blah" "etc" "...")
-	'("blah" "blah" "blah" "etc" "..."))
+  ;; (vivi ":" '() '())
+  ;; (vivi ":"
+  ;; 	'("(format t \"egg~a~%\" (lisp-implementation-type))")
+  ;; 	'("(format t \"egg~a~%\" (lisp-implementation-type))"))
+  ;; (vivi ":"
+  ;; 	'("blah" "blah" "blah" "etc" "...")
+  ;; 	'("blah" "blah" "blah" "etc" "..."))
   ;; This was before adding the -g option:
   ;; (vivi "alias" '("name") '("name"))
   ;; (vivi "alias" '("name" "expansion") '("name" "expansion"))
@@ -97,27 +97,27 @@
   ;; 	'("name" "expansion" "extra" "junk")
   ;; 	'("name" "expansion"))
 
-  (vivi "alias" '() '())
-  (vivi "alias" '("name") '(:name "name"))
-  (vivi "alias" '("name" "expansion") '(:name "name" :expansion "expansion"))
+  (vivi "alias" "" '())
+  (vivi "alias" "name" '(:name "name"))
+  (vivi "alias" "name expansion" '(:name "name" :expansion "expansion"))
   (vivi "alias"
-  	'("name" "expansion" "extra" "junk") ;; Is this really right?
+  	"name expansion extra junk" ;; Is this really right?
 	'(:name "name" :expansion "expansion"))
 
-  (vivi "bind" '() '())
-  (vivi "bind" '("-p") '(:print-bindings t))
-  (vivi "bind" '("-P") '(:print-readable-bindings t))
-  (vivi "bind" '("-r" "foo") '(:remove-key-binding "foo"))
-  (vivi "cd" '() '())
-  (vivi "cd" '("dir") '("dir"))
-  (vivi "debug" '() '())
-  (vivi "debug" '("on") '(t))
-  (vivi "debug" '("off") '(nil))
+  (vivi "bind" "" '())
+  (vivi "bind" "-p" '(:print-bindings t))
+  (vivi "bind" "-P" '(:print-readable-bindings t))
+  (vivi "bind" "-r foo" '(:remove-key-binding "foo"))
+  (vivi "cd" "" '())
+  (vivi "cd" "dir" '("dir"))
+  (vivi "debug" "" '())
+  (vivi "debug" "on" '(t))
+  (vivi "debug" "off" '(nil))
   ;; This is supposed to fail, since pecan isn't a boolean
 ;  (vivi "debug" '("pecan") '()) 
-  (vivi "gurp"  '("-i" "foo" "bar" "baz" "lemon")
+  (vivi "gurp"  "-i foo bar baz lemon")
 	'("foo" :files ("bar" "baz" "lemon") :invert t))
-  (vivi "zurp"  '("-s" "3" "chflags") '(:entry "chflags" :section "3"))
+  (vivi "zurp"  "-s 3 chflags" '(:entry "chflags" :section "3"))
 )
 
 ;(with-dbug (lish::posix-to-lisp-args (lish::get-command "bind") '("-r" "foo")))

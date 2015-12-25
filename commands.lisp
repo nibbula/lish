@@ -176,6 +176,10 @@ we want to use it for something in the future."
     ))
 |#
 
+(defun ignorable-filter (args)
+  "Given a lambda list return a list of variable names to ignore."
+  (lambda-list-vars args :all-p t))
+
 ;; There should be little distinction between a user defined command and
 ;; "built-in" command, except perhaps for a warning if you redefine a
 ;; pre-defined command, and the fact that things defined in the shell are
@@ -230,9 +234,8 @@ we want to use it for something in the future."
   (let ((func-name (command-function-name name))
 	(name-string (string-downcase name))
 	(accepts :unspecified)
-	(pass-keys-as nil)
 	(fixed-body body)
-	params)
+	pass-keys-as params ignorables)
     ;; Pull out special body tags:
     (loop :with tag
        :while (setf tag (find (car fixed-body) *special-body-tags*)) :do
@@ -244,9 +247,13 @@ we want to use it for something in the future."
 	  (setf pass-keys-as (cadr fixed-body)
 		fixed-body (cddr fixed-body)))))
     (setf params (command-to-lisp-args (make-argument-list arglist t)
-				       :pass-keys-as pass-keys-as))
+				       :pass-keys-as pass-keys-as)
+	  ignorables
+	  (when (and params pass-keys-as)
+	    `((declare (ignorable ,@(ignorable-filter params))))))
     `(progn
        (defun ,func-name ,params
+	 ,@ignorables
 	 ,@fixed-body)
        (pushnew ,name-string lish::*command-list* :test #'equal)
        (set-command ,name-string
@@ -255,7 +262,8 @@ we want to use it for something in the future."
 				   :loaded-from *load-pathname*
 				   :built-in-p ,built-in-p
 				   :accepts ,accepts
-				   :pass-keys-as ,pass-keys-as
+				   :pass-keys-as
+				   ,(and pass-keys-as `(quote ,pass-keys-as))
 				   :arglist (make-argument-list ',arglist))))))
 
 (defmacro defcommand (name (&rest arglist) &body body)
@@ -557,6 +565,7 @@ become keyword arguments, in a way specified in the command's arglist."
 			    :collect a))
 	#| (optionals '()) |#)
     ;; Flagged arguments (optional or manditory)
+    (dbug "considering flagged: ~s~%" old-list)
     (loop :with a
        :while (< i (length old-list)) :do
        #| (setf a (car old-list)) |#
@@ -592,19 +601,23 @@ become keyword arguments, in a way specified in the command's arglist."
 			 ;; @@@ have to deal with repeating?
 			 (if (eq (arg-type arg) 'boolean)
 			     (progn
+			       (dbug "short boolean arg ~s~%" arg)
 			       (move-boolean old-list new-flags i arg)
 			       (setf boolean-taken t))
 			     (if (/= cc (1- (length a)))
 				 (error "Unrecognized flag ~a." a)
-				 (move-flag old-list new-flags i arg)))))
+				 (progn
+				   (dbug "short arg ~s~%" arg)
+				   (move-flag old-list new-flags i arg))))))
 		    (when (not flag-taken)
 		      (warn "Unrecognized option ~a" (char a cc))))
 		  (if boolean-taken
 		      (setf old-list (delete-nth i old-list))
 		      (progn
-			(dbug "skipping flag arg ~a ~w~%" i a)
+			;;(incf i)
+			(dbug "skipping flag value ~a ~w~%" i (nth i old-list))
 			;;(setf old-list (delete-nth i old-list))
-			(incf i)))))
+			))))
 	   ;; Arg doesn't start with a dash, so skip it
 	   (progn
 	     (dbug "skipping arg ~a ~w~%" i a)

@@ -92,7 +92,7 @@
   (declare (ignore initargs))
   ;; Make the long-arg default to the name if the short-arg is set.
   (when (slot-value o 'short-arg)
-    (setf (slot-value o 'long-arg) (slot-value o 'name))))
+    (setf (slot-value o 'long-arg) (princ-to-string (slot-value o 'name)))))
 
 (defmethod print-object ((o argument) stream)
   "Print a lish command argument in an unreadable way."
@@ -545,7 +545,7 @@ value to be converted.
 	   (loop :for a :in command-args
 	      :if (arg-repeating a)
 	      :collect a))
-	  (keyworded (args-keyworded command-args))
+	  (keyworded (or (args-keyworded command-args) pass-keys-as))
 	  (new-list '()))
       ;; Mandatory arguments
       (loop :for a :in mandatories :do

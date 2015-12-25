@@ -408,7 +408,9 @@ NAME is replaced by EXPANSION before any other evaluation."
   |#
 
 (defbuiltin export
-    (("name"  string :help "Name of the variable to export.")
+    (("remove" boolean :short-arg #\n
+      :help "True to stop the NAME from being exported.")
+     ("name"  string :help "Name of the variable to export.")
      ("value" string :help "Value of the variable to export."))
   "Set environment variable NAME to be VALUE. Omitting VALUE, just makes sure
 the current value of NAME is exported. Omitting both, prints all the exported
@@ -418,9 +420,11 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
   (when (and value (not (stringp value)))
     (setf value (princ-to-string value)))
   (if name
-      (if value
-	  (nos:setenv name value)
-	  (nos:getenv name))		; Actually does nothing
+      (if remove
+	  (nos:unsetenv name)
+	  (if value
+	      (nos:setenv name value)
+	      (nos:getenv name)))		; Actually does nothing
       (printenv)))
 
 (defbuiltin env
