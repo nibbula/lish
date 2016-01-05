@@ -487,11 +487,11 @@ BODY recognizes some special keywords:
      (setf ,new (push t ,new))
      (setf ,old (delete-nth ,i ,old))))
 
-(defmacro move-boolean (old new i arg)
+(defmacro move-boolean (old new i arg val)
   (declare (ignore old i))
   `(progn
      (setf ,new (push (arg-key ,arg) ,new))
-     (setf ,new (push t ,new))
+     (setf ,new (push ,val ,new))
      (setf possible-flags (delete ,arg possible-flags))))
 
 (defmacro move-repeating (old new start arg keyworded &optional until)
@@ -559,6 +559,7 @@ become keyword arguments, in a way specified in the command's arglist."
 	(keyworded (args-keyworded (command-arglist command)))
 	(flag-taken      nil)
 	(boolean-taken   nil)
+	(boolean-value   t)
 	(possible-flags  (loop :for a :in (command-arglist command)
 			    :if (or (arg-short-arg a)
 				    (arg-long-arg a))
@@ -571,8 +572,10 @@ become keyword arguments, in a way specified in the command's arglist."
        #| (setf a (car old-list)) |#
        (setf a (shell-word-word (nth i old-list)))
        (if (and (stringp a) (> (length a) 0)
-		(char= (char a 0) #\-))	; arg starts with dash
-	   (if (and (> (length a) 1) (eql (char a 1) #\-)) ; two dash arg
+		(is-flag-char (char a 0)))
+	   (if (and (> (length a) 1)
+		    (is-flag-char (char a 0))
+		    (is-flag-char (char a 1))) ; two dash arg
 	       ;; --long-arg
 	       (progn
 		 (setf flag-taken nil boolean-taken nil)
@@ -592,7 +595,8 @@ become keyword arguments, in a way specified in the command's arglist."
 		   (incf i)))
 	       ;; -abcxyz (short args)
 	       (progn
-		 (setf boolean-taken nil)
+		 (setf boolean-taken nil
+		       boolean-value (is-normal-flag-char (char a 0)))
 		 (loop :for cc :from 1 :below (length a) :do
 		    (setf flag-taken nil)
 		    (loop :for arg :in (command-arglist command) :do
@@ -602,7 +606,8 @@ become keyword arguments, in a way specified in the command's arglist."
 			 (if (eq (arg-type arg) 'boolean)
 			     (progn
 			       (dbug "short boolean arg ~s~%" arg)
-			       (move-boolean old-list new-flags i arg)
+			       (move-boolean old-list new-flags i arg
+					     boolean-value)
 			       (setf boolean-taken t))
 			     (if (/= cc (1- (length a)))
 				 (error "Unrecognized flag ~a." a)

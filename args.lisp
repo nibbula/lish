@@ -94,18 +94,40 @@
   (when (slot-value o 'short-arg)
     (setf (slot-value o 'long-arg) (princ-to-string (slot-value o 'name)))))
 
+(defvar *arg-normal-flag-char* #\-
+  "Normal argument flag character.")
+
+(defvar *arg-opposite-flag-char* #\+
+  "Opposite argument flag character.")
+
+(defvar *arg-flag-chars* (vector *arg-normal-flag-char*
+				 *arg-opposite-flag-char*)
+  "Sequence of possible argument flag characters.")
+
+(defun is-flag-char (c)
+  "Return true if C is a flag character."
+  (position c *arg-flag-chars*))
+
+(defun is-normal-flag-char (c)
+  "Return true if C is a normal flag character."
+  (char= c *arg-normal-flag-char*))
+
+(defun is-opposite-flag-char (c)
+  "Return true if C is an opposite flag character."
+  (char= c *arg-opposite-flag-char*))
+
 (defmethod print-object ((o argument) stream)
   "Print a lish command argument in an unreadable way."
   (print-unreadable-object (o stream :identity nil :type t)
     (format stream
 	    "~a ~s~:[~; repeating~]~:[~; optional~]~:[~; hidden~]~
-~@[ -~a~]~@[ --~a~]"
+~@[ ~c~a~]~@[ ~c~c~a~]"
 	    (arg-name o) (arg-type o)
 	    (arg-repeating o)
 	    (arg-optional o)
 	    (arg-hidden o)
-	    (arg-short-arg o)
-	    (arg-long-arg o))))
+	    *arg-normal-flag-char* (arg-short-arg o)
+	    *arg-normal-flag-char* *arg-normal-flag-char* (arg-long-arg o))))
 
 (defgeneric convert-arg (arg value &optional quoted)
   (:documentation "Convert an argument value from one type to another.")

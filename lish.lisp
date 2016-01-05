@@ -953,6 +953,136 @@ expanded array of shell-words."
     :else
       :collect w))
 
+(defvar *input* nil
+  "The output of the previous command in pipeline.")
+
+(defvar *output* nil
+  "The output of the current command.")
+
+(defvar *accepts* nil
+  "What the next command in the pipeline accepts.")
+
+(defun resolve-command (command &optional seen)
+  "Figure some crap out, okay."
+  (let ((alias (gethash command (lish-aliases *shell*)))
+	word)
+    (if alias
+	(progn
+	  (setf word (elt (shell-expr-words (shell-read alias)) 0))
+	  (if (not (position command seen :test #'equal)) ; don't circle
+	      (progn
+		(pushnew command seen :test #'equal)
+		(resolve-command word seen))
+	      word))
+	command)))
+
+(defun get-accepts (expr)
+  (typecase expr
+    (shell-expr
+     ;;(format t "shell-expr ~s~%" expr)
+     (get-accepts (elt (shell-expr-words expr) 0)))
+    (list
+     ;;(format t "list ~s~%" expr)
+     (get-accepts (if (keywordp (car expr))
+		      (cdr expr)
+		      (car expr))))
+    (string
+     ;;(format t "string ~s~%" expr)
+     (let* ((cmd-name (resolve-command expr))
+	    (cmd (get-command cmd-name)))
+       (and cmd (command-accepts cmd))))
+    (t
+     ;;(format t "-T- ~s ~s~%" (type-of expr) expr)
+     :unspecified)))
+
+(defun successful (obj)
+  "Return true if the object represents a successful command result."
+  (or
+   ;; Zero return value from a system command?
+   (and obj (and (numberp obj) (zerop obj)))
+   t)) ;; Any other value from lisp code or commands.
+
+(defun shell-eval (sh expr &key no-expansions in-pipe out-pipe)
+  "Evaluate the shell expression EXPR. If NO-EXPANSIONS is true, don't expand
+aliases. Return a list of the result values, a stream or NIL, and a boolean
+which is true to show the values.
+
+Generally SHELL-EVAL takes the result of SHELL-READ. EXPR is either a
+SHELL-EXPR structure or some other Lisp type. If it's not a SHELL-EXPR then
+just eval it. If it is a SHELL-EXPR then do the shell expansions on it, as done
+by DO-EXPANSIONS. If the first word of EXPR is a list, then it is a compound
+command, which is a :PIPE, :AND, :OR, :SEQUENCE.
+:PIPE	   takes the output from the piped command, and feeds it as input to
+           the subcommand.
+:AND	   evaluates each subcommand until one of them is false.
+:OR	   evaluates each subcommand until one of them is true.
+:SEQUENCE  evaluates each subcommand in sequence, ignoring return values.
+"
+  (macrolet ((eval-compound (test new-pipe)
+	       "Do a compound command. TEST determines whether the next part~ 
+                of the command gets done. NEW-PIPE is true to make a new pipe."
+	       `(multiple-value-bind (vals out-stream show-vals)
+		    (shell-eval sh (second w0)
+				:in-pipe in-pipe
+				:out-pipe ,new-pipe)
+		  (declare (ignore show-vals) (ignorable vals))
+		  (when ,test
+		    (with-package *lish-user-package*
+		      (shell-eval
+		       sh
+		       (make-shell-expr
+			:words	     (cdr (shell-expr-words expr))
+			:word-start  (cdr (shell-expr-word-start expr))
+			:word-end    (cdr (shell-expr-word-end expr))
+			:word-quoted (cdr (shell-expr-word-quoted expr))
+			;; @@@ perhaps we should retain original,
+			;; since indexes not adjusted?
+			:line (format nil "~{~a ~}"
+				      (cdr (shell-expr-words expr))))
+		       :no-expansions no-expansions
+		       :in-pipe out-stream
+		       :out-pipe out-pipe))))))
+    (typecase expr
+      (shell-expr
+       ;; Quick return when no words
+       (when (= (length (shell-expr-words expr)) 0)
+	 (return-from shell-eval (values nil nil nil)))
+       (let ((w0 (elt (shell-expr-words expr) 0))
+	     vals out-stream show-vals)
+	 ;; (when (equalp w0 "opt") ;; <<<
+	 ;;   (break))
+	 (unless no-expansions
+	   (do-expansions sh expr 0))
+	 (dbug "~w~%" expr)
+	 (if (listp w0)
+	     ;; Compound command
+	     (case (first w0)
+	       (:pipe
+		(let* ((*accepts*
+			(get-accepts (elt (shell-expr-words expr) 1)))
+		       (*input* *output*)
+		       (*output* nil))
+		  (dbug "*input* = ~s~%" *input*)
+		  (setf (values vals out-stream show-vals)
+			(eval-compound (successful vals) t))
+		  (dbug "*output* = ~s~%" *output*)
+		  (values vals out-stream show-vals)))
+	       (:and      (eval-compound (successful vals) nil))
+	       (:or       (eval-compound (not (successful vals)) nil))
+	       (:sequence (eval-compound t nil)))
+	     ;; Not a list, a ‘simple’ command
+	     (with-package *lish-user-package*
+	       (dbug "*input* = ~s~%" *input*)
+	       (setf (values vals out-stream show-vals)
+		     (shell-eval-command sh expr
+					 :no-alias no-expansions
+					 :in-pipe in-pipe :out-pipe out-pipe))
+	       (dbug "*output* = ~s~%" *output*)
+	       (values vals out-stream show-vals)))))
+      (t ;; A full Lisp expression all by itself
+       (with-package *lish-user-package*
+	 (values (multiple-value-list (eval expr)) nil t))))))
+
 (defun expand-alias (sh alias words in-pipe out-pipe)
   (let* ((expr (shell-read alias))
 	 ;; XXX This could be problematic because things in expr get trashed
@@ -962,7 +1092,8 @@ expanded array of shell-words."
 	 (new-expr (words-to-expr new-words)))
     (setf (shell-expr-line new-expr)
 	  (format nil "~{~a ~}" (shell-expr-words new-expr)))
-    (shell-eval sh new-expr :no-alias t :in-pipe in-pipe :out-pipe out-pipe)))
+    (shell-eval sh new-expr :no-expansions t
+		:in-pipe in-pipe :out-pipe out-pipe)))
 
 (defun call-command (command args &optional in-pipe out-pipe)
   "Call a command with the given POSIX style arguments.
@@ -1076,110 +1207,6 @@ probably fail, but perhaps in similar way to other shells."
 		      t))  ;; show the values
 		   ;; Just try a system command anyway, which will likely fail.
 		   (sys-cmd)))))))))
-
-(defvar *input* nil
-  "The output of the previous command in pipeline.")
-
-(defvar *output* nil
-  "The output of the current command.")
-
-(defvar *accepts* nil
-  "What the next command in the pipeline accepts.")
-
-(defun get-accepts (expr)
-  (typecase expr
-    (shell-expr
-     ;;(format t "shell-expr ~s~%" expr)
-     (get-accepts (elt (shell-expr-words expr) 0)))
-    (list
-     ;;(format t "list ~s~%" expr)
-     (get-accepts (if (keywordp (car expr))
-		      (cdr expr)
-		      (car expr))))
-    (string
-     ;;(format t "string ~s~%" expr)
-     (let ((cmd (get-command expr)))
-       (and cmd (command-accepts cmd))))
-    (t
-     ;;(format t "-T- ~s ~s~%" (type-of expr) expr)
-     :unspecified)))
-
-(defun successful (obj)
-  "Return true if the object represents a successful command result."
-  (or
-   ;; Zero return value from a system command?
-   (and obj (and (numberp obj) (zerop obj)))
-   t)) ;; Any other value from lisp code or commands.
-
-(defun shell-eval (sh expr &key no-alias in-pipe out-pipe)
-  "Evaluate the shell expression EXPR. If NO-ALIAS is true, don't expand
-aliases. Return a list of the result values, a stream or NIL, and a boolean
-which is true to show the values.
-
-Generally SHELL-EVAL takes the result of SHELL-READ. EXPR is either a
-SHELL-EXPR structure or some other Lisp type. If it's not a SHELL-EXPR then
-just eval it. If it is a SHELL-EXPR then do the shell expansions on it, as done
-by DO-EXPANSIONS. If the first word of EXPR is a list, then it is a compound
-command, which is a :PIPE, :AND, :OR, :SEQUENCE.
-:PIPE	   takes the output from the piped command, and feeds it as input to
-           the subcommand.
-:AND	   evaluates each subcommand until one of them is false.
-:OR	   evaluates each subcommand until one of them is true.
-:SEQUENCE  evaluates each subcommand in sequence, ignoring return values.
-"
-  (macrolet ((eval-compound (test new-pipe)
-	       "Do a compound command. TEST determines whether the next part~ 
-                of the command gets done. NEW-PIPE is true to make a new pipe."
-	       `(multiple-value-bind (vals out-stream show-vals)
-		    (shell-eval sh (second w0)
-				:in-pipe in-pipe
-				:out-pipe ,new-pipe)
-		  (declare (ignore show-vals) (ignorable vals))
-		  (when ,test
-		    (with-package *lish-user-package*
-		      (shell-eval
-		       sh
-		       (make-shell-expr
-			:words	     (cdr (shell-expr-words expr))
-			:word-start  (cdr (shell-expr-word-start expr))
-			:word-end    (cdr (shell-expr-word-end expr))
-			:word-quoted (cdr (shell-expr-word-quoted expr))
-			;; @@@ perhaps we should retain original,
-			;; since indexes not adjusted?
-			:line (format nil "~{~a ~}"
-				      (cdr (shell-expr-words expr))))
-		       :no-alias no-alias
-		       :in-pipe out-stream
-		       :out-pipe out-pipe))))))
-    (typecase expr
-      (shell-expr
-       ;; Quick return when no words
-       (when (= (length (shell-expr-words expr)) 0)
-	 (return-from shell-eval (values nil nil nil)))
-       (let ((w0 (elt (shell-expr-words expr) 0)))
-	 ;; (when (equalp w0 "opt") ;; <<<
-	 ;;   (break))
-	 (do-expansions sh expr 0)
-	 (dbug "~w~%" expr)
-	 (if (listp w0)
-	     ;; Compound command
-	     (case (first w0)
-	       (:pipe
-		(let ((*accepts* (get-accepts (elt (shell-expr-words expr) 1)))
-		      (*input* *output*)
-		      (*output* nil))
-		  (eval-compound (successful vals) t)))
-	       (:and      (eval-compound (successful vals) nil))
-	       (:or       (eval-compound (not (successful vals)) nil))
-	       (:sequence (eval-compound t nil)))
-	     ;; Not a list, a ‘simple’ command
-	     (with-package *lish-user-package*
-	       (shell-eval-command sh expr
-				   :no-alias no-alias
-				   :in-pipe in-pipe :out-pipe out-pipe)))))
-      (t ;; A full Lisp expression all by itself
-       (with-package *lish-user-package*
-	 (values (multiple-value-list (eval expr)) nil t))))))
 
 (defun load-file (sh file)
   "Load a lish syntax file."

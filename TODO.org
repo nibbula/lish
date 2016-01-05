@@ -5,7 +5,6 @@ Lish TODO list							     -*- org -*-
 ** do essential features
 ** deal with library / utils issue
 * BUGS:
-** aliases get double expanded, e.g. bug with filenames with "[]" in it
 ** arg processing related:
 *** env builtin fails because of inadequate arg processing
 *** kill builtin arg processing
@@ -19,15 +18,22 @@ Lish TODO list							     -*- org -*-
       "There is no slot named SB-KERNEL:FORMAT-CONTROL in #<SB-KERNEL::CONDITION-CLASSOID OPSYS:POSIX-ERROR>"
    3. ?Seems to fail when taking a long time and going to a pipe.
       e.g.: find -d ~/ -n foo | less  OR even: | pager
-** piping from lisp command to system command
-   gets no output, e.g.: grep defun *.lisp | /usr/bin/less
-** completion interning of partial symbol, so completing doesn't work right
+** pipes
+*** piping from lisp command to system command
+    gets no output, e.g.: grep defun *.lisp | /usr/bin/less
+*** pipes to lisp commands take too much memory
+** completion
+*** completion interning of partial symbol, so completing doesn't work right
+*** completion should work in pipelines
+   when completing in a pipeline, e.g.: cat file | grep 
+   It doesn't seem to do anything, is probably trying to complete args
+   for the first command, not the last command in the pipeline
+*** completion (globbing) doesn't work on non-ASCII file names? e.g. résumé
+**** need unicode normalizer (see char-util.lisp)
+**** WORKAROUND: use C-x 9 to type un-normalized combining version
+    e.g. '_ for combining COMBINING_ACUTE_ACCENT
 ** resume doesn't work
    resume only works when one job, doesn't get jobs spec arguments right
-** completion (globbing) doesn't work on non-ASCII file names? e.g. résumé
-*** need unicode normalizer (see char-util.lisp)
-*** WORKAROUND: use C-x 9 to type un-normalized combining version
-    e.g. '_ for combining COMBINING_ACUTE_ACCENT
 ** parsing < in first word?
 ** newly defined commands don't get recognized in completion
 ** tiny-rl display bugs
@@ -35,10 +41,6 @@ Lish TODO list							     -*- org -*-
    time just times the first command in the pipeline
    e.g. time cat /usr/share/dict/words | snip -a bogus
    doesn't get the time, since it's snipped, and also it doesn't time snip
-** completion should work in pipelines
-   when completing in a pipeline, e.g.: cat file | grep 
-   It doesn't seem to do anything, is probably trying to complete args
-   for the first command, not the last command in the pipeline
 ** some seemingly sbcl specific bug when reading a non existent symbol,
    during load-file, like: no-exist:or-this
    exhibited when loading .lishrc doc command?
@@ -52,6 +54,10 @@ Lish TODO list							     -*- org -*-
 *** DONE fix arg-option
 **** fix help
 **** arg completion
+*** DONE completion in the middle of something??
+**** first word when args are after
+*** DONE aliases get double expanded, e.g. filenames with "[]" in it
+    test: touch "[]" ; ll * -> "Invalid empty character class"
 * Essential festures
 ** EXTRACT COMMANDS!!
    I know it seems crazy, but, I want to separate commands from lish,
@@ -82,7 +88,7 @@ Lish TODO list							     -*- org -*-
 *** jobs command
 ** test portability
 *** implementations
-**** clisp, cmu, lispworks, abcl?
+**** ccl, abcl, clisp, cmu, lispworks
 *** linux
 *** cygwin?
 * Important features

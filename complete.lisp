@@ -222,8 +222,8 @@ literally in shell syntax."
       ((and word-pos (> word-pos 1)
 ;;;	    (char= (char word (1- word-pos)) #\-)
 ;;;	    (char= (char word (- word-pos 2)) #\-))
-	    (char= (char word 0) #\-)
-	    (char= (char word 1) #\-))
+	    (is-flag-char (char word 0))
+	    (is-flag-char (char word 1)))
        ;; double dash args
        (if all
 	   (show-double-dash-arglist (command-arglist command))
@@ -232,8 +232,8 @@ literally in shell syntax."
 					   (command-arglist command)))))
       ((and all word-pos
 	    (> word-pos 0)
-	    (char= (char word (1- (min word-pos (length word)))) #\-)
-	    (char= (char word 0) #\-))
+	    (is-flag-char (char word (1- (min word-pos (length word)))))
+	    (is-flag-char (char word 0)))
        ;; dash arg enumeration
        (show-dash-arglist (command-arglist command)))
       (func
@@ -354,7 +354,8 @@ complete, and call the appropriate completion function."
 	      (dbug "jinky~%")
 	      ;; try commands
 	      (multiple-value-bind (v1 v2)
-		  (simple-complete #'complete-command context
+		  (simple-complete #'complete-command
+				   first-word ;; was: context
 				   (elt (shell-expr-word-start exp) 0))
 		;; then symbols
 		;; XXX Symbols won't come up in the list.
