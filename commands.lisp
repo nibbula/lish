@@ -261,7 +261,7 @@ we want to use it for something in the future."
 				   :name ,name-string
 				   :loaded-from *load-pathname*
 				   :built-in-p ,built-in-p
-				   :accepts ,accepts
+				   :accepts ',accepts
 				   :pass-keys-as
 				   ,(and pass-keys-as `(quote ,pass-keys-as))
 				   :arglist (make-argument-list ',arglist))))))

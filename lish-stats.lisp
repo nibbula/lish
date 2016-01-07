@@ -1,8 +1,14 @@
 ;;
-;; stats.lisp - Command statistics
+;; lish-stats.lisp - Command statistics for Lish.
 ;;
 
-(in-package :lish)
+(defpackage :lish-stats
+  (:documentation "Command statistics for Lish.")
+  (:use :cl :dlib :dlib-misc :lish)
+  (:export
+   #:!stats
+   ))
+(in-package :lish-stats)
 
 (defvar *command-stats* nil
   "Command statistics.")
@@ -109,5 +115,24 @@
 		 (command-record-count v)
 		 (command-record-dates v))))
     (format t "Done.~%")))
+
+(defcommand stats
+    (("command" choice :choices ("save" "show")
+      :help "What to do with the statistics."))
+  "Show command statistics."
+  (cond
+    ((equal command "save")
+     (format t "Stats saved in ~a.~%" (save-command-stats)))
+    ((equal command "start")
+     (show-command-stats))
+    ((equal command "stop")
+     (show-command-stats))
+    ((equal command "show")
+     (show-command-stats))
+    (t
+     (show-command-stats))))
+
+(add-hook lish:*pre-command-hook* #'record-command-stats)
+(add-hook lish:*exit-shell-hook* #'save-command-stats)
 
 ;; EOF

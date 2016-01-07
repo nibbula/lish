@@ -891,18 +891,6 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	      (format t "~a is unknown~%" n)))))
 	 (setf args (cdr args)))))
 
-(defbuiltin stats
-    (("command" choice :choices ("save" "show")
-      :help "What to do with the statistics."))
-  "Show command statistics."
-  (cond
-    ((equal command "save")
-     (format t "Stats saved in ~a.~%" (save-command-stats)))
-    ((equal command "show")
-     (show-command-stats))
-    (t
-     (show-command-stats))))
-
 (defbuiltin opt
   (("readable" boolean :short-arg #\r
     :help "True to output options that are re-readable by the shell.")

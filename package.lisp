@@ -80,7 +80,7 @@ Lish does have some novel features compared to other shells.
    #:!cd #:!pwd #:!pushd #:!popd #:!dirs #:!suspend #:!history #:!echo
    #:!help #:!alias #:!unalias #:!type #:!exit #:!source #:!debug #:!bind
    #:!times #:!time #:!ulimit #:!wait #:!export #:!format
-   #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash
+   #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash #:!opt
    ;; convenience / scripting
    #:set-alias #:unset-alias #:get-alias
    #:command-pathname

@@ -1172,16 +1172,19 @@ probably fail, but perhaps in similar way to other shells."
       ((and (in-lisp-path cmd)
 	    (setf command (load-lisp-command cmd)))
        ;; now try it as a command
-       (record-command-stats cmd :command)
+       (run-hooks *pre-command-hook* cmd :command)
+       ;;(record-command-stats cmd :command)
        (call-command command (subseq expanded-words 1) in-pipe out-pipe))
       ;; Lish command
       (command			
-       (record-command-stats cmd :command)
+       (run-hooks *pre-command-hook* cmd :command)
+       ;;(record-command-stats cmd :command)
        (call-command command (subseq expanded-words 1) in-pipe out-pipe))
       (t
        (flet ((sys-cmd ()
 		"Do a system command."
-		(record-command-stats cmd :system-command)
+		(run-hooks *pre-command-hook* cmd :system-command)
+		;;(record-command-stats cmd :system-command)
 		(setf (values result result-stream)
 		      (do-system-command expanded-words in-pipe out-pipe))
 		(dbug "result = ~w~%" result)
@@ -1197,7 +1200,8 @@ probably fail, but perhaps in similar way to other shells."
 		 (read-from-string (shell-expr-line expr) nil nil)
 	       (if (and (symbolp symb) (fboundp symb))
 		   (progn
-		     (record-command-stats cmd :function)
+		     (run-hooks *pre-command-hook* cmd :function)
+		     ;;(record-command-stats cmd :function)
 		     (values
 		      (multiple-value-list
 		       (apply (symbol-function symb)
@@ -1455,7 +1459,8 @@ handling errors."
 			      (= lvl 0) (/= lvl 0) lvl))
 		    nil))))))))
       (stop-job-control saved-sigs))
-    (save-command-stats)
+    ;;(save-command-stats)
+    (run-hooks *exit-shell-hook*)
     (when (lish-exit-flag sh)
       (return-from lish (when (lish-exit-values sh)
 			  (values-list (lish-exit-values sh)))))
@@ -1489,14 +1494,6 @@ handling errors."
       (setf *lish-level* (parse-integer level-string)))
     (lish :debug debug))
   (nos:exit-lisp))
-
-;; So, like, to do it cleanly, for me:
-;;   $LISP -- -norl
-;;   (l :tiny-repl)
-;;   (l :lish)
-;;   (lish:make-standalone)
-;; where LISP can be either sbcl or clisp.
-;; @@@ what about ccl?
 
 (defun make-standalone (&optional (name "lish"))
   "FUFKFUFUFUFUFF"

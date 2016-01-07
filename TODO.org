@@ -11,17 +11,12 @@ Lish TODO list							     -*- org -*-
 *** argument defaults don't work in lish commands? (see wc)
 *** argument parsing for commands
 **** fix edge cases, more testing for posix-to-lisp-args
-** fix find -d ~/ -n foo
-   1. Prints all files, should only print matching foo,
-      but find --dir ~/ --name foo, works.
-   2. Gets a permission error, then fails to report it:
-      "There is no slot named SB-KERNEL:FORMAT-CONTROL in #<SB-KERNEL::CONDITION-CLASSOID OPSYS:POSIX-ERROR>"
-   3. ?Seems to fail when taking a long time and going to a pipe.
-      e.g.: find -d ~/ -n foo | less  OR even: | pager
 ** pipes
 *** piping from lisp command to system command
     gets no output, e.g.: grep defun *.lisp | /usr/bin/less
 *** pipes to lisp commands take too much memory
+*** pipes seem to fail when taking a long time and going to a pipe.
+    e.g.: find -d ~/ -n foo | less  OR even: | pager
 ** completion
 *** completion interning of partial symbol, so completing doesn't work right
 *** completion should work in pipelines
@@ -58,6 +53,13 @@ Lish TODO list							     -*- org -*-
 **** first word when args are after
 *** DONE aliases get double expanded, e.g. filenames with "[]" in it
     test: touch "[]" ; ll * -> "Invalid empty character class"
+*** DONE fix find -d ~/ -n foo
+**** DONE Prints all files, should only print matching foo,
+     but find --dir ~/ --name foo, works.
+**** DONE Gets a permission error, then fails to report it:
+     "There is no slot named SB-KERNEL:FORMAT-CONTROL in #<SB-KERNEL::CONDITION-CLASSOID OPSYS:POSIX-ERROR>"
+**** DONE ?Seems to fail when taking a long time and going to a pipe.
+     e.g.: find -d ~/ -n foo | less  OR even: | pager
 * Essential festures
 ** EXTRACT COMMANDS!!
    I know it seems crazy, but, I want to separate commands from lish,

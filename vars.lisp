@@ -74,7 +74,7 @@ means every dumped executable.")
 
 ;; Like on windows this is #\; right? But not cygwin?
 ;; @@@ This should be in opsys 
-(defvar *path-separator*
+(defparameter *path-separator*		; @@@ defconstant?
   #-windows #\:
   #+windows #\;
   "Separator in the PATH environement variable.")
@@ -107,5 +107,15 @@ end points in the original string."
   name
   command-line
   resume-function)
+
+;; Hooks
+
+(defvar *pre-command-hook* nil
+  "Called before a command is run. Arguments are:
+COMMAND-NAME : string   - The name of the command.
+COMMAND-TYPE : keyword  - What kind of command it is.")
+
+(defvar *exit-shell-hook* nil
+  "Called when the shell exits.")
 
 ;; EOF
