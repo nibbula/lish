@@ -24,12 +24,10 @@
      (:file "commands"  :depends-on ("package" "vars" "args"))
      (:file "shell"     :depends-on ("package" "vars" "args" "commands"))
      (:file "complete"  :depends-on ("package" "vars" "args" "commands"))
-     (:file "stats"     :depends-on ("package" "vars" "args" "commands"
-				     "shell"))
      (:file "lish"   	:depends-on ("package" "vars" "args" "commands"
-				     "shell" "complete" "stats"))
+				     "shell" "complete"))
      (:file "builtin"   :depends-on ("package" "vars" "args" "commands"
-				     "shell" "complete" "stats" "lish"))
+				     "shell" "complete" "lish"))
      (:file "piping"	:depends-on ("package" "vars" "args" "commands"
 				     "shell" "lish"))
      (:file "mine"      :depends-on ("package" "vars" "args" "commands"
