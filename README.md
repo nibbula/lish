@@ -36,4 +36,4 @@ Also there's the dreaded ‘Utils’ issue!
 
 I should probably od this as a ".md" since ".org" rendering is usually subpar.
 Emacs can render to a ".md", but that's also subpar and needs hand tweaking.
-***sigh***
+__"*sigh*"__
