@@ -25,3 +25,7 @@ https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name.git
   "Exclusive or."
    (if a (not b) b))
 #+END_SRC
+
+I should probably do this as a ".md" since ".org" rendering is usually subpar.
+Emacs can render to a ".md", but that's also subpar and needs hand tweaking.
+*sigh*
