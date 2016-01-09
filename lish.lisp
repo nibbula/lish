@@ -804,8 +804,10 @@ The syntax is vaguely like:
   ;;    :for dir :in *lisp-path* :do
   ;;    (when (setf path (probe-file (s+ dir command)))
   ;;      (asdf::resolve-symlinks path))))	; XXX I know, this is cheating.
-  (ignore-errors (asdf:find-component nil command)))
-;  (asdf:find-component nil command))
+  (typecase command
+    ((or string keyword symbol)
+     (ignore-errors (asdf:find-component nil command)))
+    (t nil)))
 
 (defun load-lisp-command (command)
   "Load a command in the lisp path."
@@ -1163,35 +1165,45 @@ probably fail, but perhaps in similar way to other shells."
     (dbug "expanded words = ~w~%" expanded-words)
     ;; These are in order of precedence, so:
     ;;  aliases, lisp path, commands, system path
-    (cond
-      ;; Alias
-      ((and alias (not no-alias))
-       ;; re-read and re-eval the line with the alias expanded
-       (expand-alias sh alias expanded-words in-pipe out-pipe))
-      ;; Autoload
-      ((and (in-lisp-path cmd)
-	    (setf command (load-lisp-command cmd)))
-       ;; now try it as a command
-       (run-hooks *pre-command-hook* cmd :command)
-       ;;(record-command-stats cmd :command)
-       (call-command command (subseq expanded-words 1) in-pipe out-pipe))
-      ;; Lish command
-      (command			
-       (run-hooks *pre-command-hook* cmd :command)
-       ;;(record-command-stats cmd :command)
-       (call-command command (subseq expanded-words 1) in-pipe out-pipe))
-      (t
-       (flet ((sys-cmd ()
-		"Do a system command."
-		(run-hooks *pre-command-hook* cmd :system-command)
-		;;(record-command-stats cmd :system-command)
-		(setf (values result result-stream)
-		      (do-system-command expanded-words in-pipe out-pipe))
-		(dbug "result = ~w~%" result)
-		(when (not result)
-		  (format t "Command failed.~%"))
-		(force-output)	   ; @@@ is this really a good place for this?
-		(values result result-stream nil)))
+    (flet ((sys-cmd ()
+	     "Do a system command."
+	     (run-hooks *pre-command-hook* cmd :system-command)
+	     (setf (values result result-stream)
+		   (do-system-command expanded-words in-pipe out-pipe))
+	     (dbug "result = ~w~%" result)
+	     (when (not result)
+	       (format t "Command failed.~%"))
+	     (force-output)	   ; @@@ is this really a good place for this?
+	     (values result result-stream nil))
+	   (rest-of-the-line (expr)
+	     "Return the rest of the line after the first word."
+	     (if (> (length (shell-expr-word-start expr)) 1)
+		 (subseq (shell-expr-line expr)
+			 (elt (shell-expr-word-start expr) 1))
+		 ""))
+	   (run-fun (func line)
+	     "Apply the func to the line, and return the proper values."
+	     (run-hooks *pre-command-hook* cmd :function)
+	     (values
+	      (multiple-value-list (apply func (read-parenless-args line)))
+	      nil  ;; stream
+	      t))) ;; show the values
+      (cond
+	;; Alias
+	((and alias (not no-alias))
+	 ;; re-read and re-eval the line with the alias expanded
+	 (expand-alias sh alias expanded-words in-pipe out-pipe))
+	;; Autoload
+	((and (in-lisp-path cmd)
+	      (setf command (load-lisp-command cmd)))
+	 ;; now try it as a command
+	 (run-hooks *pre-command-hook* cmd :command)
+	 (call-command command (subseq expanded-words 1) in-pipe out-pipe))
+	;; Lish command
+	(command
+	 (run-hooks *pre-command-hook* cmd :command)
+	 (call-command command (subseq expanded-words 1) in-pipe out-pipe))
+	((stringp cmd)
 	 ;; If we can find a command in the path, try it first.
 	 (if (get-command-path cmd)
 	     (sys-cmd)
@@ -1200,17 +1212,16 @@ probably fail, but perhaps in similar way to other shells."
 		 (read-from-string (shell-expr-line expr) nil nil)
 	       (if (and (symbolp symb) (fboundp symb))
 		   (progn
-		     (run-hooks *pre-command-hook* cmd :function)
-		     ;;(record-command-stats cmd :function)
-		     (values
-		      (multiple-value-list
-		       (apply (symbol-function symb)
-			      (read-parenless-args
-			       (subseq (shell-expr-line expr) pos))))
-		      nil ;; stream
-		      t))  ;; show the values
+		     (run-fun (symbol-function symb)
+			      (subseq (shell-expr-line expr) pos)))
 		   ;; Just try a system command anyway, which will likely fail.
-		   (sys-cmd)))))))))
+		   (sys-cmd)))))
+	((functionp cmd)
+	 (run-fun cmd (rest-of-the-line expr)))
+	((and (symbolp cmd) (fboundp cmd))
+	 (run-fun (symbol-function cmd) (rest-of-the-line expr)))
+	(t ;; Some other type, just return it, like it's self evaluating.
+	 (values (multiple-value-list (eval cmd)) nil t))))))
 
 (defun load-file (sh file)
   "Load a lish syntax file."
