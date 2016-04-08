@@ -36,6 +36,7 @@ Lish does have some novel features compared to other shells.
    #:shell-toplevel
    ;; variables
    #:*lish-level*
+   #:*lish-user-package*
    #:*shell*
    #:*old-pwd*
    #:*dir-list*
@@ -86,8 +87,10 @@ Lish does have some novel features compared to other shells.
    #:command-pathname
    #:command-paths
    #:input-line-words
+   #:input-line-list
    #:command-output-words
    #:command-output-list
+   #:pipe
    ;; magic punctuation
    #:! #:!? #:!! #:!$ #:!$$ #:!_ #:!-
    #:!and #:!or #:!bg
@@ -102,6 +105,8 @@ Lish does have some novel features compared to other shells.
    #:format-prompt
    #:load-file
    #:suspend-job
+   #:accepts
+   #:get-accepts
    ))
 
 ;; EOF

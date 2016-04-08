@@ -10,14 +10,29 @@
    ))
 (in-package :lish-test)
 
+(defun sort-of-equal (a b)
+  "Like equalp, but ignoring symbol package differences."
+  (typecase a
+    (list
+     (return-from sort-of-equal
+       (not
+	(loop :for aa :in a :for bb :in b
+	   :unless (sort-of-equal aa bb)
+	   :return t))))
+    (symbol
+     (equal (symbol-name a) (symbol-name b)))
+    (t
+     (equalp a b))))
+
 (defun vuvu (str l-args)
   (let ((aa (command-to-lisp-args (command-arglist (get-command str)))))
     (format t "~w ~{~w ~}~%~w~%~%" str (command-arglist (get-command str)) aa)
-    (assert (equalp aa l-args))))
+    (assert (sort-of-equal aa l-args))))
 
 ;; You probably have to say: (with-package :lish (test-stla))
 ;; Unfortunately this may fail if not updated to reflect builtin changes.
-(defun test-stla ()
+(defun test-shell-to-lisp-args ()
+  "Test COMMAND-TO-LISP-ARGS."
   (vuvu "cd"      '(&optional directory))
   (vuvu "pwd"     '())
   (vuvu "pushd"   '(&optional directory))
@@ -82,7 +97,7 @@
   "Test argument conversion."
   (format t "entry = ~s section = ~s~%" entry section))
 
-(defun test-ptla ()
+(defun test-posix-to-lisp-args ()
   ;; (vivi ":" '() '())
   ;; (vivi ":"
   ;; 	'("(format t \"egg~a~%\" (lisp-implementation-type))")
@@ -115,7 +130,7 @@
   (vivi "debug" "off" '(nil))
   ;; This is supposed to fail, since pecan isn't a boolean
 ;  (vivi "debug" '("pecan") '()) 
-  (vivi "gurp"  "-i foo bar baz lemon")
+  (vivi "gurp"  "-i foo bar baz lemon"
 	'("foo" :files ("bar" "baz" "lemon") :invert t))
   (vivi "zurp"  "-s 3 chflags" '(:entry "chflags" :section "3"))
 )
@@ -125,7 +140,7 @@
 
 
 (defun run-tests ()
-  
-)
+  (test-shell-to-lisp-args)
+  (test-posix-to-lisp-args))
 
 ;; EOF

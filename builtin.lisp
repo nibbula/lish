@@ -57,9 +57,20 @@ from stack."
 ;  (opsys:kill (opsys:getpid) opsys:sigstop))
   (opsys:kill (opsys:getpid) 17))	; SIGSTOP
 
-(define-builtin-arg-type job-descriptor (arg-integer)
-  "A job descriptor."
-  ())
+;; (define-builtin-arg-type job-descriptor (arg-object)
+;;   "A job descriptor."
+;;   ())
+
+(defun job-id-list ()
+  "Return a list of suspended job ids."
+  (loop :for j :in (lish-suspended-jobs *shell*)
+     :collect (suspended-job-id j)))
+
+(defclass arg-job-descriptor (arg-lenient-choice)
+  ()
+  (:default-initargs
+   :choice-func #'job-id-list)
+  (:documentation "A job descriptor."))
 
 (defbuiltin resume
     (("job-descriptor" job-descriptor :optional t :help "Job to resume."))
@@ -72,6 +83,21 @@ from stack."
        (return-from !resume (values)))
       ((= (length (lish-suspended-jobs *shell*)) 1)
        (setf job (first (lish-suspended-jobs *shell*))))
+      ((stringp job-descriptor)
+       (setf job (find job-descriptor
+		       (lish-suspended-jobs *shell*)
+		       :test #'equalp
+		       :key #'suspended-job-name)))
+      ((numberp job-descriptor)
+       (setf job (find job-descriptor
+		       (lish-suspended-jobs *shell*)
+		       :test #'=
+		       :key #'suspended-job-id)))
+      ((symbolp job-descriptor)
+       (setf job (find (string job-descriptor)
+		       (lish-suspended-jobs *shell*)
+		       :test #'equalp
+		       :key #'suspended-job-name)))
       (t
        (setf job (find job-descriptor
 		       (lish-suspended-jobs *shell*)
@@ -238,7 +264,7 @@ Commands can be:
   - Lisp functions or methods
 ")
 
-(defun print-command-help (commands &key (built-in t))
+(defun print-multiple-command-help (commands &key (built-in t))
   (let ((rows
 	 (loop :with b :and doc :and pos
 	    :for k :in commands :do
@@ -266,6 +292,27 @@ Commands can be:
 	(format t "  ~a~%" (subseq l 0 (min (length l)
 					    (- (get-cols) 2))))))))
 
+(defun print-command-help (cmd)
+  "Print documentation for a command."
+  (format t "~a~%" (documentation cmd 'function))
+  (when (and (command-arglist cmd) (not (zerop (length (command-arglist cmd)))))
+    (format t "Arguments:~%")
+    (table:nice-print-table
+     (loop :for a :in (command-arglist cmd)
+	:when (not (arg-hidden a))
+	:collect
+	(list (if (arg-short-arg a) (s+ "  -" (arg-short-arg a)) "  ")
+	      (if (arg-long-arg a)  (s+ "--" (arg-long-arg a)) (arg-name a))
+	      (or (arg-default a) "")
+	      (string-downcase (arg-type a))
+	      (or (and (slot-boundp a 'help) (arg-help a))
+		  (arg-name a))))
+     nil :trailing-spaces nil))
+  (when (and (command-accepts cmd) (not (eq (command-accepts cmd) :unspecified)))
+    (format t "Accepts: ~a~%" (command-accepts cmd)))
+  (when (command-loaded-from cmd)
+    (format t "Loaded from: ~a~%" (command-loaded-from cmd))))
+
 (defbuiltin help (("subject" help-subject :help "Subject to get help on."))
   "Show help on the subject. Without a subject show some subjects that are
 available."
@@ -281,7 +328,7 @@ available."
 		    :collect k)
 		 #'string-lessp)))
 	   (format t "Built-in commands:~%")
-	   (print-command-help commands :built-in t)))
+	   (print-multiple-command-help commands :built-in t)))
 	((equalp subject "commands")
 	 (let ((commands
 		(sort
@@ -289,7 +336,7 @@ available."
 		    :collect k)
 		 #'string-lessp)))
 	   (format t "Defined commands:~%")
-	   (print-command-help commands :built-in nil)))
+	   (print-multiple-command-help commands :built-in nil)))
 	((or (equalp subject "editor"))	 (format t *editor-help*))
 	((or (equalp subject "syntax"))	 (format t *syntax-help*))
 	((or (equalp subject "keys"))
@@ -303,7 +350,7 @@ available."
 			(documentation (symbol-function symb) 'function))))
 ;	   (print-values* (subject cmd symb doc fdoc))
 	   (cond
-	     (doc  (format t "~a~%" doc))
+	     (doc  (print-command-help cmd))
 	     (fdoc (format t "Lisp function:~%~a~%" fdoc))
 	     (cmd  (format t "Sorry, there's no help for \"~a\".~%" subject))
 	     (t    (format t "I don't know about the subject \"~a\"~%"
@@ -427,6 +474,32 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 	      (nos:getenv name)))		; Actually does nothing
       (printenv)))
 
+#|-+
+ |\|   So we have (from a man page):
+ |\|
+ |\|     env [-i] [name=value ...] [utility [argument ...]]
+ |\|
+ |\|   as a lambda list:
+ |\|
+ |\|     (&key ignore-environment variable-assignment shell-command)
+ |\|
+ |\|   but that doesn't have enough information. So
+ |\|
+ |\|    (:or "-i" "var=value" (:and "cmd")
+ |\|@@@@@@@@@@@@@@@
+ |\|
+ |\|    (("ignore-environment" boolean :short-arg #\i
+ |\|      :help "Ignore the environment.")
+ |\|     :positional
+ |\|     ("variable-assignment" string :repeating t :matches "\\S+=\\S+"
+ |\|      :help "Assingment to make in the environment.")
+ |\|     ("shell-command" shell-command
+ |\|      :help "Command to execute with the possibly modified environment.")
+ |\|     ("arguments" string :repeating t
+ |\|      :help "Variable assignments, commands and command arguments."))
+ |\|
+ +-|#
+
 (defbuiltin env
     (("ignore-environment" boolean :short-arg #\i
       :help "Ignore the environment.")
@@ -434,8 +507,8 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
       :help "Assingment to make in the environment.")
      ("shell-command" shell-command
       :help "Command to execute with the possibly modified environment.")
-     ("arguments" object :repeating t
-      :help "Arguments to the command."))
+     ("arguments" string :repeating t
+      :help "Variable assignments, commands and command arguments."))
   "Modify the command environment. If ignore-environment"
   (if (and (not shell-command) (not arguments))
       ;; Just print variables
@@ -726,7 +799,6 @@ better just to use Lisp syntax.
 (defun is-regular-executable (p)
   (let ((st (stat p)))
     (and st (is-executable st) (is-regular st))))
-|#
 
 (defun has-directory-p (p)
   (position *directory-separator* p))
@@ -748,6 +820,8 @@ if there isn't one."
 	      (return-from command-pathname full))))
        (error (c) (declare (ignore c)))))
   nil)
+
+|#
 
 (defun command-paths (cmd)
   "Return all possible command paths. Don't cache the results."
@@ -781,24 +855,29 @@ if there isn't one."
 		result path))))
     result))
 
+;; Maybe this should be called "cache", and leave a posix compatible hash.
 (defbuiltin hash
     (("rehash" boolean :short-arg #\r
       :help "Forget about command locations.")
+     ("packages" boolean :short-arg #\p
+      :help "Forget about cached loadable packages.")
      ("commands" t :repeating t
       :help "Command to operate on."))
   "Show or forget remembered full pathnames of commands."
   (labels ((pr-cmd (c) (format t "~a~%" c)))
-    (if rehash
-	(if commands
-	    (loop :for c :in commands :do
-	       (remhash c *command-cache*))
-	    (setf *command-cache* nil))
-	(when *command-cache*
-	  (if commands
-	      (loop :for c :in commands :do
-		 (pr-cmd (gethash c *command-cache*)))
-	      (maphash #'(lambda (c p) (declare (ignore c)) (pr-cmd p))
-		       *command-cache*))))))
+    (when rehash
+      (if commands
+	  (loop :for c :in commands :do
+	     (remhash c *command-cache*))
+	  (setf *command-cache* nil)))
+    (when packages
+      (clear-loadable-package-cache))
+    (when (and *command-cache* (not (or rehash packages)))
+      (if commands
+	  (loop :for c :in commands :do
+	     (pr-cmd (gethash c *command-cache*)))
+	  (maphash #'(lambda (c p) (declare (ignore c)) (pr-cmd p))
+		   *command-cache*)))))
 
 ;; Since this is based on phonetics, we would need phonetic dictionaries to do
 ;; this right.

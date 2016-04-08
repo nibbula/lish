@@ -52,21 +52,26 @@ probably means it's a regular file and we have execute permission on it."
   "Return the command list for the current shell: *shell*."
   (if (not *verb-list*)
       (setf *verb-list*
-	    (remove-duplicates
-	     (append
-	      (loop :for k :being :the :hash-keys :of (lish-aliases shell)
-		 :collect k)
-	      (loop :for k :being :the :hash-keys :of (lish-commands)
-		 :collect k)
-	      (loop :for dir :in (split-sequence #\: (nos:getenv "PATH"))
-		 :if (probe-directory dir)
-		 :append (loop :for f :in (nos:read-directory :dir dir :full t
-							      :omit-hidden t)
-			    :if (without-access-errors
-				  (is-executable (s+ dir *directory-separator*
-						     (nos:dir-entry-name f))))
-			    :collect (nos:dir-entry-name f))))
-	     :test #'equal))
+	    (with-spin ()
+	      (remove-duplicates
+	       (append
+		(loop :for k :being :the :hash-keys :of (lish-aliases shell)
+		   :collect k)
+		(loop :for k :being :the :hash-keys :of (lish-commands)
+		   :do (spin)
+		   :collect k)
+		(loop :for dir :in (split-sequence #\: (nos:getenv "PATH"))
+		   :do (spin)
+		   :if (probe-directory dir)
+		   :append (loop :for f :in (nos:read-directory
+					     :dir dir :full t
+					     :omit-hidden t)
+			      :if (without-access-errors
+				      (is-executable
+				       (s+ dir *directory-separator*
+					   (nos:dir-entry-name f))))
+			      :collect (nos:dir-entry-name f))))
+	       :test #'equal)))
       *verb-list*))
 
 (defun complete-command (str all)
@@ -94,6 +99,14 @@ probably means it's a regular file and we have execute permission on it."
 	 word :package pack :external external)
 	(values (completion::symbol-completion
 		 word :package pack :external external) word-start))))
+
+(defun shell-complete-symbol (context pos all &optional bang-p)
+  "Complete symbols in the *lish-user-package*, optionally with a
+preceding exclamation point '!' ."
+  (with-package *lish-user-package*
+    (if bang-p
+	(complete-bang-symbol context pos all)
+	(complete-symbol context pos all))))
 
 (defun quotify (string)
   "Put a backslash in front of any character that might not be intrepreted
@@ -263,12 +276,6 @@ literally in shell syntax."
 		   (complete-list fake-word (length fake-word) all choices)
 		   (complete-filename fake-word pos all)))))))))
 
-(defvar *junk-package*
-  (progn
-    (when (find-package :lish-junk)
-      (delete-package :lish-junk))
-    (make-package :lish-junk)))
-
 ;; Remember, a completion functions returns:
 ;;   One completion: completion and replacement starting position
 ;;   List:           sequence and sequence length
@@ -283,7 +290,7 @@ complete, and call the appropriate completion function."
     (typecase exp
       (cons
        (dbug "Hellow I am janky!~%")
-       (complete-symbol context pos all))
+       (shell-complete-symbol context pos all))
       (shell-expr
        (let* ((word-num (shell-word-number exp pos))
 	      (first-word (first (shell-expr-words exp)))
@@ -311,7 +318,7 @@ complete, and call the appropriate completion function."
 		  (progn
 		    ;; probably ()
 		    (dbug "bogo~%")
-		    (complete-symbol context pos all))
+		    (shell-complete-symbol context pos all))
 		  (let ((from-end (- (length context) pos)))
 		    (dbug "heyba~%")
 		    (multiple-value-bind (result new-pos)
@@ -329,15 +336,15 @@ complete, and call the appropriate completion function."
 				  pos))))))
 	     ((symbolp word)
 	      (dbug "janky~%")
-	      (complete-bang-symbol context pos all))
+	      (shell-complete-symbol context pos all t))
 	     ((consp word)		; (foo)
 	      (dbug "junky~%")
-	      (complete-symbol context pos all))
+	      (shell-complete-symbol context pos all))
 	     ((eql (aref word 0) #\()	; (foo
 	      (dbug "half baka~%")
-	      (complete-symbol context pos all))
+	      (shell-complete-symbol context pos all))
 	     ((eql (aref word 0) #\!)	; !foo
-	      (complete-bang-symbol context pos all))
+	      (shell-complete-symbol context pos all t))
 	     ((eql (aref word 0) #\$)	; $foo
 	      (simple-complete #'complete-env-var
 			       (subseq word 1)
@@ -361,7 +368,7 @@ complete, and call the appropriate completion function."
 		;; XXX Symbols won't come up in the list.
 		(when (not v1)
 		  (setf (values v1 v2)
-			(complete-symbol context pos all))
+			(shell-complete-symbol context pos all))
 		  )
 		(values v1 v2)))
 	     (t

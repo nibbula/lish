@@ -38,8 +38,7 @@
     :documentation "List of suspended jobs.")
    (options
     :initarg :options :accessor lish-options :initform nil
-    :documentation "Operator configurable options.")
-   )
+    :documentation "Operator configurable options."))
   (:default-initargs
    :exit-flag nil
    :exit-values '())

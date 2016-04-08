@@ -34,6 +34,6 @@ Also there's the dreaded ‘Utils’ issue!
    (if a (not b) b))
 ```
 
-I should probably od this as a ".md" since ".org" rendering is usually subpar.
+I should probably add this as a ".md" since ".org" rendering is usually subpar.
 Emacs can render to a ".md", but that's also subpar and needs hand tweaking.
 __"*sigh*"__

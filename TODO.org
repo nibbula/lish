@@ -30,8 +30,8 @@ Lish TODO list							     -*- org -*-
 ** resume doesn't work
    resume only works when one job, doesn't get jobs spec arguments right
 ** parsing < in first word?
-** newly defined commands don't get recognized in completion
-** tiny-rl display bugs
+** newly defined commands don't get recognized in completion?
+** tiny-rl display bugs [more specific?]
 ** time should work for whole pipelines
    time just times the first command in the pipeline
    e.g. time cat /usr/share/dict/words | snip -a bogus
@@ -75,6 +75,7 @@ Lish TODO list							     -*- org -*-
 ** Better argument specification
 *** operators and grouping in argument lists: :or :opt :and :repeat :case
 *** something like docargs
+** argument name can be either string or symbol
 ** redirections: < > << <()
 ** give in and handle ENVVAR=value command -OR- make env builtin work
 ** at least handle ^Z of subprocess!
@@ -109,6 +110,10 @@ Lish TODO list							     -*- org -*-
 ** add shell errors and restarts
 *** appropriate errors should be continuable, restartable
 *** all errors should be with shell-error or something
+** multiple line command lines, e.g. lines with newlines in them,
+   unfinished exprs, etc
+   mostly in rl
+   rl enter command shouldn't exit
 * Non-essential features
 ** port to windows
 ** syntax colorization

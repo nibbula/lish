@@ -102,7 +102,8 @@ So far we support:
 %W	The basename of `$PWD', tildified.
 %$	If the effective UID is 0, `#', otherwise `$'.
 %i      The lisp implementation nickname.
-%p      The current value of *package*.
+%p      The shortest nickname of *lish-user-package*.
+%P      The current value of *lish-user-package*.
 %d      <3 char weekday> <3 char month name> <date>.
 %t	24 hour HH:MM:SS
 %T	12 hour HH:MM:SS
@@ -149,8 +150,13 @@ Not implemented yet:
 		     (twiddlify (basename (nos:current-directory))) str))
 	       (#\$ (write-char (if (= (nos:geteuid) 0) #\# #\$) str))
 	       (#\i (write-string *lisp-implementation-nickname* str))
-	       (#\p (write-string (s+ (shortest-package-nick)) str))
-	       (#\P (write-string (package-name *package*) str))
+	       (#\p (write-string
+		     (s+ (and *lish-user-package*
+			      (shortest-package-nick *lish-user-package*)))
+		     str))
+	       (#\P (write-string
+		     (s+ (and *lish-user-package*
+			      (package-name *lish-user-package*))) str))
 	       (#\d (write-string
 		     (format-date "~3a ~3a ~2d"
 				  (:day-abbrev :month-abbrev :date)) str))
@@ -271,10 +277,18 @@ Not implemented yet:
 		      (tt-color ts nil :default))
 		     (otherwise
 		      (error "Unrecognized attribute ~a" (car s)))))
+		  ((and (symbolp (car s)) (fboundp (car s)))
+		   ;; (tt-format ts "~a" (apply (symbol-function (car s)) (cdr s))))
+		   (tt-format ts "~a" (eval s)))
 		  (t
-		   (error "Unrecognized thing in attribute list ~a" (car s)))))
+		   (error "Unrecognized thing in attribute list ~a" (car s))
+		   )))
+	       (symbol
+		(when (boundp s)
+		  (tt-format ts "~a" (symbol-value s))))
 	       (t
-		(princ s str))))
+		(tt-format ts "~a" s)
+		)))
 	  (tt-finish-output ts)))))
 
 (defgeneric make-prompt (shell)
@@ -353,204 +367,20 @@ the end and didn't get a close quote, the third value is true.~
 (defun contains-whitespace-p (s)
   (position-if #'(lambda (x) (position x *whitespace*)) s))
 
-#|
- 
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@@@@@@@@@ DREADFUL
-
-;;;;;;;;
-    (labels ((finish-word ()
-	       "Finish the current word."
-	       (when in-word
-		 (push (copy-seq w) args)
-		 (push i word-end)
-		 (push did-quote word-quoted)
-		 (setf (fill-pointer w) 0
-		       in-word nil
-		       did-quote nil)))
-	     (return-partial ()
-	       (push i word-start)
-	       (push (subseq line i) args)
-	       (push (length line) word-end)
-	       (push nil word-quoted)
-	       (return-from shell-read
-		 (make-shell-expr
-		  :line line
-		  :words (nreverse args)
-		  :word-start (reverse word-start)
-		  :word-end (nreverse word-end) 
-		  :word-end (nreverse word-quoted))))
-	     (do-continue ()
-	       "Handle when the expression is incomplete."
-	       (if partial
-		   (return-partial)
-		   (return-from shell-read *continue-symbol*)))
-	     (do-reader-error (c)
-	       "Handle when the expression has an error."
-	       (if partial
-		   (return-partial)
-		   (signal c)))
-	     (next-char ()
-	       "Return the next character or NIL."
-	       (when (< (+ i 1) len) (aref line (1+ i))))
-	     (reverse-things ()
-	       "Reverse the things we've been consing, so they're in order."
-	       (setf word-start  (reverse word-start)
-		     word-end    (nreverse word-end)
-		     word-quoted (nreverse word-quoted)
-		     words       (nreverse args)))
-	     (make-the-expr ()
-	       "Make an expression, with it's own copy of the lists."
-	       (make-shell-expr
-		:line line
-		:words (copy-seq words)
-		:word-start (copy-seq word-start)
-		:word-end (copy-seq word-end)
-		:word-quoted (copy-seq word-quoted)))
-	     (make-compound (key &optional (inc 2))
-	       "Make a compound expression with type KEY."
-	       (finish-word)
-	       (reverse-things)
-	       (let ((e (list key (make-the-expr))))
-		 (setf args (list e)))
-	       (setf word-start (list i))
-	       (incf i inc)
-	       (setf word-end (list i)
-		     word-quoted (list nil))))
-
-;;;;;;;;
-
-(defmacro with-words ((line) &body body)
-  "Do something for each word in the line."
-  (with-unique-names (word in-word do-quote did-quote i len)
-    `(let ((,word (make-stretchy-string 12))
-	 (,i 0)	(,len (length line)) ; index in line
-	 ,in-word ,do-quote ,did-quote ,c
-	 word)
-      (loop :while (< ,i ,len) :do
-	 (setf ,c (aref ,line ,i))
-	 (cond
-	   ;; quoted char
-	   (do-quote
-	       (vector-push-extend c ,word)
-	     (when (not in-word)
-	       (push (1- i) word-start))
-	   ;; a string
-	   ((eql c #\")
-	    (finish-word)
-	    ;; read a string as a separate word
-	    (multiple-value-bind (str ink cont)
-		(read-string (subseq line (1+ i)))
-	      (when (and cont (not partial))
-		(return-from shell-read *continue-symbol*))
-	      (push i word-start)
-	      (push str args)
-	      (incf i (+ 2 ink))
-	      (push i word-end)
-	      (push t word-quoted)))
-	   ;; a lisp function application
-	   ((eql c #\()
-	    (finish-word)
-	    (handler-case
-		;; read a form as a separate word
-		(multiple-value-bind (obj pos)
-		    (with-package package
-		      (read-from-string line nil *continue-symbol* :start i))
-		  (push i word-start)
-		  (setf i pos)
-		  (push obj args)
-		  (push i word-end)
-		  (push nil word-quoted))
-	      (end-of-file () (do-continue))
-	      (reader-error (c) (do-reader-error c))
-;	      (error () (do-continue))
-;	      (condition (c) (signal c))
-	      ))
-	   ;; a lisp expr
-	   ((eql c #\!)
-	    (finish-word)
-	    ;; read a form as a separate word
-	    (handler-case
-		(multiple-value-bind (obj pos)
-		    (with-package package
-		      (read-from-string line nil nil :start (+ i 1)))
-		  (push i word-start)
-		  (setf i pos)
-		  (push i word-end)
-		  (push nil word-quoted)
-		  (push obj args))
-	      (end-of-file () (do-continue))
-;	      (error () (do-continue))
-;	      (end-of-file () (do-continue))
-;	      (condition (c) (signal c))
-	      ))
-	   ;; quote char
-	   ((eql c #\\)
-	    (setf do-quote t)
-	    (incf i))
-	   ;; whitespace
-	   ((position c *whitespace*)
-	    (finish-word)
-	    (incf i))
-	   ;; comment
-	   ((eql c #\;)
-	    (finish-word)
-	    (loop :for j :from i :below len
-	       :while (not (eql (aref line j) #\newline))
-	       :do (incf i)))
-	   ;; pipe
-	   ((and (eql c #\|) (not (eql (next-char) #\|)))
-	    (make-compound :pipe 1))
-	   ;; redirect
-	   ((or (eql c #\<) (eql c #\>))
-	    (finish-word)
-	    (reverse-things)
-	    ;; @@@ need to get the file name as a word
-	    (let ((e (list :redirect (make-the-expr))))
-	      (setf args (list e)))
-	    (setf word-start (list i))
-	    (incf i)
-	    (setf word-end (list i)
-		  word-quoted (list nil)))
-	   ((and (eql c #\&) (eql (next-char) #\&))
-	    (make-compound :and))
-	   ((and (eql c #\|) (eql (next-char) #\|))
-	    (make-compound :or))
-	   ((eql c #\^)
-	    (make-compound :sequence 1))
-	   ;; any other character: add to word
-	   (t
-	    (when (not in-word)
-	      (push i word-start))
-	    (setf in-word t)
-	    (vector-push-extend c w)
-	    (incf i)))
-
-(defun expand-global-aliases (line)
-  "Expand global aliases in the line."
-  line)
-
-@@@@@@@@@ DREADFUL
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-
-|#
-
 (defun shell-read (line &key partial (package *lish-user-package*))
   "Read objects in shell syntax and return them. If PARTIAL is true, don't 
 signal an error if we can't read a full expression.
 The syntax is vaguely like:
   ; comment
   command [arg...]
-  command \"string\" !*lisp-object* (lisp-code)
+  command \"string\" !*lisp-object* !(lisp-code)
   command word\ with\ spaces \"string \\\" with a double quote\"
   command | command | ...
   command < file-name
   command > file-name
   ([lisp expressions...])"
 ;  (setf line (expand-global-aliases line))
-  (let (word-start word-end word-quoted words
+  (let (word-start word-end word-quoted word-eval words
 	(c nil)				; current char
 	(i 0)				; index in line
 	(len (length line))
@@ -565,6 +395,7 @@ The syntax is vaguely like:
 		 (push (copy-seq w) args)
 		 (push i word-end)
 		 (push did-quote word-quoted)
+		 (push nil word-eval)
 		 (setf (fill-pointer w) 0
 		       in-word nil
 		       did-quote nil)))
@@ -573,13 +404,16 @@ The syntax is vaguely like:
 	       (push (subseq line i) args)
 	       (push (length line) word-end)
 	       (push nil word-quoted)
+	       (push nil word-eval)
 	       (return-from shell-read
 		 (make-shell-expr
 		  :line line
 		  :words (nreverse args)
 		  :word-start (reverse word-start)
 		  :word-end (nreverse word-end) 
-		  :word-quoted (nreverse word-quoted))))
+		  :word-quoted (nreverse word-quoted)
+		  :word-eval (nreverse word-eval)
+		  )))
 	     (do-continue ()
 	       "Handle when the expression is incomplete."
 	       (if partial
@@ -587,6 +421,7 @@ The syntax is vaguely like:
 		   (return-from shell-read *continue-symbol*)))
 	     (do-reader-error (c)
 	       "Handle when the expression has an error."
+	       (format t "Gots an ~a ~s~%" partial c)
 	       (if partial
 		   (return-partial)
 		   (signal c)))
@@ -598,6 +433,7 @@ The syntax is vaguely like:
 	       (setf word-start  (reverse word-start)
 		     word-end    (nreverse word-end)
 		     word-quoted (nreverse word-quoted)
+		     word-eval   (nreverse word-eval)
 		     words       (nreverse args)))
 	     (make-the-expr ()
 	       "Make an expression, with it's own copy of the lists."
@@ -606,7 +442,8 @@ The syntax is vaguely like:
 		:words (copy-seq words)
 		:word-start (copy-seq word-start)
 		:word-end (copy-seq word-end)
-		:word-quoted (copy-seq word-quoted)))
+		:word-quoted (copy-seq word-quoted)
+		:word-eval (copy-seq word-eval)))
 	     (make-compound (key &optional (inc 2))
 	       "Make a compound expression with type KEY."
 	       (finish-word)
@@ -616,7 +453,8 @@ The syntax is vaguely like:
 	       (setf word-start (list i))
 	       (incf i inc)
 	       (setf word-end (list i)
-		     word-quoted (list nil))))
+		     word-quoted (list nil)
+		     word-eval (list nil))))
       (loop
 	 :named tralfaz
 	 :while (< i len)
@@ -631,7 +469,7 @@ The syntax is vaguely like:
 	     (setf in-word t)
 	     (setf do-quote nil)
 	     ;; XXX I don't think \ in words should make them not expand
-;	     (setf did-quote t)
+	     ;(setf did-quote t)
 	     (incf i))
 	   ;; a string
 	   ((eql c #\")
@@ -645,43 +483,49 @@ The syntax is vaguely like:
 	      (push str args)
 	      (incf i (+ 2 ink))
 	      (push i word-end)
-	      (push t word-quoted)))
+	      (push t word-quoted)
+	      (push nil word-eval)))
 	   ;; a lisp function application
 	   ((eql c #\()
 	    (finish-word)
-	    (handler-case
+	    (handler-bind
+		((end-of-file (_  (declare (ignore _)) (do-continue)))
+		 (reader-error (_ (do-reader-error _))))
 		;; read a form as a separate word
 		(multiple-value-bind (obj pos)
 		    (with-package package
-		      (read-from-string line nil *continue-symbol* :start i))
+		      (if partial
+			  (clean-read-from-string line *junk-package* nil
+						  *continue-symbol* :start i)
+			  (read-from-string line nil
+					    *continue-symbol* :start i)))
 		  (push i word-start)
 		  (setf i pos)
 		  (push obj args)
 		  (push i word-end)
-		  (push nil word-quoted))
-	      (end-of-file () (do-continue))
-	      (reader-error (c) (do-reader-error c))
-;	      (error () (do-continue))
-;	      (condition (c) (signal c))
-	      ))
+		  (push nil word-quoted)
+		  (push nil word-eval))))
 	   ;; a lisp expr
 	   ((eql c #\!)
 	    (finish-word)
 	    ;; read a form as a separate word
-	    (handler-case
-		(multiple-value-bind (obj pos)
-		    (with-package package
-		      (read-from-string line nil nil :start (+ i 1)))
+	    (handler-bind
+		((end-of-file (_  (declare (ignore _)) (do-continue)))
+		 (reader-error (_ (do-reader-error _))))
+	      (multiple-value-bind (obj pos)
+		  (with-package package
+		    (if partial
+			(clean-read-from-string line *junk-package* nil
+						*continue-symbol*
+						:start (+ i 1))
+			(read-from-string line nil *continue-symbol*
+					  :start (+ i 1))))
 		  (push i word-start)
 		  (setf i pos)
+		  (push obj args)
 		  (push i word-end)
 		  (push nil word-quoted)
-		  (push obj args))
-	      (end-of-file () (do-continue))
-;	      (error () (do-continue))
-;	      (end-of-file () (do-continue))
-;	      (condition (c) (signal c))
-	      ))
+		  (push t word-eval))))
 	   ;; quote char
 	   ((eql c #\\)
 	    (setf do-quote t)
@@ -709,11 +553,15 @@ The syntax is vaguely like:
 	    (setf word-start (list i))
 	    (incf i)
 	    (setf word-end (list i)
-		  word-quoted (list nil)))
+		  word-quoted (list nil)
+		  word-eval (list nil)))
+	   ;; and
 	   ((and (eql c #\&) (eql (next-char) #\&))
 	    (make-compound :and))
+	   ;; or
 	   ((and (eql c #\|) (eql (next-char) #\|))
 	    (make-compound :or))
+	   ;; sequence
 	   ((eql c #\^)
 	    (make-compound :sequence 1))
 	   ;; any other character: add to word
@@ -728,7 +576,8 @@ The syntax is vaguely like:
 	  (when in-word
 	    (push (copy-seq w) args)
 	    (push i word-end)
-	    (push did-quote word-quoted))
+	    (push did-quote word-quoted)
+	    (push nil word-eval))
 	  (reverse-things)))
       (if (and (= (length words) 1) (consp (first words)))
 	  ;; just a lisp expression to be evaluated
@@ -911,8 +760,10 @@ read from."
      :for s = (shell-expr-word-start expr) :then (cdr s)
      :for e = (shell-expr-word-end expr) :then (cdr e)
      :for q = (shell-expr-word-quoted expr) :then (cdr q)
+     :for v = (shell-expr-word-eval expr) :then (cdr v)
      :collect (make-shell-word :word w
-			       :start (car s) :end (car e) :quoted (car q))))
+			       :start (car s) :end (car e) :quoted (car q)
+			       :eval (car v))))
 
 (defun words-to-expr (words &optional line)
   (let ((expr (make-shell-expr)))
@@ -920,11 +771,13 @@ read from."
        (push (shell-word-word   w) (shell-expr-words       expr))
        (push (shell-word-start  w) (shell-expr-word-start  expr))
        (push (shell-word-end    w) (shell-expr-word-end    expr))
-       (push (shell-word-quoted w) (shell-expr-word-quoted expr)))
+       (push (shell-word-quoted w) (shell-expr-word-quoted expr))
+       (push (shell-word-eval   w) (shell-expr-word-eval   expr)))
     (setf
      (shell-expr-words       expr) (nreverse (shell-expr-words       expr))
      (shell-expr-word-start  expr) (nreverse (shell-expr-word-start  expr))
      (shell-expr-word-end    expr) (nreverse (shell-expr-word-end    expr))
+     (shell-expr-word-eval   expr) (nreverse (shell-expr-word-eval   expr))
      (shell-expr-word-quoted expr) (nreverse (shell-expr-word-quoted expr))
      (shell-expr-line expr)        line)
     expr))
@@ -943,15 +796,16 @@ read from."
   "Evaluate Lisp expressions in the array of shell-words, return a possibly
 expanded array of shell-words."
   (loop :with results
-    :for w :in words
-    :if (or (consp (shell-word-word w)) (symbolp (shell-word-word w)))
-      :do (setf results (eval (shell-word-word w)))
-      :and :if (listp results)
+     :for w :in words
+     :if (and (or (consp (shell-word-word w)) (symbolp (shell-word-word w)))
+	      (shell-word-eval w))
+     :do (setf results (eval (shell-word-word w)))
+     :and :if (listp results)
 	;; Spread list results into separate args
-	:append (mapcar #'(lambda (x) (make-shell-word :word x))
+        :append (mapcar #'(lambda (x) (make-shell-word :word x))
 			results)
-      :else
-	:collect (make-shell-word :word results)
+     :else
+        :collect (make-shell-word :word results)
     :else
       :collect w))
 
@@ -997,6 +851,14 @@ expanded array of shell-words."
      ;;(format t "-T- ~s ~s~%" (type-of expr) expr)
      :unspecified)))
 
+(defun accepts (first-type &rest other-types)
+  "Return true if *ACCEPTS* matches one of the given types."
+  (let ((types (cons first-type other-types)))
+    (typecase *accepts*
+      (sequence (some (_ (position _ *accepts*)) types))
+      (keyword  (some (_ (eq       _ *accepts*)) types))
+      (t        (some (_ (equal    _ *accepts*)) types)))))
+
 (defun successful (obj)
   "Return true if the object represents a successful command result."
   (or
@@ -1037,6 +899,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			:word-start  (cdr (shell-expr-word-start expr))
 			:word-end    (cdr (shell-expr-word-end expr))
 			:word-quoted (cdr (shell-expr-word-quoted expr))
+			:word-eval   (cdr (shell-expr-word-eval expr))
 			;; @@@ perhaps we should retain original,
 			;; since indexes not adjusted?
 			:line (format nil "~{~a ~}"
@@ -1137,6 +1000,7 @@ bound during command."
 (defun read-parenless-args (string)
   "Read and shell-eval all the expressions possible from a string and return
 them as a list."
+  ;;; @@@ I think I want to change this to do a shell-read
   (loop :with start = 0 :and expr
      :while (setf (values expr start)
 		  (read-from-string string nil nil :start start))
@@ -1228,9 +1092,10 @@ probably fail, but perhaps in similar way to other shells."
   (with-open-file (stream file :direction :input)
     (with-package *lish-user-package*
       (let ((*load-pathname* file))
-	(loop :with line = nil :and new-line = t :and expr = nil
-	   :while (and (setf line (read-line stream nil))
-		       new-line)
+	(loop :with line = nil
+	   :and new-line = t
+	   :and expr = nil
+	   :while (and (setf line (read-line stream nil)) new-line)
 	   :do
 	   (loop :with i = 0
 	      :while (and (eql (setf expr (shell-read line))
@@ -1239,7 +1104,7 @@ probably fail, but perhaps in similar way to other shells."
 	      :do
 	      (setf line (s+ line #\newline new-line))
 	      ;; (when (> i 100)
-	      ;;   (break))
+	      ;;    (break))
 	      (incf i))
 	   (shell-eval sh expr))))))
       ;; (loop :while (setf line (read-line stream nil))
@@ -1251,7 +1116,9 @@ probably fail, but perhaps in similar way to other shells."
   "Load the users start up (a.k.a. run commands) file, if it exists."
 ;;;  (without-warning
   (let ((file (merge-pathnames (user-homedir-pathname)
-			       (make-pathname :name ".lishrc"))))
+			       (make-pathname :name ".lishrc")))
+	;; I don't like this special case, but ...
+	(*lish-user-package* (find-package :lish-user)))
     (when (probe-file file)
       (load-file sh file))))
 
@@ -1296,12 +1163,15 @@ suspend itself."
 (defstruct read-state
   "The line we've read and the previous line."
   string
-  prefix-string)
+  prefix-string
+  this-command
+  last-command)
 
 (defun lish-read (sh state)
   "Read a string with the line editor and convert it shell expressions,
 handling errors."
-  (with-slots ((str string) (pre-str prefix-string)) state
+  (with-slots ((str string) (pre-str prefix-string) this-command last-command)
+      state
     (handler-case
 	(handler-bind
 	    (#+sbcl
@@ -1338,9 +1208,13 @@ handling errors."
 	    ((and (stringp str) (equal 0 (length str))) *empty-symbol*)
 	    ((equal str *real-eof-symbol*)		*real-eof-symbol*)
 	    ((equal str *quit-symbol*)	  		*quit-symbol*)
-	    (t (shell-read (if pre-str
-			       (s+ pre-str #\newline str)
-			       str)))))
+	    (t
+	     (setf ! last-command
+		   last-command (copy-seq this-command))
+	     (shell-read (setf this-command
+				 (if pre-str
+				     (s+ pre-str #\newline str)
+				     str))))))
       #+sbcl
       (sb-sys:interactive-interrupt ()
 	(format t "~%") (finish-output)
@@ -1350,8 +1224,7 @@ handling errors."
       (error (c)
 	(if (lish-debug sh)
 	    (invoke-debugger c)
-	    (format t "~&~a" c)
-	    )
+	    (format t "~&~a" c))
 	*error-symbol*))))
 
 (defun lish-eval (sh result state)
@@ -1411,6 +1284,13 @@ handling errors."
 	       (invoke-debugger c)
 	       (format t "~a~%" c))))))))
 
+(defun confirm-quit ()
+  (if (lish-suspended-jobs *shell*)
+      (progn
+	(format t "There are stopped jobs. ")
+	(confirm "quit the shell"))
+      t))
+
 (defun lish (&key debug terminal-name)
   "Unix Shell & Lisp somehow smushed together."
   (let* ((*shell* (make-instance 'shell :debug debug))
@@ -1419,11 +1299,14 @@ handling errors."
 	 (*lish-level* (if *lish-level*
 			   (funcall #'1+ (symbol-value '*lish-level*))
 			   0))
+	 ! ;-) !
 	 (saved-sigs (list (signal-action nos::SIGTSTP)
 			   (signal-action nos::SIGTTIN)
 			   (signal-action nos::SIGTTOU))))
     (declare (special *shell*))	; XXX it's probably already special from defvar
-    (update-user-package)
+    ;; Don't do the wacky package updating in other packages.
+    (when (eq *lish-user-package* (find-package :lish-user))
+      (update-user-package))
     (nos:setenv "LISH_LEVEL" (format nil "~d" lish::*lish-level*))
     (load-rc-file sh)
     ;; Make a customized line editor
@@ -1444,22 +1327,28 @@ handling errors."
 		:and lvl = *lish-level*
 		:and eof-count = 0
 		:if (lish-exit-flag sh)
-		  :return (values-list (lish-exit-values sh))
+		  :if (confirm-quit)
+		    :return (values-list (lish-exit-values sh))
+		  :else
+		    :do (setf (lish-exit-flag sh) nil)
+		  :end
 		:end
 		:do
 		(restart-case
 		    (progn
 		      (setf result (lish-read sh state))
-		      (when (eq result *real-eof-symbol*)
+		      (when (and (eq result *real-eof-symbol*) (confirm-quit))
 			(return-from pippy result))
 		      (if (eq result *quit-symbol*)
-			  (if (not (lish-ignore-eof sh))
+			  (if (and (not (lish-ignore-eof sh)) (confirm-quit))
 			      (return-from pippy result)
 			      (progn
 				(when (numberp (lish-ignore-eof sh))
 				  (if (< eof-count (lish-ignore-eof sh))
 				      (incf eof-count)
-				      (return-from pippy result)))
+				      (if (confirm-quit)
+					  (return-from pippy result)
+					  (setf eof-count 0))))
 				(format t "Type 'exit' to exit the shell.~%")))
 			  (lish-eval sh result state)))
 		  (abort ()

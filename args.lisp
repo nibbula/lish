@@ -27,7 +27,7 @@
     :accessor arg-default)
    (repeating
     :type boolean
-    :documentation "True if value can repeat."
+    :documentation "True if the value can repeat."
     :initarg :repeating
     :initform nil
     :accessor arg-repeating)
@@ -84,7 +84,13 @@
     :documentation "Command line argument, old long form, with a single dash."
     :initarg :old-long-arg
     :initform nil
-    :accessor arg-old-long-arg))
+    :accessor arg-old-long-arg)
+   (pattern
+    :type (or string null)
+    :documentation "Pattern to match."
+    :initarg :pattern
+    :initform nil 
+    :accessor arg-pattern))
   (:documentation "Generic command parameter."))
 
 (defmethod initialize-instance :after
@@ -158,59 +164,28 @@
 (defclass arg-number (argument) () (:documentation "A number."))
 (defmethod convert-arg ((arg arg-number) (value string) &optional quoted)
   (declare (ignore quoted))
-  (let* ((*read-eval* nil)
-	 (num (read-from-string value nil nil)))
+  (let* ((num (safe-read-from-string value nil nil)))
     (if (and num (numberp num))
 	num
 	(error "Can't convert ~w to a number." value))))
 
-;; @@@ This should probably support the same args as PARSE-INTEGER and be
-;; put somewhere else.
-(defun parse-integer-with-radix (str)
-  "Parse an integer from a string, allowing for a Lisp radix prefix."
-  (cond
-    ((and str (> (length str) 2)
-	  (char= (char str 0) #\#))
-     (cond
-       ((position (char str 1) #(#\b #\o #\x) :test #'char-equal)
-	(parse-integer str :junk-allowed nil :start 2
-		       :radix (cond
-				((char-equal (char str 1) #\b) 2)
-				((char-equal (char str 1) #\o) 8)
-				((char-equal (char str 1) #\x) 16)
-				(t 10))))
-       ((digit-char-p (char str 1))
-	(let (radix start)
-	  (cond
-	    ((char-equal #\r (char str 2))
-	     (setf radix (parse-integer str :start 1 :end 2 :junk-allowed nil)
-		   start 3))
-	    ((and (digit-char-p (char str 2))
-		  (char-equal #\r (char str 3)))
-	     (setf radix (parse-integer str :start 1 :end 3 :junk-allowed nil)
-		   start 4))
-	    (t
-	     (error "Malformed radix in integer ~a." str)))
-	  (parse-integer str :junk-allowed nil :start start :radix radix)))
-       (t
-	(error "Malformed integer ~a." str))))
-    (t
-     (parse-integer str :junk-allowed nil))))
-
 (defclass arg-integer (arg-number) () (:documentation "An integer."))
 (defmethod convert-arg ((arg arg-integer) (value string) &optional quoted)
   (declare (ignore quoted))
-  (let ((int (parse-integer-with-radix value)))
-    (if (and int (integerp int))
-	int
-	(error "Can't convert ~w to an integer." value))))
+  (handler-case
+      (let ((int (parse-integer-with-radix value)))
+	(if (and int (integerp int))
+	    int
+	    (error "Can't convert ~w to an integer." value)))
+    ;; Make the error be a little more descriptive.
+    (error (c)
+      (error (format nil "Can't convert arg ~w to an integer: ~a" value c)))))
 
 (defclass arg-float (arg-number) ()
   (:documentation "An floating point number."))
 (defmethod convert-arg ((arg arg-float) (value string) &optional quoted)
   (declare (ignore quoted))
-  (let* ((*read-eval* nil)
-	 (num (read-from-string value nil nil)))
+  (let* ((num (safe-read-from-string value nil nil)))
     (if (and num (floatp num))
 	num
 	(error "Can't convert ~w to a float." value))))
@@ -450,6 +425,8 @@ ARG-* class, it defaults to the generic ARGUMENT class."
 	(error "Arguments must have a name."))
       (when (not type)
 	(error "Arguments must have a type."))
+      (when (symbolp name)
+	(setf name (string-downcase name)))
       (setf a (append (list :name name :type type) (cddr a)))
       (apply #'make-instance
 	     (if compile-time
@@ -554,7 +531,7 @@ value to be converted.
 ;; Thankfully this is nowhere near as hairy as posix-to-lisp-args.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun command-to-lisp-args (command-args &key pass-keys-as)
-    "Return a Lisp argument list for the given lish argument list."
+    "Return a Lisp argument list for the given Lish argument list."
     (let ((mandatories
 	   (loop :for a :in command-args
 	      :if (not (arg-optional a))

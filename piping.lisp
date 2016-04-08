@@ -2,8 +2,6 @@
 ;; piping.lisp - Piping for Lish
 ;;
 
-;; $Revision$
-
 ;;||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 ;;|| Piping
 ;;||
@@ -14,7 +12,7 @@
 
 (defun lisp-args-to-command (args &key (auto-space nil))
   "Turn the arguments into a string of arguments for a system command. String
-arguements are concatenated together. Symbols are downcased and turned into
+arguments are concatenated together. Symbols are downcased and turned into
 strings. Keywords are like symbols but prefixed with '--'. Everything else is
 just turned into a string as printed with PRINC. If AUTO-SPACE is true, put
 spaces between every argument."
@@ -35,21 +33,10 @@ spaces between every argument."
 	  (princ a str))))))
 
 #|
-;; I suppose we could make this generic so that streams can do a special
-;; things with it, but that might be sort of edging into the stream protocol,
-;; which simple-streams and 
+;; This needs so much work.
 (defun copy-stream (source destination)
   "Copy data from reading from SOURCE and writing to DESTINATION, until we get
 an EOF on SOURCE."
-  ;; ^^^ We could try to make *buffer-size* be the minimum of the file size
-  ;; (if it's a file) and the page size, but I'm pretty sure that the stat
-  ;; call and possible file I/O is way more inefficient than wasting less than
-  ;; 4k of memory to momentarily. Of course we could mmap it, but it should
-  ;; end up doing approximately that anyway and the system should have a
-  ;; better idea of how big is too big, window sizing and all that. Also,
-  ;; that's way more complicated. Even this comment is too much. Let's just
-  ;; imagine that a future IDE will collapse or footnotify comments tagged
-  ;; with "^^^".
   (let ((buf (make-array *buffer-size*
 			 :element-type (stream-element-type source)))
 	pos)
@@ -91,6 +78,12 @@ an EOF on SOURCE."
 		  (setf first nil))
 	   (format s " ~a" l)))))
 
+(defun input-line-list ()
+  "Return lines from *standard-input* as list of strings."
+  (loop :with l = nil
+     :while (setf l (read-line *standard-input* nil nil))
+     :collect l))
+
 (defun map-output-lines (func command)
   "Return a list of the results of calling the function FUNC with each output
 line of COMMAND. COMMAND should probably be a string, and FUNC should take one
@@ -131,6 +124,27 @@ string as an argument."
   "Return lines output from command as a list."
   (map-output-lines #'identity command))
 
+(defun pipe (&rest commands)
+  "Send output from commands to subsequent commands."
+  (labels ((sub (cmds &optional stream)
+	     (multiple-value-bind (vals stream show-vals)
+		 (shell-eval *shell* (shell-read (car cmds))
+			     :in-pipe stream
+			     :out-pipe (and (cadr cmds) t))
+	       (declare (ignore show-vals))
+	       (if (and vals (listp vals) (> (length vals) 0))
+		   (if (cdr cmds)
+		       (apply #'pipe stream (cdr cmds))
+		       (values-list vals))
+		   (progn
+		     (when stream
+		       (finish-output stream)
+		       (close stream))
+		     nil)))))
+    (if (streamp (car commands))
+	(sub (cdr commands) (car commands))
+	(sub commands))))
+
 ;; (defvar *files-to-delete* '()
 ;;   "A list of files to delete at the end of a command.")
 ;;
@@ -151,21 +165,8 @@ string as an argument."
 ;; 	  (close stream)
 ;; 	  nil))))
 
-;;; The problem with these shelly symbols is: even I can't remember them all.
-;;; I think I can remember all the Tetris™ pieces or even all the Blokus™
-;;; pieces, so it's not really not a capacity thing. The issue seems to be
-;;; memorability versus succinctness. Perhaps if I could come up with one
-;;; memorable word for each one of these and then these could be used as
-;;; replacements (even automatcially / abbrev-like). Or maybe once they're
-;;; working and I'm using them regularly, I will figure it out.
-;;;
-;;; I call these the Snormnambulous™®© Shellbilitous Frobmogrifiers.
-;;; [after drinking far Too. Much. Coffee.]
-;;;
-;;; I'm also a bit worried that if we use these things in real code (vs
-;;; interactive commands lines), we may start to look like Perl (and I
-;;; really hope you know why that should be worrying:
-;;; (e.g. https://sites.google.com/site/steveyegge2/ancient-languages-perl))
+;; I'm not really sure about these. I have a hard time remembering them,
+;; and I worry they'll look like Perl.
 
 (defun ! (&rest args)
   "Evaluate the shell command."
@@ -183,7 +184,7 @@ like $(command) in bash."
   (command-output-words (lisp-args-to-command command)))
 
 (defun !$$ (&rest command)
-  "Return lines output from command as a string of quoted words."
+  "Return lines of output from command as a string of quoted words."
   (command-output-words (lisp-args-to-command command) t))
 
 (defun !_ (&rest command)

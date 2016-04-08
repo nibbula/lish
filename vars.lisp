@@ -4,6 +4,9 @@
 
 (in-package :lish)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Versioning
+
 #|
 (eval-when (:compile-toplevel)
   (format t "compile ~a~%"
@@ -66,18 +69,21 @@ means every dumped executable.")
 (defparameter *version*
   (format nil "~d.~d.~d" *major-version* *minor-version* *build-version*))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Misc
+
 (defparameter *shell-name* "Lish"
   "The somewhat superfluous name of the shell.")
 
 (defvar *shell* nil
   "The current shell instance.")
 
-;; Like on windows this is #\; right? But not cygwin?
-;; @@@ This should be in opsys 
-(defparameter *path-separator*		; @@@ defconstant?
-  #-windows #\:
-  #+windows #\;
-  "Separator in the PATH environement variable.")
+(defvar *junk-package*
+  (progn
+    (when (find-package :lish-junk)
+      (delete-package :lish-junk))
+    (make-package :lish-junk))
+  "Package to put partial or unknown reader junk.")
 
 ;; @@@ Something else that should be in opsys
 (defvar *buffer-size* (nos:getpagesize)
@@ -86,6 +92,15 @@ means every dumped executable.")
 (defparameter *options* nil
   "List of options defined.")
 
+;; I really have some reservations about incuding this. It's somewhat
+;; serendipitous that it works out this way, and it is highly efficient
+;; keystroke-wise, but seems like an unorthoganal hackish trick.
+(defvar ! nil
+  "The previous command, so you can say e.g.: sudo !!")
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Types?
+
 (defstruct shell-expr
   "The result of the shell lexer. A sequence of words and their start and ~
 end points in the original string."
@@ -93,6 +108,7 @@ end points in the original string."
   word-start
   word-end
   word-quoted
+  word-eval
   line)
 
 (defstruct shell-word
@@ -100,7 +116,8 @@ end points in the original string."
   word
   start
   end
-  quoted)
+  quoted
+  eval)
 
 (defstruct suspended-job
   id
@@ -108,6 +125,7 @@ end points in the original string."
   command-line
   resume-function)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hooks
 
 (defvar *pre-command-hook* nil
