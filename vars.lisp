@@ -92,6 +92,9 @@ means every dumped executable.")
 (defparameter *options* nil
   "List of options defined.")
 
+(defvar *lishrc* nil
+  "Pathname of the start up file.")
+
 ;; I really have some reservations about incuding this. It's somewhat
 ;; serendipitous that it works out this way, and it is highly efficient
 ;; keystroke-wise, but seems like an unorthoganal hackish trick.

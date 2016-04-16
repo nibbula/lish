@@ -235,6 +235,8 @@ Some notable keys are:
  <F9>         Switch back and forth between LISH and the lisp REPL.
 ")
 
+;; @@@ I want this to be markdown or something. At least fit the paragraphs to
+;; the width of the terminal.
 (defparameter *syntax-help*
 "The syntax is a combination of POSIX shell and Lisp, hopefully in a way that
 is familiar and not too surprising to those who know either.

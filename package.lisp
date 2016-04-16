@@ -44,6 +44,7 @@ Lish does have some novel features compared to other shells.
    #:*accepts*
    #:*output*
    #:*input*
+   #:*lishrc*
    ;; (installation)
    #:make-standalone
    ;; shell options

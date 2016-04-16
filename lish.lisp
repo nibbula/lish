@@ -1115,8 +1115,9 @@ probably fail, but perhaps in similar way to other shells."
 (defun load-rc-file (sh)
   "Load the users start up (a.k.a. run commands) file, if it exists."
 ;;;  (without-warning
-  (let ((file (merge-pathnames (user-homedir-pathname)
-			       (make-pathname :name ".lishrc")))
+  (let ((file (or *lishrc*
+		  (merge-pathnames (user-homedir-pathname)
+				   (make-pathname :name ".lishrc"))))
 	;; I don't like this special case, but ...
 	(*lish-user-package* (find-package :lish-user)))
     (when (probe-file file)
