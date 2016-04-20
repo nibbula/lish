@@ -1091,7 +1091,7 @@ probably fail, but perhaps in similar way to other shells."
   "Load a lish syntax file."
   (with-open-file (stream file :direction :input)
     (with-package *lish-user-package*
-      (let ((*load-pathname* file))
+      (let ((*load-pathname* (pathname file)))
 	(loop :with line = nil
 	   :and new-line = t
 	   :and expr = nil
