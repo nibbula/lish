@@ -90,7 +90,7 @@ a known compression suffix, then the stream is appropriately decompressed."
     (mine-page f)))
 
 (defun mine-manual-pages ()
-  (loop :for dir :in (split-sequence #\: (getenv "MANPATH"))
+  (loop :for dir :in (split-sequence #\: (environment-variable "MANPATH"))
      :do
      (format t "~a:~%" dir)
      (loop :for sec :in *command-sections*

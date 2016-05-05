@@ -22,10 +22,10 @@
 (defbuiltin cd (("directory" directory :help "Directory to change to."))
   "Change the current directory to DIRECTORY."
   (setf (lish-old-pwd *shell*) (nos:current-directory))
-  (nos:change-directory (or directory (nos:getenv "HOME")))
+  (nos:change-directory (or directory (nos:environment-variable "HOME")))
   ;; Update $PWD like traditional Unix shells.
   ;; @@@ Maybe someday we can get rid of this.
-  (nos:setenv "PWD" (nos:current-directory)))
+  (setf (nos:environment-variable "PWD") (nos:current-directory)))
 
 (defbuiltin pwd ()
   "Print the current working directory."
@@ -50,12 +50,13 @@ from stack."
 
 (defbuiltin dirs ()
   "Show the directory stack."
-  (format t "~a~%" (lish-dir-list *shell*)))
+  (format t "~w~%" (lish-dir-list *shell*)))
 
 (defbuiltin suspend ()
   "Suspend the shell."
-;  (opsys:kill (opsys:getpid) opsys:sigstop))
-  (opsys:kill (opsys:getpid) 17))	; SIGSTOP
+  ;; ;  (opsys:kill (opsys:getpid) opsys:sigstop))
+  ;;   (opsys:kill (opsys:getpid) 17))	; SIGSTOP
+  (opsys:suspend-process))
 
 ;; (define-builtin-arg-type job-descriptor (arg-object)
 ;;   "A job descriptor."
@@ -470,10 +471,10 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
     (setf value (princ-to-string value)))
   (if name
       (if remove
-	  (nos:unsetenv name)
+	  (setf (nos:environment-variable name) nil)
 	  (if value
-	      (nos:setenv name value)
-	      (nos:getenv name)))		; Actually does nothing
+	      (setf (nos:environment-variable name) value)
+	      (nos:environment-variable name)))		; Actually does nothing
       (printenv)))
 
 #|-+
@@ -520,7 +521,7 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 			(first (split-sequence #\= v))
 			v)))
 	   (when var
-	     (format t "~a=~a~%" var (nos:getenv var)))))
+	     (format t "~a=~a~%" var (nos:environment-variable var)))))
       ;; Set variables and execute command
       (progn
 	(loop :for v :in variable-assignment
@@ -533,7 +534,7 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 		       val (third seq))
 		 (setf var v))
 	     (when (and var val)
-	       (nos:setenv var val))))
+	       (setf (nos:environment-variable var) val))))
 	(apply #'do-system-command
 	       `(,`(,shell-command ,@arguments)
 		   ,@(if ignore-environment '(nil nil nil)))))))
@@ -543,37 +544,56 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
     (terminal-get-size tty)
     (terminal-window-columns tty)))
 
-(defparameter *signal-names* (make-array
-			      (list nos:*signal-count*)
-			      :initial-contents
-			      (cons ""
-			        (loop :for i :from 1 :below nos:*signal-count*
-				   :collect (nos:signal-name i))))
+;; We do a simple fake out for signals on OS's that don't really support them.
+
+(defparameter *siggy*
+  #+windows
+  '(("TERM" 15 terminate-process)
+    ("STOP" 17 suspend-process)
+    ("CONT" 19 resume-process))
+  #+unix
+  (loop :for i :from 1 :below unix:*signal-count*
+     :collect (list (unix:signal-name i) i))
+  "Fake windows signals.")
+
+(defparameter *signal-names*
+  #+unix (make-array
+	  (list unix:*signal-count*)
+	  :initial-contents
+	  (cons ""
+		(loop :for i :from 1 :below unix:*signal-count*
+		   :collect (unix:signal-name i))))
+  #+windows (mapcar #'car *siggy*)
   "Names of the signals.")
 
 (define-builtin-arg-type signal (arg-integer)
   "A system signal."
   ()
   :convert string
-    (or (position value *signal-names* :test #'equalp)
-	(parse-integer value)))
+  (or #+unix (position value *signal-names* :test #'equalp)
+      #+windows (cadr (assoc value *siggy* :test #'equalp))
+      (parse-integer value)))
+
+(defun pseudo-kill (sig pid)
+  #+unix (unix:kill sig pid)
+  #+windows (funcall (caddr (find value *siggy* :key #'second)) pid)
+  )
 
 (defbuiltin kill
-    (("list-signals" boolean :short-arg #\l
-      :help "List available signals.")
-     ("signal" 	     signal  :default   15
-      :help "Signal number to send.")
-     ("pids" 	     integer :repeating t
-      :help "Process IDs to signal."))
+  ((list-signals boolean :short-arg #\l  :help "List available signals.")
+   (signal       signal  :default "TERM" :help "Signal number to send.")
+   (pids         integer :repeating t    :help "Process IDs to signal."))
   ;; @@@ pid should be job # type to support %job
   "Sends SIGNAL to PID."
   ;; @@@ totally faked & not working
   (if list-signals
       (format t (s+ "~{~<~%~1," (get-cols) ":;~a~> ~}~%") ; bogus, but v fails
-	      (loop :for i :from 1 :below nos:*signal-count*
-		 :collect (format nil "~2d) ~:@(~8a~)" i (nos:signal-name i))))
+	      ;; (loop :for i :from 1 :below nos:*signal-count*
+	      ;;  :collect (format nil "~2d) ~:@(~8a~)" i (nos:signal-name i))))
+	      (loop :for s :in *siggy*
+		 :collect (format nil "~2d) ~:@(~8a~)" (second s) (first s))))
       (when pids
-	(mapcar #'(lambda (x) (nos:kill signal x)) pids))))
+	(mapcar #'(lambda (x) (pseudo-kill signal x)) pids))))
 
 ;; Actually I think that "format" and "read" are a bad idea / useless, because
 ;; they're for shell scripting which you should do in Lisp.
@@ -603,6 +623,7 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
   "Shows some time statistics resulting from the execution of COMMNAD."
   (time (shell-eval *shell* (make-shell-expr :words command))))
 
+#|
 (defun print-timeval (tv &optional (stream t))
   (let* ((secs  (+ (timeval-seconds tv)
 		   (/ (timeval-micro-seconds tv) 1000000)))
@@ -621,17 +642,40 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
             (when (>= hours 1) (floor hours))
             (when (>= mins 1) (floor mins))
             secs)))
+|#
+
+(defun print-time (seconds micro-seconds &optional (stream t))
+  (let* ((secs  (+ seconds (/ micro-seconds 1000000)))
+	 days hours mins)
+    (setf days  (/ secs (* 60 60 24))
+	  secs  (mod secs (* 60 60 24))
+	  hours (/ secs (* 60 60))
+	  secs  (mod secs (* 60 60))
+	  mins  (/ secs 60)
+	  secs  (mod secs 60))
+    ;; (format t "days ~a hours ~a min ~a sec ~a~%"
+    ;; 	    (floor days) (floor hours) (floor mins) secs)
+    (format stream
+	    "~@[~dd ~]~@[~dh ~]~@[~dm ~]~5,3,,,'0fs"
+            (when (>= days 1) (floor days))
+            (when (>= hours 1) (floor hours))
+            (when (>= mins 1) (floor mins))
+            secs)))
 
 (defbuiltin times ()
   "Show accumulated times for the shell."
-  (let ((self (getrusage :SELF))
-	(children (getrusage :CHILDREN)))
+  (let (self-u-sec self-u-ms self-s-sec self-s-ms
+	children-u-sec children-u-ms children-s-sec children-s-ms)
+    (setf (values self-u-sec self-u-ms self-s-sec self-s-ms)
+	  (process-times :self)
+	  (values children-u-sec children-u-ms children-s-sec children-s-ms)
+	  (process-times :children))
     (format t "Self     User: ~a~32tSys: ~a~%"
-	    (print-timeval (rusage-user self) nil)
-	    (print-timeval (rusage-system self) nil))
+	    (print-time self-u-sec self-u-ms nil)
+	    (print-time self-s-sec self-s-ms nil))
     (format t "Children User: ~a~32tSys: ~a~%"
-	    (print-timeval (rusage-user children) nil)
-	    (print-timeval (rusage-system children) nil))))
+	    (print-time children-u-sec children-u-ms nil)
+	    (print-time children-s-sec children-s-ms nil))))
 
 (defbuiltin umask
     (("print-command" boolean :short-arg #\p
@@ -645,10 +689,12 @@ If mode is not given, print the current mode. If PRINT-COMMAND is true, print
 the mode as a command that can be executed. If SYMBOLIC is true, output in
 symbolic format, otherwise output in octal."
   (declare (ignore symbolic)) ;; @@@
+  #+windows (error "umask is not a thing on windows.")
+  #+unix
   (if (not mask)
       ;; printing
-      (let ((current-mask (nos:umask 0)))
-	(nos:umask current-mask)
+      (let ((current-mask (unix:umask 0)))
+	(unix:umask current-mask)
 	(when print-command
 	  (format t "umask "))
 	;; (if symbolic
@@ -661,7 +707,7 @@ symbolic format, otherwise output in octal."
 	    (ignore-errors (parse-integer mask :radix 8))
 	  (when (typep err 'error)
 	    (error err))
-	  (nos:umask real-mask)))))
+	  (unix:umask real-mask)))))
 
 (defbuiltin ulimit ()
   "Examine or set process resource limits."
@@ -674,12 +720,13 @@ symbolic format, otherwise output in octal."
 (defbuiltin exec (("command-words" t :repeating t
                     :help "Words of the command to execute."))
   "Replace the whole Lisp system with another program. This seems like a rather
-drastic thing to do to a running Lisp system. Wouldn't you prefer a nice game
-of chess?"
+drastic thing to do to a running Lisp system."
+  #+windows (error "Wouldn't you prefer a nice game of chess?")
+  #+unix
   (when command-words
     (let ((path (command-pathname (first command-words))))
       (format t "path = ~w~%command-words = ~w~%" path command-words)
-      (nos:exec path command-words))))
+      (unix:exec path command-words))))
 
 (define-builtin-arg-type function (arg-symbol)
   "A function name."
@@ -734,7 +781,6 @@ of chess?"
 	  tiny-rl:*normal-keymap*)))
     ((and key-sequence function-name)
      (keymap:set-key key-sequence function-name tiny-rl:*normal-keymap*))))
-
 
 #|
 This is really just for simple things. You should probably use the
@@ -791,56 +837,23 @@ better just to use Lisp syntax.
      (error "I don't know how to undefine a command of type ~a."
 	    (type-of command)))))
 
-#|
-(defun is-executable (s)
-  (logand (file-status-mode s) S_IXUSR))
-
-(defun is-regular (s)
-  (logand (file-status-mode s) S_IXUSR))
-
-(defun is-regular-executable (p)
-  (let ((st (stat p)))
-    (and st (is-executable st) (is-regular st))))
-
-(defun has-directory-p (p)
-  (position *directory-separator* p))
-
-(defun command-pathname (cmd)
-  "Return the full pathname of the first executable file in the PATH or nil
-if there isn't one."
-  (when (has-directory-p cmd)
-    (return-from command-pathname cmd))
-  (loop :for dir :in (split-sequence *path-separator* (getenv "PATH")) :do
-     (handler-case
-       (when (probe-directory dir)
-	 (loop :with full = nil
-	    :for f :in (read-directory :dir dir) :do
-	    (when (and (equal f cmd)
-		       (is-executable
-			(setf full (format nil "~a~c~a"
-					   dir *directory-separator* cmd))))
-	      (return-from command-pathname full))))
-       (error (c) (declare (ignore c)))))
-  nil)
-
-|#
-
 (defun command-paths (cmd)
   "Return all possible command paths. Don't cache the results."
   (loop :with r = nil
-    :for dir :in (split-sequence *path-separator* (getenv "PATH"))
-    :do
-    (setf r (when (probe-directory dir)
-	      (loop :with full = nil
-		    :for f :in (read-directory :dir dir)
-		    :when (and (equal f cmd)
-			       (is-executable
-				(setf full
-				      (format nil "~a~c~a"
-					      dir *directory-separator* cmd))))
-		    :return full)))
-    :if r
-    :collect r))
+     :for dir :in (split-sequence *path-separator*
+				  (nos:environment-variable "PATH"))
+     :do
+     (setf r (when (probe-directory dir)
+	       (loop :with full = nil
+		  :for f :in (read-directory :dir dir)
+		  :when (and (equal f cmd)
+			     (is-executable
+			      (setf full
+				    (format nil "~a~c~a"
+					    dir *directory-separator* cmd))))
+		  :return full)))
+     :if r
+     :collect r))
 
 (defparameter *command-cache* nil
   "A hashtable which caches the of full names of commands.")

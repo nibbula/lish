@@ -11,18 +11,13 @@
 
 (defun complete-env-var (str all)
   ;; (complete-string-sequence
-  ;;  str all (mapcar #'(lambda (x) (string (car x))) (nos:environ))))
+  ;;  str all (mapcar #'(lambda (x) (string (car x))) (nos:environment))))
   (complete-list str (length str) all
-		 (mapcar #'(lambda (x) (string (car x))) (nos:environ))))
+		 (mapcar #'(lambda (x) (string (car x))) (nos:environment))))
 
 (defun complete-user-name (str all)
-  (prog2
-      (nos:setpwent)
-      (complete-list str (length str) all
-		     (loop :with p = nil
-			:while (setf p (nos:getpwent))
-			:collect (nos:passwd-name p)))
-    (nos:endpwent)))
+  (complete-list str (length str) all
+		 (mapcar (_ (nos:user-name _)) (nos:user-list))))
 
 ;; @@@ Consider caching this.
 ;; @@@ In fact we should probably require a "rehash", like other shells.
@@ -34,6 +29,7 @@ commands are added.")
 (defun probe-file-or-dir (p)
   (or (probe-directory p) (probe-file p)))
 
+#|
 ;; Perhaps, this should be in OPSYS, but of course there's also access(2).
 (defun is-executable (pathname)
   "Given a pathname, return true if it's likely to be executable, which
@@ -47,6 +43,7 @@ probably means it's a regular file and we have execute permission on it."
 	     (and (is-group-executable mode)
 		  (or (eql (file-status-gid stat) (getegid)))
 		  (position (file-status-gid stat) (get-groups)))))))
+|#
 
 (defun verb-list (shell)
   "Return the command list for the current shell: *shell*."
@@ -60,7 +57,9 @@ probably means it's a regular file and we have execute permission on it."
 		(loop :for k :being :the :hash-keys :of (lish-commands)
 		   :do (spin)
 		   :collect k)
-		(loop :for dir :in (split-sequence #\: (nos:getenv "PATH"))
+		(loop :for dir :in (split-sequence
+				    nos:*path-separator*
+				    (nos:environment-variable *path-variable*))
 		   :do (spin)
 		   :if (probe-directory dir)
 		   :append (loop :for f :in (nos:read-directory
@@ -126,6 +125,18 @@ literally in shell syntax."
        :do (when (> pos (elt (shell-expr-word-end expr) i))
 	     (setf past (1+ i))))
     past))
+
+(defun first-word-in-expr (pos expr)
+  "Find the first word of pipeline where POS is in a shell expr."
+  (let ((w (first (shell-expr-words expr))))
+    (cond
+      ((stringp w) w)
+      ((and (consp w) (eq (car w) :pipe))
+       (if (<= pos (elt (shell-expr-word-start expr) 0))
+	   (first-word-in-expr pos (cadr w))
+	   (if (>= pos (elt (shell-expr-word-start expr) 0))
+	       (second (shell-expr-words expr))
+	       nil))))))		; We couldn't find it?
 
 (defun list-arg-choices (command doc choices)
   (let* ((cols
@@ -293,7 +304,7 @@ complete, and call the appropriate completion function."
        (shell-complete-symbol context pos all))
       (shell-expr
        (let* ((word-num (shell-word-number exp pos))
-	      (first-word (first (shell-expr-words exp)))
+	      (first-word (first-word-in-expr pos exp))
 	      word word-pos)
 	 ;; word-num is the index of the word in the shell expr
 	 ;; word is the text of the word

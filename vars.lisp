@@ -78,6 +78,11 @@ means every dumped executable.")
 (defvar *shell* nil
   "The current shell instance.")
 
+(defvar *lish-user-package*
+  (make-package "LISH-USER" :use '(:cl :lish :cl-ppcre :glob)
+		:nicknames '("LU"))
+  "Package for lish to hang out in. Auto-updates from :cl-user.")
+
 (defvar *junk-package*
   (progn
     (when (find-package :lish-junk)
@@ -85,8 +90,8 @@ means every dumped executable.")
     (make-package :lish-junk))
   "Package to put partial or unknown reader junk.")
 
-;; @@@ Something else that should be in opsys
-(defvar *buffer-size* (nos:getpagesize)
+;; @@@ Something else that should be in opsys?
+(defvar *buffer-size* (nos:memory-page-size)
   "General buffer size for file or stream operations.")
 
 (defparameter *options* nil

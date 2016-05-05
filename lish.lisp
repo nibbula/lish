@@ -8,11 +8,6 @@
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 ;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 
-(defvar *lish-user-package*
-  (make-package "LISH-USER" :use '(:cl :lish :cl-ppcre :glob)
-		:nicknames '("LU"))
-  "Package for lish to hang out in. Auto-updates from :cl-user.")
-
 ;; The "result" argument is not for the caller, but rather so we can detect
 ;; cycles in the package inheritance graph.
 (defun flattened-package-use-list (package &optional result)
@@ -148,7 +143,8 @@ Not implemented yet:
 	       (#\w (write-string (twiddlify (nos:current-directory)) str))
 	       (#\W (write-string
 		     (twiddlify (basename (nos:current-directory))) str))
-	       (#\$ (write-char (if (= (nos:geteuid) 0) #\# #\$) str))
+	       (#\$ (write-char
+		     (if (= (nos:user-id :effective t) 0) #\# #\$) str))
 	       (#\i (write-string *lisp-implementation-nickname* str))
 	       (#\p (write-string
 		     (s+ (and *lish-user-package*
@@ -589,22 +585,33 @@ The syntax is vaguely like:
 ;; Job control
 
 (defun start-job-control ()
-  (setf (signal-action nos::SIGTSTP) :ignore
-	(signal-action nos::SIGTTIN) :ignore
-	(signal-action nos::SIGTTOU) :ignore))
+  #+unix
+  (setf (unix:signal-action unix:+SIGTSTP+) :ignore
+	(unix:signal-action unix:+SIGTTIN+) :ignore
+	(unix:signal-action unix:+SIGTTOU+) :ignore))
 
 (defun stop-job-control (saved-sigs)
+  #+unix
   (let ((tstp (first saved-sigs))
 	(ttin (second saved-sigs))
 	(ttou (third saved-sigs)))
-    (setf (signal-action nos::SIGTSTP) (if (keywordp tstp) tstp :default)
-	  (signal-action nos::SIGTTIN) (if (keywordp tstp) ttin :default)
-	  (signal-action nos::SIGTTOU) (if (keywordp tstp) ttou :default))))
+    (setf (unix:signal-action unix:+SIGTSTP+)
+	  (if (keywordp tstp) tstp :default)
+	  (unix:signal-action unix:+SIGTTIN+)
+	  (if (keywordp tstp) ttin :default)
+	  (unix:signal-action unix:+SIGTTOU+)
+	  (if (keywordp tstp) ttou :default))))
+
+(defun job-control-signals ()
+  #+unix (list (unix:signal-action unix:+SIGTSTP+)
+	       (unix:signal-action unix:+SIGTTIN+)
+	       (unix:signal-action unix:+SIGTTOU+)))
 
 (defun set-default-job-sigs ()
-  (setf (signal-action nos::SIGTSTP) :default
-	(signal-action nos::SIGTTIN) :default
-	(signal-action nos::SIGTTOU) :default))
+  #+unix
+  (setf (unix:signal-action unix:+SIGTSTP+) :default
+	(unix:signal-action unix:+SIGTTIN+) :default
+	(unix:signal-action unix:+SIGTTOU+) :default))
 
 ;(defun run (cmd args)
   ; block sigchld & sigint
@@ -695,7 +702,7 @@ read from."
 		;; 	  (slurp in-pipe))
 		;;   (file-position in-pipe 0))
 		(setf result-stream
-		      (apply #'nos:popen
+		      (apply #'nos:pipe-program
 			     `(,path ,args
 			       ,@(when in-pipe `(:in-stream ,in-pipe))
 			       ,@(when (not out-pipe) '(:out-stream t))
@@ -733,7 +740,7 @@ read from."
 	 (cond
 	   ;; $ environment variable expansion
 	   ((eql #\$ (aref w 0))
-	    (setf value (nos:getenv (subseq w 1)))
+	    (setf value (nos:environment-variable (subseq w 1)))
 	    (push (or value "") new-words))
 	   ;; filename globbing, with ~ expansion on
 	   ((glob:pattern-p w nil t)
@@ -1120,8 +1127,10 @@ probably fail, but perhaps in similar way to other shells."
 				   (make-pathname :name ".lishrc"))))
 	;; I don't like this special case, but ...
 	(*lish-user-package* (find-package :lish-user)))
-    (when (probe-file file)
-      (load-file sh file))))
+    (if (probe-file file)
+	(load-file sh file)
+	;(when (lish-debug sh)
+	(format t "Couldn't find RC file: ~s~%" file))))
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
@@ -1195,7 +1204,7 @@ handling errors."
 			      #| (format t "~&~a" c) |#
 			      (signal c))))))
 	  (progn
-;	    (break)
+	    ;;(break)
 	    (setf str (tiny-rl
 		       :eof-value *real-eof-symbol*
 		       :quit-value *quit-symbol*
@@ -1301,14 +1310,13 @@ handling errors."
 			   (funcall #'1+ (symbol-value '*lish-level*))
 			   0))
 	 ! ;-) !
-	 (saved-sigs (list (signal-action nos::SIGTSTP)
-			   (signal-action nos::SIGTTIN)
-			   (signal-action nos::SIGTTOU))))
+	 (saved-sigs (job-control-signals)))
     (declare (special *shell*))	; XXX it's probably already special from defvar
     ;; Don't do the wacky package updating in other packages.
     (when (eq *lish-user-package* (find-package :lish-user))
       (update-user-package))
-    (nos:setenv "LISH_LEVEL" (format nil "~d" lish::*lish-level*))
+    (setf (nos:environment-variable "LISH_LEVEL")
+	  (format nil "~d" lish::*lish-level*))
     (load-rc-file sh)
     ;; Make a customized line editor
     (setf (lish-editor sh)
@@ -1390,7 +1398,7 @@ handling errors."
   "For being invoked as a standalone shell."
   (setf *standalone* t)
   (format t "Welcome to ~a ~a~%" *shell-name* *version*)
-  (let* ((level-string (nos:getenv "LISH_LEVEL")))
+  (let* ((level-string (nos:environment-variable "LISH_LEVEL")))
     (when level-string
       (setf *lish-level* (parse-integer level-string)))
     (lish :debug debug))
