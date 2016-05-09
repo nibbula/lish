@@ -547,14 +547,14 @@ and the name of the external program. ARGLIST is a shell argument list."
 a list of the converted boolean options."
   (let* (option-list
 	 new-args)
-    (loop :with boolean-taken :and boolean-value :and flag-taken
+    (loop :with boolean-taken :and boolean-value #| :and flag-taken |#
        :for a :in posix-args
        :when (and (>= (length a) 2)
 		  (is-flag-char (char a 0))
 		  (not (is-flag-char (char a 1))))
        :do
        (setf boolean-value (is-normal-flag-char (char a 0))
-	     flag-taken nil)
+	     #| flag-taken nil |#)
        (loop :for cc :from 1 :below (length a) :do
 	  (setf boolean-taken nil)
 	  (loop :for arg :in (command-arglist command) :do

@@ -65,7 +65,7 @@ LISH_LEVEL environment variable.")
 
 (defun fixed-homedir ()
   "(user-homedir-pathname) with a trailing slash removed if there was one."
-  (let ((h (safe-namestring (user-homedir-pathname))))
+  (let ((h (safe-namestring (truename (user-homedir-pathname)))))
     (if (equal #\/ (aref h (1- (length h))))
 	(subseq h 0 (1- (length h)))
 	h)))
@@ -586,32 +586,32 @@ The syntax is vaguely like:
 
 (defun start-job-control ()
   #+unix
-  (setf (unix:signal-action unix:+SIGTSTP+) :ignore
-	(unix:signal-action unix:+SIGTTIN+) :ignore
-	(unix:signal-action unix:+SIGTTOU+) :ignore))
+  (setf (os-unix:signal-action os-unix:+SIGTSTP+) :ignore
+	(os-unix:signal-action os-unix:+SIGTTIN+) :ignore
+	(os-unix:signal-action os-unix:+SIGTTOU+) :ignore))
 
 (defun stop-job-control (saved-sigs)
   #+unix
   (let ((tstp (first saved-sigs))
 	(ttin (second saved-sigs))
 	(ttou (third saved-sigs)))
-    (setf (unix:signal-action unix:+SIGTSTP+)
+    (setf (os-unix:signal-action os-unix:+SIGTSTP+)
 	  (if (keywordp tstp) tstp :default)
-	  (unix:signal-action unix:+SIGTTIN+)
+	  (os-unix:signal-action os-unix:+SIGTTIN+)
 	  (if (keywordp tstp) ttin :default)
-	  (unix:signal-action unix:+SIGTTOU+)
+	  (os-unix:signal-action os-unix:+SIGTTOU+)
 	  (if (keywordp tstp) ttou :default))))
 
 (defun job-control-signals ()
-  #+unix (list (unix:signal-action unix:+SIGTSTP+)
-	       (unix:signal-action unix:+SIGTTIN+)
-	       (unix:signal-action unix:+SIGTTOU+)))
+  #+unix (list (os-unix:signal-action os-unix:+SIGTSTP+)
+	       (os-unix:signal-action os-unix:+SIGTTIN+)
+	       (os-unix:signal-action os-unix:+SIGTTOU+)))
 
 (defun set-default-job-sigs ()
   #+unix
-  (setf (unix:signal-action unix:+SIGTSTP+) :default
-	(unix:signal-action unix:+SIGTTIN+) :default
-	(unix:signal-action unix:+SIGTTOU+) :default))
+  (setf (os-unix:signal-action os-unix:+SIGTSTP+) :default
+	(os-unix:signal-action os-unix:+SIGTTIN+) :default
+	(os-unix:signal-action os-unix:+SIGTTOU+) :default))
 
 ;(defun run (cmd args)
   ; block sigchld & sigint

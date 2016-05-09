@@ -21,7 +21,7 @@
 
 ;; @@@ Consider caching this.
 ;; @@@ In fact we should probably require a "rehash", like other shells.
-(defparameter *verb-list* nil
+(defvar *verb-list* nil
   "List of current lish commands. Includes aliases, built-in commands, and ~
 exectuables in the path. Use the \"rehash\" command to update after new ~
 commands are added.")

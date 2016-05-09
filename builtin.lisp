@@ -184,7 +184,7 @@ from stack."
     (format t "~%")))
 
 (defparameter *help-subjects*
-  '("commands" "builtins" "editor" "keys" "syntax")
+  '("commands" "builtins" "editor" "keys" "options" "syntax")
   "Subjects we have help about.")
 
 (defun help-choices ()
@@ -217,6 +217,7 @@ Subjects:
   help commands       Show help on added commands.
   help editor         Show help on the line editor.
   help keys           Show help on key bindings.
+  help options	      Show help on shell options.
   help syntax         Show help on shell syntax.
   help <command>      Show help for the command.
 ")
@@ -267,6 +268,26 @@ Commands can be:
   - Lisp functions or methods
 ")
 
+(defun print-columnar-help (rows)
+  ;; (with-input-from-string
+  ;;     (in-str (with-output-to-string (str)
+  ;; 		(table:nice-print-table
+  ;; 		 rows nil :trailing-spaces nil
+  ;; 		 :stream str)))
+  ;;   (with-lines (l in-str)
+  ;;     ;; add spaces in front and clip to screen columns
+  ;;     (format t "  ~a~%" (subseq l 0 (min (length l)
+  ;; 					  (- (get-cols) 2)))))))
+  (let ((prefix-size (loop :for (a b) :in rows :maximize (length a))))
+    (loop :for (a b) :in rows
+       :do
+       (format t "  ~v,a : " prefix-size a)
+       (justify-text (substitute #\space #\newline b)
+		     :prefix (make-string (+ prefix-size 5)
+					  :initial-element #\space)
+		     :omit-first-prefix t :cols (get-cols))
+       (terpri))))
+  
 (defun print-multiple-command-help (commands &key (built-in t))
   (let ((rows
 	 (loop :with b :and doc :and pos
@@ -285,15 +306,7 @@ Commands can be:
 			 (if pos
 			     (subseq doc 0 (1+ pos))
 			     doc))))))
-    (with-input-from-string
-	(in-str (with-output-to-string (str)
-		  (table:nice-print-table
-		   rows nil :trailing-spaces nil
-		   :stream str)))
-      (with-lines (l in-str)
-	;; add spaces in front and clip to screen columns
-	(format t "  ~a~%" (subseq l 0 (min (length l)
-					    (- (get-cols) 2))))))))
+    (print-columnar-help rows)))
 
 (defun print-command-help (cmd)
   "Print documentation for a command."
@@ -342,6 +355,11 @@ available."
 	   (print-multiple-command-help commands :built-in nil)))
 	((or (equalp subject "editor"))	 (format t *editor-help*))
 	((or (equalp subject "syntax"))	 (format t *syntax-help*))
+	((or (equalp subject "options"))
+	 (format t "Shell options:~%")
+	 (print-columnar-help 
+	  (loop :for o :in (lish-options *shell*) :collect
+	     `(,(arg-name o) ,(substitute #\space #\newline (arg-help o))))))
 	((or (equalp subject "keys"))
 	 (format t "Here are the keys active in the editor:~%")
 	 (!bind :print-bindings t))
@@ -552,17 +570,17 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
     ("STOP" 17 suspend-process)
     ("CONT" 19 resume-process))
   #+unix
-  (loop :for i :from 1 :below unix:*signal-count*
-     :collect (list (unix:signal-name i) i))
+  (loop :for i :from 1 :below os-unix:*signal-count*
+     :collect (list (os-unix:signal-name i) i))
   "Fake windows signals.")
 
 (defparameter *signal-names*
   #+unix (make-array
-	  (list unix:*signal-count*)
+	  (list os-unix:*signal-count*)
 	  :initial-contents
 	  (cons ""
-		(loop :for i :from 1 :below unix:*signal-count*
-		   :collect (unix:signal-name i))))
+		(loop :for i :from 1 :below os-unix:*signal-count*
+		   :collect (os-unix:signal-name i))))
   #+windows (mapcar #'car *siggy*)
   "Names of the signals.")
 
@@ -575,7 +593,7 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
       (parse-integer value)))
 
 (defun pseudo-kill (sig pid)
-  #+unix (unix:kill sig pid)
+  #+unix (os-unix:kill sig pid)
   #+windows (funcall (caddr (find value *siggy* :key #'second)) pid)
   )
 
@@ -693,8 +711,8 @@ symbolic format, otherwise output in octal."
   #+unix
   (if (not mask)
       ;; printing
-      (let ((current-mask (unix:umask 0)))
-	(unix:umask current-mask)
+      (let ((current-mask (os-unix:umask 0)))
+	(os-unix:umask current-mask)
 	(when print-command
 	  (format t "umask "))
 	;; (if symbolic
@@ -707,7 +725,7 @@ symbolic format, otherwise output in octal."
 	    (ignore-errors (parse-integer mask :radix 8))
 	  (when (typep err 'error)
 	    (error err))
-	  (unix:umask real-mask)))))
+	  (os-unix:umask real-mask)))))
 
 (defbuiltin ulimit ()
   "Examine or set process resource limits."
@@ -726,7 +744,7 @@ drastic thing to do to a running Lisp system."
   (when command-words
     (let ((path (command-pathname (first command-words))))
       (format t "path = ~w~%command-words = ~w~%" path command-words)
-      (unix:exec path command-words))))
+      (os-unix:exec path command-words))))
 
 (define-builtin-arg-type function (arg-symbol)
   "A function name."
@@ -884,7 +902,8 @@ better just to use Lisp syntax.
       (if commands
 	  (loop :for c :in commands :do
 	     (remhash c *command-cache*))
-	  (setf *command-cache* nil)))
+	  (setf *command-cache* nil
+		*verb-list* nil)))	; @@@ from complete.lisp
     (when packages
       (clear-loadable-package-cache))
     (when (and *command-cache* (not (or rehash packages)))
