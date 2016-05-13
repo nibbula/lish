@@ -13,7 +13,9 @@
   ;; (complete-string-sequence
   ;;  str all (mapcar #'(lambda (x) (string (car x))) (nos:environment))))
   (complete-list str (length str) all
-		 (mapcar #'(lambda (x) (string (car x))) (nos:environment))))
+		 (append
+		  (fake-var-list)
+		  (mapcar #'(lambda (x) (string (car x))) (nos:environment)))))
 
 (defun complete-user-name (str all)
   (complete-list str (length str) all

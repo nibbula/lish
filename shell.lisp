@@ -7,6 +7,16 @@
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 ;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 
+;; (defkeymap *default-lish-esc-keymap*
+;;   "Keymap for Lish."
+;;   `((#\o		. shell-expand-line)))
+
+;; (defkeymap *lish-esc-keymap* nil)
+
+(defkeymap *lish-default-keymap*
+  "Keymap for Lish."
+  `((,(ctrl #\v)	. shell-expand-line)))
+
 (defclass shell ()
   ((exit-flag
     :initarg :exit-flag
@@ -25,6 +35,9 @@
    (editor
     :accessor lish-editor
     :documentation "Line editor instance.")
+   (keymap
+    :accessor lish-keymap
+    :documentation "Keymap for the line editor.")
    (old-pwd
     :accessor lish-old-pwd
     :initform nil
@@ -41,7 +54,8 @@
     :documentation "Operator configurable options."))
   (:default-initargs
    :exit-flag nil
-   :exit-values '())
+   :exit-values '()
+   :keymap (copy-keymap *lish-default-keymap*))
   (:documentation "A lispy system command shell."))
 
 (defmethod initialize-instance :after
@@ -50,6 +64,10 @@
 ;  (setf (slot-value sh 'commands) (make-hash-table :test #'equal))
   (setf (slot-value sh 'aliases) (make-hash-table :test #'equal))
   (setf (slot-value sh 'global-aliases) (make-hash-table :test #'equal))
+  ;; Set default keymap
+  (when (or (not (slot-boundp sh 'keymap)) (not (slot-value sh 'keymap)))
+    (setf (slot-value sh 'keymap)
+	  (copy-keymap *lish-default-keymap*)))
   ;; Copy the objecs from the defined option list, and set the default values.
   (loop :with o :for opt :in *options* :do
      (setf o (shallow-copy-object opt)

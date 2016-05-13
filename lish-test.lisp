@@ -4,9 +4,9 @@
 
 (defpackage :lish-test
   (:documentation "Tests for Lish")
-  (:use :cl #| :test |# :lish)
+  (:use :cl :test :lish)
   (:export
-   #:run-tests
+   #:run
    ))
 (in-package :lish-test)
 
@@ -78,13 +78,13 @@
     (format t "~w ~{~w ~}~%~w~%~%" str p-args aa)
     (assert (equalp aa l-args))))
 
-(defcommand tata  ;; @@@ just for testing
+(defcommand tata
     (("one" boolean :short-arg #\1)
      ("two" string  :short-arg #\2))
   "Test argument conversion."
   (format t "one = ~s two = ~s~%" one two))
 
-(defcommand gurp ;; @@@ just for testing
+(defcommand gurp
     (("pattern" string   :optional nil)
      ("files"   pathname :repeating t)
      ("invert"  boolean  :short-arg #\i))
@@ -138,9 +138,40 @@
 ;(with-dbug (lish::posix-to-lisp-args (lish::get-command "bind") '("-r" "foo")))
 ;(with-dbug (lish::posix-to-lisp-args (lish::get-command "find") '("--name" "txt$")))
 
+;; @@@ This is an internal-ish way to test. Once we finish, we should test it
+;; through a more external interface.
+(deftests (expand-variables-1 :doc "Test variable expansion")
+  :setup
+  (progn
+    (setf (nos:environment-variable "bar") nil
+	  (nos:environment-variable "foo") "Yow$a!"))
+  :takedown
+  (setf (nos:environment-variable "foo") nil)
+  (equal (lish::expand-variables "") "")
+  (equal (lish::expand-variables "foo") "foo")
+  (equal (lish::expand-variables "foo\\$bar") "foo\\$bar")
+  (equal (lish::expand-variables "foobar\\") "foobar\\")
+  (equal (lish::expand-variables "\\foo\\bar\\") "\\foo\\bar\\")
+  (equal (lish::expand-variables "\\foo\\$bar\\") "\\foo\\$bar\\")
+  (equal (lish::expand-variables "\\$foobar\\$") "\\$foobar\\$")
+  (equal (lish::expand-variables "foo$bar") "foo")
+  (equal (lish::expand-variables "$bar") "")
+  (equal (lish::expand-variables "foo$bar.baz") "foo.baz")
+  (equal (lish::expand-variables "foo$bar_baz") "foo")
+  (equal (lish::expand-variables "foo$bar_baz.zeep") "foo.zeep")
+  (equal (lish::expand-variables "$foo") "Yow$a!")
+  (equal (lish::expand-variables "-$foo-") "-Yow$a!-")
+  (equal (lish::expand-variables "\\$foo") "\\$foo")
+  (equal (lish::expand-variables "-$foo$bar-") "-Yow$a!-")
+  (equal (lish::expand-variables "$}") "$}")
+  )
 
-(defun run-tests ()
+(deftests (lish-all :doc "All the tests.")
+  expand-variables-1)
+  
+(defun run ()
   (test-shell-to-lisp-args)
-  (test-posix-to-lisp-args))
+  (test-posix-to-lisp-args)
+  (run-group-name 'lish-all :verbose t))
 
 ;; EOF

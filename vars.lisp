@@ -112,26 +112,26 @@ means every dumped executable.")
 (defstruct shell-expr
   "The result of the shell lexer. A sequence of words and their start and ~
 end points in the original string."
-  words
-  word-start
-  word-end
-  word-quoted
-  word-eval
-  line)
+  words					; sequence of objects
+  word-start				; sequence of word start positions
+  word-end				; sequence of word end positions
+  word-quoted				; sequence of booleans
+  word-eval				; sequence of booleans
+  line)					; the original string
 
 (defstruct shell-word
   "Used for temporarily splicing a shell-expr."
-  word
-  start
-  end
-  quoted
-  eval)
+  word					; an object
+  start					; integer start position
+  end					; integer end position
+  quoted				; boolean, true if word quoted
+  eval)					; boolean, true to evaluate word
 
 (defstruct suspended-job
-  id
-  name
-  command-line
-  resume-function)
+  id					; unique integer
+  name					; string
+  command-line				; string
+  resume-function)			; closure to resume
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hooks

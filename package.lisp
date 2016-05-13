@@ -28,8 +28,8 @@ Lish does have some novel features compared to other shells.
 - 
 
 ")
-  (:use :cl :dlib :dlib-misc :opsys :stretchy :glob :completion :tiny-rl
-	:cl-ppcre :terminal :terminal-ansi)
+  (:use :cl :dlib :dlib-misc :opsys :char-util :stretchy :glob :completion
+	:keymap :tiny-rl :cl-ppcre :terminal :terminal-ansi)
   (:export
    ;; Main entry point(s)
    #:lish

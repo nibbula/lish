@@ -363,6 +363,11 @@ the end and didn't get a close quote, the third value is true.~
 (defun contains-whitespace-p (s)
   (position-if #'(lambda (x) (position x *whitespace*)) s))
 
+(defparameter *reader-quote-char*
+  ;; I don't think #\\ should be in here.
+  #(#\" #\( #\! #\space #\; #\| #\< #\> #\& #\^) 
+  "Characters which the reader interprets specially if not quoted.")
+
 (defun shell-read (line &key partial (package *lish-user-package*))
   "Read objects in shell syntax and return them. If PARTIAL is true, don't 
 signal an error if we can't read a full expression.
@@ -381,17 +386,25 @@ The syntax is vaguely like:
 	(i 0)				; index in line
 	(len (length line))
 	(args '())
+	(sub-expr '())
 	(w (make-stretchy-string 12))	; temp word
 	(in-word nil)			; t if in word
-	(do-quote nil)			;
+	(do-quote nil)
 	(did-quote nil))		;
     (labels ((finish-word ()
 	       "Finish the current word."
 	       (when in-word
-		 (push (copy-seq w) args)
+		 (if sub-expr
+		     (progn
+		       (push (copy-seq w) sub-expr)
+		       (setf sub-expr (nreverse sub-expr))
+		       (push t word-eval)
+		       (push sub-expr args))
+		     (progn
+		       (push (copy-seq w) args)
+		       (push nil word-eval)))
 		 (push i word-end)
 		 (push did-quote word-quoted)
-		 (push nil word-eval)
 		 (setf (fill-pointer w) 0
 		       in-word nil
 		       did-quote nil)))
@@ -459,13 +472,17 @@ The syntax is vaguely like:
 	 (cond
 	   ;; quoted char
 	   (do-quote
-	       (vector-push-extend c w)
+	     ;; @@@ Actually I think we should leave some quote chars in until
+	     ;; after expansion. That way we can expand part of word, while
+	     ;; having some chars protected from expansion, e.g. glob chars
+	     ;; can be quoted.
+	     (when (not (position c *reader-quote-char*))
+	       (vector-push-extend #\\ w))
+	     (vector-push-extend c w)
 	     (when (not in-word)
 	       (push (1- i) word-start))
 	     (setf in-word t)
 	     (setf do-quote nil)
-	     ;; XXX I don't think \ in words should make them not expand
-	     ;(setf did-quote t)
 	     (incf i))
 	   ;; a string
 	   ((eql c #\")
@@ -503,7 +520,11 @@ The syntax is vaguely like:
 		  (push nil word-eval))))
 	   ;; a lisp expr
 	   ((eql c #\!)
-	    (finish-word)
+	    (when (not sub-expr)
+	      (push 's+ sub-expr))	; !!!
+	    (when (length w)
+	      (push (copy-seq w) sub-expr)
+	      (setf (fill-pointer w) 0))
 	    ;; read a form as a separate word
 	    (handler-bind
 		((end-of-file (_  (declare (ignore _)) (do-continue)))
@@ -516,12 +537,9 @@ The syntax is vaguely like:
 						:start (+ i 1))
 			(read-from-string line nil *continue-symbol*
 					  :start (+ i 1))))
-		  (push i word-start)
-		  (setf i pos)
-		  (push obj args)
-		  (push i word-end)
-		  (push nil word-quoted)
-		  (push t word-eval))))
+		(setf i pos)
+		(setf in-word t) ; so it gets output
+		(push obj sub-expr))))
 	   ;; quote char
 	   ((eql c #\\)
 	    (setf do-quote t)
@@ -569,11 +587,7 @@ The syntax is vaguely like:
 	    (incf i)))
         :finally
 	(progn
-	  (when in-word
-	    (push (copy-seq w) args)
-	    (push i word-end)
-	    (push did-quote word-quoted)
-	    (push nil word-eval))
+	  (finish-word)
 	  (reverse-things)))
       (if (and (= (length words) 1) (consp (first words)))
 	  ;; just a lisp expression to be evaluated
@@ -684,7 +698,9 @@ OUT-PIPE is T to return a input stream which the output of the command can be
 read from."
   ;; Since run-program can't throw an error when the program is not found, we
   ;; try to do it here.
-  (let* ((command-line (mapcar #'shell-word-word words))
+  (let* ((command-line
+	  ;; System command arguments must be strings
+	  (mapcar (_ (princ-to-string (shell-word-word _))) words))
 	 (program (car command-line))
 	 (args    (cdr command-line))
 	 (path    (get-command-path program))
@@ -728,20 +744,168 @@ read from."
        (and (shell-expr-word-quoted expr)
 	    (not (elt (shell-expr-word-quoted expr) i)))))
 
-(defun do-expansions (sh expr pos)
-  "Perform shell syntax expansions / subsitutions on the expression."
-  (declare (ignore sh))
+(defstruct fake-var
+  name
+  value
+  cacheable
+  cached-value
+  description)
+
+(defparameter *fake-vars*
+  `(("HOSTNAME" nil "Name of the host."		  	 *host*)
+    ("HOSTTYPE" t   "Type of the host."		  	 ,#'machine-type)
+    ("MACHTYPE" nil "Fully specific platform"	  	 *arch*)
+    ("OLDPWD"   nil "Last working directory"
+     ,#'(lambda () (lish-old-pwd *shell*)))
+    ("PPID"     t   "Parent process ID"		  	 ,#'os-unix:getppid)
+    ("PWD"      nil "Current working directory"	  	 ,#'current-directory)
+    ("SHLVL"    nil "Shell level"		  	 *lish-level*)
+    ("COLUMNS"  nil "Terminal character columns"
+     ,#'(lambda () (terminal-window-columns
+	      (tiny-rl::line-editor-terminal (lish-editor *shell*)))))
+    ("ROWS"     nil "Terminal character rows"
+     ,#'(lambda () (terminal-window-rows
+	      (tiny-rl::line-editor-terminal (lish-editor *shell*)))))
+    ("LINES"    nil "Terminal character rows"
+     ,#'(lambda () (terminal-window-rows
+	      (tiny-rl::line-editor-terminal (lish-editor *shell*)))))
+    ("$"        nil "Current process ID"	  	 ,#'os-unix:getpid)
+    ("!"        nil "Process ID of the previous command" nil)	;; @@@
+    ("?"        nil "Result of the last command." 	 nil))) ;; @@@
+
+(defparameter *fake-var-table* nil
+  "The fake var table.")
+
+(defparameter *fake-var-single-chars* nil
+  "Sequence of single characters that are fake vars.")
+
+(defun fake-var-list ()
+  "Return a list of the fake variable names."
+  (make-fake-var-table)
+  (loop :for name :being :the :hash-keys :of *fake-var-table*
+     :collect name))
+
+(defun make-fake-var-table ()
+  ;;(format t "Making the fake var table.")
+  (when (not *fake-var-table*)
+    (setf *fake-var-table* (make-hash-table :test #'equal))
+    (loop :for (name cacheable desc value) :in *fake-vars* :do
+       (setf (gethash name *fake-var-table*)
+	     (make-fake-var
+	      :name name
+	      :value value
+	      :cacheable cacheable
+	      :description desc))
+       ;; Note single char vars
+       (when (= (length name) 1)
+	 (pushnew (char name 0) *fake-var-single-chars*)))
+    (setf *fake-vars* nil)) 		; maybe it could be gc'd
+  *fake-var-table*)
+
+(defun fake-var (name)
+  "Return the value of fake var named NAME."
+  (make-fake-var-table)
+  (flet ((evaluate (x)
+	   (cond
+	     ((functionp x) (funcall x))
+	     ((symbolp x) (symbol-value x))
+	     (t nil))))
+    (let ((var (gethash name *fake-var-table*)))
+      ;;(format t "fake-var ~s = ~s~%" name var)
+      (when var
+	(if (fake-var-cacheable var)
+	    (or (fake-var-cached-value var)
+		(setf (fake-var-cached-value var)
+		      (evaluate (fake-var-value var))))
+	    (evaluate (fake-var-value var)))))))
+
+;; @@@ This is overly consy.
+(defun remove-backquotes (s)
+  "Remove backquotes from the string S, except don't remove double backquotes."
+  ;;(join (substitute "\\" "" (split-sequence #\\ s) :test #'equal) ""))
+  (with-output-to-string (str)
+    (let ((start 0) (last-start 0) (len (length s)))
+      (loop
+	 :while (and (< start len) (setf start (position #\\ s :start start)))
+	 :do
+	 (format t "start = ~s last-start = ~s~%" start last-start)
+	 (when (> (- start last-start) 0)
+	   (princ (subseq s last-start start) str))
+	 (when (and (< (1+ start) len) (char= #\\ (char s (1+ start))))
+	   (write-char #\\ str)
+	   (incf start))
+	 (incf start)
+	 (setf last-start start))
+      (when (< last-start len)
+	(princ (subseq s last-start) str)))))
+
+;; a.k.a. parameter expansion
+(defun expand-variables (s)
+  "Return S with variables expanded."
+  (let ((start 0) (last-start 0) (len (length s)))
+    (with-output-to-string (str)
+      (loop
+	 :while (and (< last-start len)
+		     (setf start
+			   (position-if (_ (or (char= #\$ _) (char= #\\ _)))
+					s :start last-start)))
+	 :do
+	 (cond
+	   ;; backslash
+	   ((char= #\\ (char s start))
+	    (incf start)		; skip over backslash
+	    (when (< start len)		; if there is one,
+	      (incf start))		; skip over the next char
+	    ;; output the first part
+	    (when (not (zerop (- start last-start)))
+	      (princ (subseq s last-start start) str)))
+	   ;; dollar
+	   ((char= #\$ (char s start))
+	    (when (not (zerop (- start last-start)))
+	      (princ (subseq s last-start start) str))
+	    (make-fake-var-table)
+	    (if (and (< (1+ start) len)
+		     (position (char s (1+ start)) *fake-var-single-chars*))
+		(progn
+		  (princ (or (fake-var (subseq s (1+ start) (+ start 2)))
+			     "") str)
+		  (incf start 2))
+		(let ((end (or (position-if
+				(_ (not (or (alphanumericp _) (char= #\_ _))))
+				s :start (1+ start))
+			       (length s))))
+		  (incf start)
+		  (if (not (zerop (- end start)))
+		      (progn
+			;;(format t "looking up |~s| start=~s end=~s~%"
+			;;	(subseq s start end) start end)
+			(princ (or (fake-var (subseq s start end))
+				   (nos:environment-variable
+				    (subseq s start end))
+				   "") str))
+		      (princ "$" str))
+		  (setf start end))))
+	   (t (error "Shouldn't happen")))
+	 ;;(format t "start = ~s last-start = ~s~%" start last-start)
+	 (setf last-start start)
+	 )
+      ;;(format t "end: start = ~s last-start = ~s~%" start last-start)
+      (when (not (zerop (- (or start len) last-start)))
+	(princ (subseq s last-start (or start len)) str)))))
+
+(defun do-expansions (expr)
+  "Perform shell syntax expansions / subsitutions on the expression.
+Remove backquotes."
   (let ((new-words '()))
-    (loop :with value
+    (loop
        :for w :in (shell-expr-words expr)
        :for i = 0 :then (1+ i)
        :do
        (if (unquoted-string-p w expr i)
 	 (cond
 	   ;; $ environment variable expansion
-	   ((eql #\$ (aref w 0))
-	    (setf value (nos:environment-variable (subseq w 1)))
-	    (push (or value "") new-words))
+	   ((position #\$ w)
+	    (push (expand-variables w) new-words))
 	   ;; filename globbing, with ~ expansion on
 	   ((glob:pattern-p w nil t)
 	    (let ((g (glob:glob w :tilde t)))
@@ -755,19 +919,38 @@ read from."
 	    (loop :for a :in (shell-expr-words
 			      (shell-read v #| :package *junk-package* |#))
 	       :do (push (or v "") new-words))) |#
-	   (t (push w new-words)))
+	   (t (push (remove-backquotes w) new-words)))
 	 ;; Quoted, so just push it verbatim
 	 (push w new-words)))
     (setf (shell-expr-words expr) (nreverse new-words)))
-  pos)
+  expr)
+
+(defun shell-expand-line (editor)
+  "A command to expand the current line."
+  ;;(format t "editor is a ~a = ~s~%" (type-of editor) editor)
+  (let ((buf (tiny-rl::buf editor)))
+    (let ((words (possibly-expand-aliases
+		  *shell*
+		  (lisp-exp-eval
+		   (expr-to-words (do-expansions (shell-read buf)))))))
+      (tiny-rl::replace-buffer
+       editor
+       (with-output-to-string (str)
+	 (when (first words)
+	   (princ (shell-word-word (first words)) str))
+	 (loop :for w :in (rest words)
+	    :do (write-char #\space str)
+	    (if (shell-word-quoted w)
+		(format str "\"~a\"" (shell-word-word w))
+		(princ (shell-word-word w) str))))))))
 
 (defun expr-to-words (expr)
   (loop
      :for w :in (shell-expr-words expr)
-     :for s = (shell-expr-word-start expr) :then (cdr s)
-     :for e = (shell-expr-word-end expr) :then (cdr e)
+     :for s = (shell-expr-word-start  expr) :then (cdr s)
+     :for e = (shell-expr-word-end    expr) :then (cdr e)
      :for q = (shell-expr-word-quoted expr) :then (cdr q)
-     :for v = (shell-expr-word-eval expr) :then (cdr v)
+     :for v = (shell-expr-word-eval   expr) :then (cdr v)
      :collect (make-shell-word :word w
 			       :start (car s) :end (car e) :quoted (car q)
 			       :eval (car v))))
@@ -924,7 +1107,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	 ;; (when (equalp w0 "opt") ;; <<<
 	 ;;   (break))
 	 (unless no-expansions
-	   (do-expansions sh expr 0))
+	   (do-expansions expr))
 	 (dbug "~w~%" expr)
 	 (if (listp w0)
 	     ;; Compound command
@@ -955,17 +1138,32 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
        (with-package *lish-user-package*
 	 (values (multiple-value-list (eval expr)) nil t))))))
 
-(defun expand-alias (sh alias words in-pipe out-pipe)
-  (let* ((expr (shell-read alias))
-	 ;; XXX This could be problematic because things in expr get trashed
-	 ;; or are not set, or faked like the shell-expr-line below.
-	 (expr-words (expr-to-words expr))
-	 (new-words (append expr-words (subseq words 1)))
-	 (new-expr (words-to-expr new-words)))
+(defun expand-alias-words (alias words)
+  "Take an alias and a shell-words array and return a shell-words array
+with the alias expanded."
+  (let* ((alias-words (expr-to-words (shell-read alias)))
+	 (new-words (append alias-words (subseq words 1))))
+    new-words))
+
+(defun possibly-expand-aliases (sh words)
+  (if (zerop (length words))
+      words
+      (let* ((cmd (shell-word-word (elt words 0)))
+	     (alias (gethash cmd (lish-aliases sh))))
+	(if alias
+	    (lisp-exp-eval (expand-alias-words alias words))
+	    words))))
+
+;; XXX This can be problematic because in the back and forth to words things
+;; in expr can get trashed or are not set, or faked like the shell-expr-line
+;; below.
+(defun expand-alias (alias words)
+  "Take an alias and a shell words array and return a shell-expr with the alias
+expanded."
+  (let ((new-expr (words-to-expr (expand-alias-words alias words))))
     (setf (shell-expr-line new-expr)
 	  (format nil "~{~a ~}" (shell-expr-words new-expr)))
-    (shell-eval sh new-expr :no-expansions t
-		:in-pipe in-pipe :out-pipe out-pipe)))
+    new-expr))
 
 (defun call-command (command args &optional in-pipe out-pipe)
   "Call a command with the given POSIX style arguments.
@@ -1063,7 +1261,8 @@ probably fail, but perhaps in similar way to other shells."
 	;; Alias
 	((and alias (not no-alias))
 	 ;; re-read and re-eval the line with the alias expanded
-	 (expand-alias sh alias expanded-words in-pipe out-pipe))
+	 (shell-eval sh (expand-alias alias expanded-words)
+		     :no-expansions t :in-pipe in-pipe :out-pipe out-pipe))
 	;; Autoload
 	((and (in-lisp-path cmd)
 	      (setf command (load-lisp-command cmd)))
@@ -1325,6 +1524,7 @@ handling errors."
 			 :completion-func #'shell-complete
 			 :context :lish
 			 :terminal-device-name terminal-name
+			 :local-keymap (lish-keymap sh)
 			 :prompt-func nil))
     (unwind-protect
 	 (progn
