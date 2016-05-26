@@ -430,7 +430,7 @@ The syntax is vaguely like:
 		   (return-from shell-read *continue-symbol*)))
 	     (do-reader-error (c)
 	       "Handle when the expression has an error."
-	       (format t "Gots an ~a ~s~%" partial c)
+	       (format t "lish-read error ~a~%" c)
 	       (if partial
 		   (return-partial)
 		   (signal c)))
