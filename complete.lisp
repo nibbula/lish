@@ -52,27 +52,33 @@ probably means it's a regular file and we have execute permission on it."
   (if (not *verb-list*)
       (setf *verb-list*
 	    (with-spin ()
-	      (remove-duplicates
-	       (append
-		(loop :for k :being :the :hash-keys :of (lish-aliases shell)
-		   :collect k)
-		(loop :for k :being :the :hash-keys :of (lish-commands)
-		   :do (spin)
-		   :collect k)
-		(loop :for dir :in (split-sequence
-				    nos:*path-separator*
-				    (nos:environment-variable *path-variable*))
-		   :do (spin)
-		   :if (probe-directory dir)
-		   :append (loop :for f :in (nos:read-directory
-					     :dir dir :full t
-					     :omit-hidden t)
-			      :if (without-access-errors
-				      (is-executable
-				       (s+ dir *directory-separator*
-					   (nos:dir-entry-name f))))
-			      :collect (nos:dir-entry-name f))))
-	       :test #'equal)))
+	      (locally
+		#+sbcl (declare
+			(sb-ext:muffle-conditions sb-ext:compiler-note))
+		(sort
+		 (remove-duplicates
+		  (append
+		   (loop :for k :being :the :hash-keys :of (lish-aliases shell)
+		      :collect k)
+		   (loop :for k :being :the :hash-keys :of (lish-commands)
+		      :do (spin)
+		      :collect k)
+		   (loop :for dir :in (split-sequence
+				       nos:*path-separator*
+				       (nos:environment-variable
+					*path-variable*))
+		      :do (spin)
+		      :if (probe-directory dir)
+		      :append (loop :for f :in (nos:read-directory
+						:dir dir :full t
+						:omit-hidden t)
+				 :if (without-access-errors
+					 (is-executable
+					  (s+ dir *directory-separator*
+					      (nos:dir-entry-name f))))
+				 :collect (nos:dir-entry-name f))))
+		  :test #'equal)
+		 #'string<))))
       *verb-list*))
 
 (defun complete-command (str all)
