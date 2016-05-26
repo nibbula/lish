@@ -390,6 +390,7 @@ The syntax is vaguely like:
 	(w (make-stretchy-string 12))	; temp word
 	(in-word nil)			; t if in word
 	(do-quote nil)
+	(in-compound nil)
 	(did-quote nil))		;
     (labels ((finish-word ()
 	       "Finish the current word."
@@ -446,6 +447,7 @@ The syntax is vaguely like:
 		     words       (nreverse args)))
 	     (make-the-expr ()
 	       "Make an expression, with it's own copy of the lists."
+	       (setf in-compound nil)
 	       (make-shell-expr
 		:line line
 		:words (copy-seq words)
@@ -463,7 +465,8 @@ The syntax is vaguely like:
 	       (incf i inc)
 	       (setf word-end (list i)
 		     word-quoted (list nil)
-		     word-eval (list nil))))
+		     word-eval (list nil)
+		     in-compound t)))
       (loop
 	 :named tralfaz
 	 :while (< i len)
@@ -562,13 +565,19 @@ The syntax is vaguely like:
 	    (finish-word)
 	    (reverse-things)
 	    ;; @@@ need to get the file name as a word
-	    (let ((e (list :redirect (make-the-expr))))
+	    (let ((e (list
+		      (if (eql c #\>)
+			  (if (eql (next-char) #\>)
+			      (progn (incf i) :append-to)
+			      :redirect-to)
+			  :redirect-from)
+		      (make-the-expr))))
 	      (setf args (list e)))
 	    (setf word-start (list i))
 	    (incf i)
 	    (setf word-end (list i)
 		  word-quoted (list nil)
-		  word-eval (list nil)))
+		  word-eval (list t)))
 	   ;; and
 	   ((and (eql c #\&) (eql (next-char) #\&))
 	    (make-compound :and))
@@ -589,7 +598,8 @@ The syntax is vaguely like:
 	(progn
 	  (finish-word)
 	  (reverse-things)))
-      (if (and (= (length words) 1) (consp (first words)))
+      (if (and (= (length words) 1) (consp (first words))
+	       (not in-compound))
 	  ;; just a lisp expression to be evaluated
 	  (first words)
 	  ;; a normal shell expression
@@ -1124,7 +1134,16 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		  (values vals out-stream show-vals)))
 	       (:and      (eval-compound (successful vals) nil))
 	       (:or       (eval-compound (not (successful vals)) nil))
-	       (:sequence (eval-compound t nil)))
+	       (:sequence (eval-compound t nil))
+	       (:redirect-to
+		(run-with-output-to
+		 (elt (shell-expr-words expr) 1) (elt w0 1)))
+	       (:append-to
+		(run-with-output-to
+		 (elt (shell-expr-words expr) 1) (elt w0 1) :append t))
+	       (:redirect-from
+		(run-with-input-from
+		 (elt (shell-expr-words expr) 1) (elt w0 1))))
 	     ;; Not a list, a ‘simple’ command
 	     (with-package *lish-user-package*
 	       (dbug "*input* = ~s~%" *input*)

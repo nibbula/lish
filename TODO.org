@@ -8,7 +8,6 @@ Lish TODO list							     -*- org -*-
 ** arg processing related:
 *** env builtin fails because of inadequate arg processing
 *** kill builtin arg processing
-*** argument defaults don't work in lish commands? (see wc)
 *** argument parsing for commands
 **** fix edge cases, more testing for posix-to-lisp-args
 ** pipes
@@ -19,6 +18,7 @@ Lish TODO list							     -*- org -*-
     e.g.: find -d ~/ -n foo | less  OR even: | pager
 ** completion
 *** completion interning of partial symbol, so completing doesn't work right
+    fixed with *read-intern*, but that's an even bigger problem.
 *** completion should work in pipelines
    when completing in a pipeline, e.g.: cat file | grep 
    It doesn't seem to do anything, is probably trying to complete args
@@ -29,9 +29,14 @@ Lish TODO list							     -*- org -*-
     e.g. '_ for combining COMBINING_ACUTE_ACCENT
 ** resume doesn't work
    resume only works when one job, doesn't get jobs spec arguments right
+** valence element-type (and encoding) issues with pipes and redirect
+*** cat < words - not a binary input stream
+*** /bin/cat < words - CR or NL doesn't get mapped right
 ** parsing < in first word?
 ** newly defined commands don't get recognized in completion?
-** tiny-rl display bugs [more specific?]
+** tiny-rl display bugs
+*** still problems clearing later lines after delete on long lines
+*** something else?
 ** time should work for whole pipelines
    time just times the first command in the pipeline
    e.g. time cat /usr/share/dict/words | snip -a bogus
@@ -40,6 +45,7 @@ Lish TODO list							     -*- org -*-
    during load-file, like: no-exist:or-this
    exhibited when loading .lishrc doc command?
 ** DONE fixed bugs
+*** DONE argument defaults don't work in lish commands? (see wc)
 *** DONE should probabbaly unset $PWD if we're not going to update it
 *** DONE completion with absolute path and stuff following, e.g.:
     "/opt/local/share/man/<here> (foo bar)"
@@ -75,8 +81,6 @@ Lish TODO list							     -*- org -*-
 ** Better argument specification
 *** operators and grouping in argument lists: :or :opt :and :repeat :case
 *** something like docargs
-** argument name can be either string or symbol
-** redirections: < > << <()
 ** give in and handle ENVVAR=value command -OR- make env builtin work
 ** at least handle ^Z of subprocess!
 *** code after fork
@@ -90,10 +94,16 @@ Lish TODO list							     -*- org -*-
 *** background jobs: & fg bg jobs %n ^Z SIGTSTP etc
 *** jobs command
 ** test portability
+*** windows native
 *** implementations
-**** ccl, abcl, clisp, cmu, lispworks
+**** ccl
+**** abcl
+**** clisp
+**** cmu
+**** lispworks
 *** linux
-*** cygwin?
+*** cygwin
+*** BSD
 * Important features
 ** add argument specs for external programs
 *** defexternal?
@@ -135,7 +145,6 @@ Lish TODO list							     -*- org -*-
 *** consider whole path expansion, eg.: /u/l/b -> /usr/local/bin
 **** also /u/s/b -> /usr/sX/b  (cursor is placed at X)
 ** prettier completion
-*** replace under the prompt style, instead of scrolling style
 *** cycle through options by repeating tab
 *** colorized: filenames, etc
 ** completion of remote filenames? ssh scp sftp etc?
@@ -153,6 +162,10 @@ Lish TODO list							     -*- org -*-
 *** ulimit
 *** umask
 *** wait
+* DONE completed features
+** DONE argument name can be either string or symbol
+** DONE replace under the prompt style, instead of scrolling style
+** DONE redirections: < > <<
 * COMMENT org
 #+SEQ_TODO: TODO DONE
 #+SEQ_TODO: LATER NO

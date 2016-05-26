@@ -47,12 +47,18 @@ an EOF on SOURCE."
        :while (= pos *buffer-size*))))
 |#
 
-(defun run-with-output-to (file-or-stream commands &key supersede)
-  "Run commands with output to a file or stream."
+(defun run-with-output-to (file-or-stream commands &key supersede append)
+  "Run commands with output to a file or stream. COMMANDS can be a SHELL-EXPR,
+or a list to be converted by LISP-ARGS-TO-COMMAND."
+  (when (and supersede append)
+    (error "Can't both supersede and append to a file."))
   (let ((result nil))
     (multiple-value-bind (vals in-stream show-vals)
-	(shell-eval
-	 *shell* (shell-read (lisp-args-to-command commands)) :out-pipe t)
+	(shell-eval *shell*
+		    (if (shell-expr-p commands)
+			commands
+			(shell-read (lisp-args-to-command commands)))
+		    :out-pipe t)
       (declare (ignore show-vals))
       (unwind-protect
 	   (when (and vals (> (length vals) 0))
@@ -60,11 +66,29 @@ an EOF on SOURCE."
 						   :direction :output
 						   :if-exists
 						   (if supersede
-						       :supersede :error)
+						       :supersede
+						       (if append
+							   :append
+							   :error))
 						   :if-does-not-exist :create)
 	       (copy-stream in-stream out-stream))
 	     (setf result vals))
 	(close in-stream)))
+    result))
+
+(defun run-with-input-from (file-or-stream commands)
+  "Run commands with input from a file or stream. COMMANDS can be a SHELL-EXPR,
+or a list to be converted by LISP-ARGS-TO-COMMAND."
+  (let ((result nil))
+    (with-open-file-or-stream (in-stream file-or-stream)
+      (multiple-value-bind (vals stream show-vals)
+	  (shell-eval *shell*
+		      (if (shell-expr-p commands)
+			  commands
+			  (shell-read (lisp-args-to-command commands)))
+		      :in-pipe in-stream)
+	(declare (ignore stream show-vals))
+	(setf result vals)))
     result))
 
 (defun input-line-words ()
@@ -248,12 +272,13 @@ like $(command) in bash."
 
 (defun !< (file-or-stream &rest commands)
   "Run commands with input from a file or stream."
-  (with-open-file-or-stream (in-stream file-or-stream)
-    (multiple-value-bind (vals stream show-vals)
-	(shell-eval *shell* (shell-read (lisp-args-to-command commands))
-		    :in-pipe in-stream)
-      (declare (ignore stream show-vals))
-      (values-list vals))))
+  ;; (with-open-file-or-stream (in-stream file-or-stream)
+  ;;   (multiple-value-bind (vals stream show-vals)
+  ;; 	(shell-eval *shell* (shell-read (lisp-args-to-command commands))
+  ;; 		    :in-pipe in-stream)
+  ;;     (declare (ignore stream show-vals))
+  ;;     (values-list vals))))
+  (run-with-input-from file-or-stream commands))
 
 (defun !!< (file-or-stream &rest commands)
   "Run commands with input from a file or stream and return a stream of output."

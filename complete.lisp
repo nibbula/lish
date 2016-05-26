@@ -295,6 +295,23 @@ literally in shell syntax."
 		   (complete-list fake-word (length fake-word) all choices)
 		   (complete-filename fake-word pos all)))))))))
 
+(defun start-of-a-compound-p (expr pos)
+  "Return true if we are at the start of the last compound command."
+  (and (= (length (shell-expr-words expr)) 1)
+       (consp (first (shell-expr-words expr)))
+       (keywordp (first (first (shell-expr-words expr))))
+       (>= pos (length (shell-expr-line expr)))))
+
+(defun in-command-position-p (expr word-num)
+  (or
+   ;; first word in a line
+   (= word-num 0)
+   ;; first word after a compound command
+   (and (= (length (shell-expr-words expr)) 2)
+	(consp (first (shell-expr-words expr)))
+	(keywordp (first (first (shell-expr-words expr))))
+	(= word-num 1))))
+
 ;; Remember, a completion functions returns:
 ;;   One completion: completion and replacement starting position
 ;;   List:           sequence and sequence length
@@ -328,16 +345,18 @@ complete, and call the appropriate completion function."
 			(values list (length list)))
 		      (values (funcall func word all) wpos))))
 	   (cond
-	     ((and (not word-num) (= pos 0))
+	     ((or (and (not word-num) (= pos 0))
+		  (start-of-a-compound-p exp pos))
 	      ;; no words
 	      (dbug "none~%")
 	      (simple-complete #'complete-command "" 0))
 	     ((not word)
 	      (if (= 0 (length (shell-expr-words exp)))
+		  ;; probably ()
 		  (progn
-		    ;; probably ()
 		    (dbug "bogo~%")
 		    (shell-complete-symbol context pos all))
+		  ;; a blank spot somewhere in the line
 		  (let ((from-end (- (length context) pos)))
 		    (dbug "heyba~%")
 		    (multiple-value-bind (result new-pos)
@@ -376,13 +395,15 @@ complete, and call the appropriate completion function."
 			       (1+ (elt (shell-expr-word-start exp)
 					word-num))))
 	     ;; first word, when not starting with directory chars
-	     ((and (= word-num 0) (not (position (aref word 0) "/.~")))
+	     ((and
+	       (in-command-position-p exp word-num)
+	       (not (position (aref word 0) "/.~")))
 	      (dbug "jinky~%")
 	      ;; try commands
 	      (multiple-value-bind (v1 v2)
 		  (simple-complete #'complete-command
 				   first-word ;; was: context
-				   (elt (shell-expr-word-start exp) 0))
+				   (elt (shell-expr-word-start exp) word-num))
 		;; then symbols
 		;; XXX Symbols won't come up in the list.
 		(when (not v1)
