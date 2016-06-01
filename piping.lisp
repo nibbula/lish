@@ -10,6 +10,9 @@
 
 (in-package :lish)
 
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 1)
+		   (compilation-speed 0)))
+
 (defun lisp-args-to-command (args &key (auto-space nil))
   "Turn the arguments into a string of arguments for a system command. String
 arguments are concatenated together. Symbols are downcased and turned into
@@ -102,10 +105,10 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 		  (setf first nil))
 	   (format s " ~a" l)))))
 
-(defun input-line-list ()
+(defun input-line-list (&optional (stream *standard-input*))
   "Return lines from *standard-input* as list of strings."
   (loop :with l = nil
-     :while (setf l (read-line *standard-input* nil nil))
+     :while (setf l (read-line (or stream *standard-input*) nil nil))
      :collect l))
 
 (defun map-output-lines (func command)

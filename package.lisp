@@ -6,30 +6,18 @@
   (:documentation
    "Unix Shell & Lisp somehow smushed together.
 
-Lish is a program designed to make typing operating system commands, and
+Lish is a program designed to make typing both operating system commands, and
 Common Lisp expressions, convienient. It combines the features of a
 traditional operating system shell with a Lisp REPL. It's designed to
 hopefully have little annoyance to people familair with a POSIX shell. But it
-does not have exact compatibility with POSIX shells. In particular Lish can
-run any operating system programs, but commands can also be defined in Lisp,
-which usually run directly in the same process.
+does not have exact compatibility with POSIX shells.
 
 The motivation for writing Lish came from the annoyance of having to swtich
-between a Lisp REPL and a Unix shell.
-But you can just use Lish for it's shell features.
-You might also want to use Lish for it's enhanced programabilty, compared
-to most shells. For example by loading other software, Lish can simultaneously
-be a shell and a web server, text editor, symbolic math solver, music composer,
-etc.
-
-Lish does have some novel features compared to other shells.
-
-- Commands may be compiled to optimized machine code, depending on your Lisp compiler, and therefore may be somewhat faster than other shells.
-- 
-
+between a Lisp REPL and a Unix shell. But you might just want to use Lish for
+it's shell features.
 ")
   (:use :cl :dlib :dlib-misc :opsys :char-util :stretchy :glob :completion
-	:keymap :tiny-rl :cl-ppcre :terminal :terminal-ansi)
+	:keymap :tiny-rl :cl-ppcre :terminal :terminal-ansi :fatchar)
   (:export
    ;; Main entry point(s)
    #:lish

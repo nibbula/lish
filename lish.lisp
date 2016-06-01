@@ -75,17 +75,16 @@ LISH_LEVEL environment variable.")
   (replace-subseq (safe-namestring (fixed-homedir)) "~"
 		  (safe-namestring name) :count 1))
 
-;; I personally favor the prompt function, so this is basically a ploy to get
-;; people that just want their bash prompt to work, to use my shell.
+;; This is mostly for bash compatibility.
 
 (defun format-prompt (sh prompt &optional (escape-char #\%))
   "Return the prompt string with bash-like formatting character replacements.
 So far we support:
 %%	A percent.
-%a	#\bell
-%e	#\escape
-%n	#\newline
-%r	#\return
+%a	#\\bell
+%e	#\\escape
+%n	#\\newline
+%r	#\\return
 %NNN	The character whose ASCII code is the octal value NNN.
 %s	The name of the shell, which is usually “Lish”.
 %v	Shell version.
@@ -116,59 +115,62 @@ Not implemented yet:
 %j	The number of jobs currently managed by the shell.
 "
   (declare (ignore sh))
-  (with-output-to-string (str)
-    (loop :with c :for i :from 0 :below (length prompt) :do
-       (setf c (aref prompt i))
-       (if (equal c escape-char)
-         (progn
-	   (incf i)
-	   (when (< i (length prompt))
-	     (setf c (aref prompt i))
-	     (case c
-	       (#\% (write-char escape-char str))
-	       (#\a (write-char #\bell str))
-	       (#\e (write-char #\escape str))
-	       (#\n (write-char #\newline str))
-	       (#\r (write-char #\return str))
-	       ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9)
-		(write-char (code-char
-			     (parse-integer (subseq prompt i (+ i 3)) :radix 8))
-			    str))
-	       (#\s (write-string *shell-name* str))
-	       (#\v (write-string *major-version* str))
-	       (#\V (write-string *version* str))
-	       (#\u (write-string (nos:user-name) str))
-	       (#\h (write-string dlib:*host* str))
-	       (#\H (write-string (machine-instance) str))
-	       (#\w (write-string (twiddlify (nos:current-directory)) str))
-	       (#\W (write-string
-		     (twiddlify (basename (nos:current-directory))) str))
-	       (#\$ (write-char
-		     (if (= (nos:user-id :effective t) 0) #\# #\$) str))
-	       (#\i (write-string *lisp-implementation-nickname* str))
-	       (#\p (write-string
-		     (s+ (and *lish-user-package*
-			      (shortest-package-nick *lish-user-package*)))
-		     str))
-	       (#\P (write-string
-		     (s+ (and *lish-user-package*
-			      (package-name *lish-user-package*))) str))
-	       (#\d (write-string
-		     (format-date "~3a ~3a ~2d"
-				  (:day-abbrev :month-abbrev :date)) str))
-	       (#\t (write-string
-		     (format-date "~2,'0d:~2,'0d:~2,'0d"
-				  (:hours :minutes :seconds)) str))
-	       (#\T (write-string
-		     (format-date "~2,'0d:~2,'0d:~2,'0d"
-				  (:12-hours :minutes :seconds)) str))
-	       (#\@ (write-string
-		     (format-date "~2,'0d:~2,'0d ~2a"
-				  (:12-hours :minutes :am)) str))
-	       (#\A (write-string
-		     (format-date "~2,'0d:~2,'0d" (:hours :minutes)) str))
-	       )))
-	 (write-char c str)))))
+  (let ((out (make-stretchy-string 80)))
+    (with-output-to-string (str out)
+      (loop :with c :for i :from 0 :below (length prompt) :do
+	 (setf c (aref prompt i))
+	 (if (equal c escape-char)
+	     (progn
+	       (incf i)
+	       (when (< i (length prompt))
+		 (setf c (aref prompt i))
+		 (case c
+		   (#\% (write-char escape-char str))
+		   (#\a (write-char #\bell str))
+		   (#\e (write-char #\escape str))
+		   (#\n (write-char #\newline str))
+		   (#\r (write-char #\return str))
+		   ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9)
+		    (write-char (code-char
+				 (parse-integer
+				  (subseq prompt i (+ i 3)) :radix 8))
+				str))
+		   (#\s (write-string *shell-name* str))
+		   (#\v (princ *major-version* str))
+		   (#\V (write-string *version* str))
+		   (#\u (write-string (nos:user-name) str))
+		   (#\h (write-string dlib:*host* str))
+		   (#\H (write-string (machine-instance) str))
+		   (#\w (write-string (twiddlify (nos:current-directory)) str))
+		   (#\W (write-string
+			 (twiddlify (basename (nos:current-directory))) str))
+		   (#\$ (write-char
+			 (if (= (nos:user-id :effective t) 0) #\# #\$) str))
+		   (#\i (write-string *lisp-implementation-nickname* str))
+		   (#\p (write-string
+			 (s+ (and *lish-user-package*
+				  (shortest-package-nick *lish-user-package*)))
+			 str))
+		   (#\P (write-string
+			 (s+ (and *lish-user-package*
+				  (package-name *lish-user-package*))) str))
+		   (#\d (write-string
+			 (format-date "~3a ~3a ~2d"
+				      (:day-abbrev :month-abbrev :date)) str))
+		   (#\t (write-string
+			 (format-date "~2,'0d:~2,'0d:~2,'0d"
+				      (:hours :minutes :seconds)) str))
+		   (#\T (write-string
+			 (format-date "~2,'0d:~2,'0d:~2,'0d"
+				      (:12-hours :minutes :seconds)) str))
+		   (#\@ (write-string
+			 (format-date "~2,'0d:~2,'0d ~2a"
+				      (:12-hours :minutes :am)) str))
+		   (#\A (write-string
+			 (format-date "~2,'0d:~2,'0d" (:hours :minutes)) str))
+		   )))
+	     (write-char c str))))
+    out))
 
 (defun symbolic-prompt-to-string (symbolic-prompt &optional ts-in)
   (with-output-to-string (str)
@@ -286,6 +288,23 @@ Not implemented yet:
 		(tt-format ts "~a" s)
 		)))
 	  (tt-finish-output ts)))))
+
+#|
+(defun fill-prompt ()
+  (#\f (let ((len (length out)) out-char cols)
+	 (when (> len 1)
+	   (setf out-char (aref out (1- len))
+		 cols (terminal-window-columns
+		       (tiny-rl::line-editor-terminal
+			(lish-editor sh))))
+	   (loop :repeat (- cols len)
+	      :do (write-char out-char str))))))
+
+1. Expand the %<things> in the symbolic version.
+2. Convert to fatchar and expand the %fill which can now know the true size
+3. Convert from fatchar to final device form
+
+|#
 
 (defgeneric make-prompt (shell)
   (:documentation "Return a string to prompt with."))
@@ -409,6 +428,12 @@ The syntax is vaguely like:
 		 (setf (fill-pointer w) 0
 		       in-word nil
 		       did-quote nil)))
+	     (ignore-word ()
+	       "Ignore the current word."
+	       (when in-word
+		 (setf (fill-pointer w) 0
+		       in-word nil
+		       did-quote nil)))
 	     (return-partial ()
 	       (push i word-start)
 	       (push (subseq line i) args)
@@ -431,7 +456,7 @@ The syntax is vaguely like:
 		   (return-from shell-read *continue-symbol*)))
 	     (do-reader-error (c)
 	       "Handle when the expression has an error."
-	       (format t "lish-read error ~a~%" c)
+	       ;; (format t "lish-read error ~a~%" c)
 	       (if partial
 		   (return-partial)
 		   (signal c)))
@@ -457,16 +482,26 @@ The syntax is vaguely like:
 		:word-eval (copy-seq word-eval)))
 	     (make-compound (key &optional (inc 2))
 	       "Make a compound expression with type KEY."
-	       (finish-word)
+	       ;; (finish-word)
+	       ;; (reverse-things)
+	       ;; (let ((e (list key (make-the-expr))))
+	       ;; 	 (setf args (list e)))
+	       ;; (setf word-start (list i))
+	       ;; (incf i inc)
+	       ;; (setf word-end (list i)
+	       ;; 	     word-quoted (list nil)
+	       ;; 	     word-eval (list nil)
+	       ;; 	     in-compound t)))
+	       (ignore-word)
 	       (reverse-things)
 	       (let ((e (list key (make-the-expr))))
-		 (setf args (list e)))
-	       (setf word-start (list i))
+	       	 (setf args (list e)))
 	       (incf i inc)
-	       (setf word-end (list i)
-		     word-quoted (list nil)
-		     word-eval (list nil)
-		     in-compound t)))
+	       (setf word-start '(0)
+		     word-end '(0)
+	       	     word-quoted '(nil)
+	       	     word-eval '(nil)
+	       	     in-compound t)))
       (loop
 	 :named tralfaz
 	 :while (< i len)
@@ -1052,12 +1087,15 @@ expanded array of shell-words."
      :unspecified)))
 
 (defun accepts (first-type &rest other-types)
-  "Return true if *ACCEPTS* matches one of the given types."
+  "Return true if *ACCEPTS* matches or is a subtype of one of the given types.
+This should be used rather than directly testing *ACCEPTS*."
   (let ((types (cons first-type other-types)))
-    (typecase *accepts*
-      (sequence (some (_ (position _ *accepts*)) types))
-      (keyword  (some (_ (eq       _ *accepts*)) types))
-      (t        (some (_ (equal    _ *accepts*)) types)))))
+    (labels ((is-like (x type)
+	       (or (equal x type) (subtypep x type))))
+      (typecase *accepts*
+	(sequence (some (_ (position _ *accepts* :test #'is-like)) types))
+	(keyword  (some (_ (eq       _ *accepts*)) types))
+	(t        (some (_ (is-like  _ *accepts*)) types))))))
 
 (defun successful (obj)
   "Return true if the object represents a successful command result."
@@ -1123,15 +1161,15 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	     ;; Compound command
 	     (case (first w0)
 	       (:pipe
-		(let* ((*accepts*
-			(get-accepts (elt (shell-expr-words expr) 1)))
-		       (*input* *output*)
-		       (*output* nil))
-		  (dbug "*input* = ~s~%" *input*)
-		  (setf (values vals out-stream show-vals)
-			(eval-compound (successful vals) t))
-		  (dbug "*output* = ~s~%" *output*)
-		  (values vals out-stream show-vals)))
+		(setf *accepts*
+		      (get-accepts (elt (shell-expr-words expr) 1))
+		      *input* *output*
+		      *output* nil)
+		(dbug "*input* = ~s~%" *input*)
+		(setf (values vals out-stream show-vals)
+		      (eval-compound (successful vals) t))
+		(dbug "*output* = ~s~%" *output*)
+		(values vals out-stream show-vals))
 	       (:and      (eval-compound (successful vals) nil))
 	       (:or       (eval-compound (not (successful vals)) nil))
 	       (:sequence (eval-compound t nil))
@@ -1146,6 +1184,10 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		 (elt (shell-expr-words expr) 1) (elt w0 1))))
 	     ;; Not a list, a ‘simple’ command
 	     (with-package *lish-user-package*
+	       ;; accepts is :unspecified because we're last in the pipeline
+	       (setf *accepts* (get-accepts expr) ;; :unspecified
+		     *input* *output*
+		     *output* nil)
 	       (dbug "*input* = ~s~%" *input*)
 	       (setf (values vals out-stream show-vals)
 		     (shell-eval-command sh expr
@@ -1225,10 +1267,46 @@ bound during command."
   "Read and shell-eval all the expressions possible from a string and return
 them as a list."
   ;;; @@@ I think I want to change this to do a shell-read
+  ;;(format t "p-l line = ~s~%" string)
   (loop :with start = 0 :and expr
      :while (setf (values expr start)
 		  (read-from-string string nil nil :start start))
+     ;;:do
+     ;;(format t "p-l before eval arg ~s of type ~a~%" expr (type-of expr))
      :collect (eval expr)))
+
+(defmacro with-first-value-to-output (&body body)
+  (with-unique-names (vals)
+    `(values-list
+      (let* ((,vals (multiple-value-list (progn ,@body))))
+	(setf *output* (first ,vals))
+	,vals))))
+
+(defun call-parenless (func line)
+  "Apply the function to the line, and return the proper values. If there are
+not enough arguements supplied, and *INPUT* is set, i.e. it's a recipient of
+a non-I/O pipeline, supply *INPUT* as the missing tail argument."
+  (let ((parenless-args (read-parenless-args line))
+	(function-args (lambda-list
+			(if (functionp func)
+			    (third
+			     (multiple-value-list
+			      (function-lambda-expression func)))
+			    func))))
+    (if (and (< (length parenless-args) (length function-args))
+	     *input*)
+	(progn
+	  ;;(format t "WOO HOO! parenless input!~%")
+	  (if parenless-args
+	      (progn
+		;;(format t "parenless-args = ~s~%" parenless-args)
+		(with-first-value-to-output
+		    (apply func `(,@parenless-args ,*input*))))
+	      (progn
+		;;(format t "just input~%")
+		(with-first-value-to-output (apply func (list *input*))))))
+	;; no *input* stuffing
+	(with-first-value-to-output (apply func parenless-args)))))
 
 (defun shell-eval-command (sh expr &key no-alias in-pipe out-pipe)
   "Evaluate a shell expression that is a command.
@@ -1266,14 +1344,15 @@ probably fail, but perhaps in similar way to other shells."
 	   (rest-of-the-line (expr)
 	     "Return the rest of the line after the first word."
 	     (if (> (length (shell-expr-word-start expr)) 1)
-		 (subseq (shell-expr-line expr)
-			 (elt (shell-expr-word-start expr) 1))
+		 ;; (subseq (shell-expr-line expr)
+		 ;; 	 (elt (shell-expr-word-start expr) 1))
+		 (join (subseq (shell-expr-words expr) 1) " ")
 		 ""))
 	   (run-fun (func line)
 	     "Apply the func to the line, and return the proper values."
 	     (run-hooks *pre-command-hook* cmd :function)
 	     (values
-	      (multiple-value-list (apply func (read-parenless-args line)))
+	      (multiple-value-list (call-parenless func line))
 	      nil  ;; stream
 	      t))) ;; show the values
       (cond
@@ -1299,18 +1378,26 @@ probably fail, but perhaps in similar way to other shells."
 	     ;; Otherwise try a parenless Lisp line.
 	     (multiple-value-bind (symb pos)
 		 (read-from-string (shell-expr-line expr) nil nil)
+	       (declare (ignore pos))
 	       (if (and (symbolp symb) (fboundp symb))
 		   (progn
 		     (run-fun (symbol-function symb)
-			      (subseq (shell-expr-line expr) pos)))
+			      ;;(subseq (shell-expr-line expr) pos)
+			      (rest-of-the-line expr)
+			      ))
 		   ;; Just try a system command anyway, which will likely fail.
 		   (sys-cmd)))))
 	((functionp cmd)
+	 (format t "CHOWZA ~s~%" (rest-of-the-line expr))
 	 (run-fun cmd (rest-of-the-line expr)))
 	((and (symbolp cmd) (fboundp cmd))
+	 (format t "FLEOOP ~s~%" (rest-of-the-line expr))
 	 (run-fun (symbol-function cmd) (rest-of-the-line expr)))
 	(t ;; Some other type, just return it, like it's self evaluating.
-	 (values (multiple-value-list (eval cmd)) nil t))))))
+	 ;;(values (multiple-value-list (eval cmd)) nil t))))))
+	 (values (multiple-value-list
+		  (with-first-value-to-output (eval cmd)))
+		 nil t))))))
 
 (defun load-file (sh file)
   "Load a lish syntax file."

@@ -2,11 +2,6 @@
 ;;; lish-stats.asd -- System definition for lish-stats
 ;;;
 
-(defpackage :lish-stats-system
-    (:use :common-lisp :asdf))
-
-(in-package :lish-stats-system)
-
 (defsystem lish-stats
     :name               "lish-stats"
     :description        "Command statistics for Lish."

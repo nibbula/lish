@@ -237,6 +237,11 @@
 	    obj
 	    value))))
 
+(defclass arg-sequence (arg-object) () (:documentation "A sequence."))
+(defmethod convert-arg ((arg arg-sequence) (value sequence) &optional quoted)
+  (declare (ignore arg quoted))
+  value)
+
 (defclass arg-date (argument) () (:documentation "A date."))
 (defmethod convert-arg ((arg arg-date) (value string) &optional quoted)
   (declare (ignore arg quoted))

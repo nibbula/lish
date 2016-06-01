@@ -2,21 +2,17 @@
 ;;; lish.asd -- System definition for LISH package
 ;;;
 
-(defpackage :lish-system
-    (:use :common-lisp :asdf))
-
-(in-package :lish-system)
-
 (defsystem lish
     :name               "lish"
     :description        "Lispy system command shell."
-    :version            "0.1.0"
+    ;; :version            "0.1.0"
+    :version		(:read-file-form "version.lisp")
     :author             "Nibby Nebbulous <nibbula -(. @ .)- gmail.com>"
     :licence            "GPLv3 or something."
-    :long-description   "I don't recommend using this yet."
+    :long-description   "Lish is a Lisp shell. Don't hold your breath."
     :entry-point	"lish:shell-toplevel"
     :depends-on (:dlib :opsys :dlib-misc :stretchy :glob :tiny-rl :cl-ppcre
-		 :chipz)
+		 :chipz :fatchar)
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))
