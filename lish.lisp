@@ -408,6 +408,7 @@ The syntax is vaguely like:
 	(sub-expr '())
 	(w (make-stretchy-string 12))	; temp word
 	(in-word nil)			; t if in word
+	(in-first-word t)		; t if in the first word on the line
 	(do-quote nil)
 	(in-compound nil)
 	(did-quote nil))		;
@@ -427,13 +428,40 @@ The syntax is vaguely like:
 		 (push did-quote word-quoted)
 		 (setf (fill-pointer w) 0
 		       in-word nil
+		       in-first-word nil
 		       did-quote nil)))
 	     (ignore-word ()
 	       "Ignore the current word."
 	       (when in-word
 		 (setf (fill-pointer w) 0
 		       in-word nil
+		       in-first-word nil
 		       did-quote nil)))
+	     (add-to-word ()
+	       "Add the character to the current word or start a new one."
+	       (when (not in-word)
+		 (push i word-start))
+	       (setf in-word t)
+	       (vector-push-extend c w)
+	       (incf i))
+	     (read-lisp-expr ()
+	       (handler-bind
+		   ((end-of-file (_  (declare (ignore _)) (do-continue)))
+		    (reader-error (_ (do-reader-error _))))
+		 ;; read a form as a separate word
+		 (multiple-value-bind (obj pos)
+		     (with-package package
+		       (if partial
+			   (clean-read-from-string line *junk-package* nil
+						   *continue-symbol* :start i)
+			   (read-from-string line nil
+					     *continue-symbol* :start i)))
+		   (push i word-start)
+		   (setf i pos)
+		   (push obj args)
+		   (push i word-end)
+		   (push nil word-quoted)
+		   (push nil word-eval))))
 	     (return-partial ()
 	       (push i word-start)
 	       (push (subseq line i) args)
@@ -539,23 +567,23 @@ The syntax is vaguely like:
 	   ;; a lisp function application
 	   ((eql c #\()
 	    (finish-word)
-	    (handler-bind
-		((end-of-file (_  (declare (ignore _)) (do-continue)))
-		 (reader-error (_ (do-reader-error _))))
-		;; read a form as a separate word
-		(multiple-value-bind (obj pos)
-		    (with-package package
-		      (if partial
-			  (clean-read-from-string line *junk-package* nil
-						  *continue-symbol* :start i)
-			  (read-from-string line nil
-					    *continue-symbol* :start i)))
-		  (push i word-start)
-		  (setf i pos)
-		  (push obj args)
-		  (push i word-end)
-		  (push nil word-quoted)
-		  (push nil word-eval))))
+	    (read-lisp-expr))
+	   ((eql c #\#)
+	    ;; This is so we can use the Lisp reader interpretation of # at
+	    ;; the beginning of a shell line, but otherwise, in the rest of
+	    ;; the line ‘#’ is treated as a normal character.
+	    ;; This means we can do #+foo etc. before an expressin in scripts
+	    ;; and but still have command arguments, like filenames, that
+	    ;; begin with ‘#’. Of course ‘#’ in Lisp sub-expressions still
+	    ;; should work.
+	    (cond
+	     (in-word
+	      ;; # doesn't break words, like (
+	      (add-to-word))
+	     (in-first-word
+	      (read-lisp-expr))
+	     (t
+	      (add-to-word))))
 	   ;; a lisp expr
 	   ((eql c #\!)
 	    (when (not sub-expr)
@@ -624,11 +652,7 @@ The syntax is vaguely like:
 	    (make-compound :sequence 1))
 	   ;; any other character: add to word
 	   (t
-	    (when (not in-word)
-	      (push i word-start))
-	    (setf in-word t)
-	    (vector-push-extend c w)
-	    (incf i)))
+	    (add-to-word)))
         :finally
 	(progn
 	  (finish-word)
@@ -1073,7 +1097,7 @@ expanded array of shell-words."
      ;;(format t "shell-expr ~s~%" expr)
      (get-accepts (elt (shell-expr-words expr) 0)))
     (list
-     ;;(format t "list ~s~%" expr)
+     (format t "list ~s~%" expr)
      (get-accepts (if (keywordp (car expr))
 		      (cdr expr)
 		      (car expr))))
@@ -1081,6 +1105,8 @@ expanded array of shell-words."
      ;;(format t "string ~s~%" expr)
      (let* ((cmd-name (resolve-command expr))
 	    (cmd (get-command cmd-name)))
+       ;;(when cmd
+       ;;  (format t "command ~a accepts ~s~%" cmd-name (command-accepts cmd)))
        (and cmd (command-accepts cmd))))
     (t
      ;;(format t "-T- ~s ~s~%" (type-of expr) expr)
@@ -1166,6 +1192,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		      *input* *output*
 		      *output* nil)
 		(dbug "*input* = ~s~%" *input*)
+		(dbug "*accepts* = ~s~%" *accepts*)
 		(setf (values vals out-stream show-vals)
 		      (eval-compound (successful vals) t))
 		(dbug "*output* = ~s~%" *output*)
@@ -1336,6 +1363,7 @@ probably fail, but perhaps in similar way to other shells."
 	     (run-hooks *pre-command-hook* cmd :system-command)
 	     (setf (values result result-stream)
 		   (do-system-command expanded-words in-pipe out-pipe))
+	     (run-hooks *post-command-hook* cmd :system-command)
 	     (dbug "result = ~w~%" result)
 	     (when (not result)
 	       (format t "Command failed.~%"))
@@ -1352,7 +1380,9 @@ probably fail, but perhaps in similar way to other shells."
 	     "Apply the func to the line, and return the proper values."
 	     (run-hooks *pre-command-hook* cmd :function)
 	     (values
-	      (multiple-value-list (call-parenless func line))
+	      (prog1
+		  (multiple-value-list (call-parenless func line))
+		(run-hooks *post-command-hook* cmd :function))
 	      nil  ;; stream
 	      t))) ;; show the values
       (cond
@@ -1366,11 +1396,15 @@ probably fail, but perhaps in similar way to other shells."
 	      (setf command (load-lisp-command cmd)))
 	 ;; now try it as a command
 	 (run-hooks *pre-command-hook* cmd :command)
-	 (call-command command (subseq expanded-words 1) in-pipe out-pipe))
+	 (multiple-value-prog1
+	     (call-command command (subseq expanded-words 1) in-pipe out-pipe)
+	   (run-hooks *post-command-hook* cmd :command)))
 	;; Lish command
 	(command
 	 (run-hooks *pre-command-hook* cmd :command)
-	 (call-command command (subseq expanded-words 1) in-pipe out-pipe))
+	 (multiple-value-prog1
+	     (call-command command (subseq expanded-words 1) in-pipe out-pipe)
+	   (run-hooks *post-command-hook* cmd :command)))
 	((stringp cmd)
 	 ;; If we can find a command in the path, try it first.
 	 (if (get-command-path cmd)

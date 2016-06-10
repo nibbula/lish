@@ -33,6 +33,10 @@ it's shell features.
    #:*output*
    #:*input*
    #:*lishrc*
+   ;; hooks
+   #:*pre-command-hook*
+   #:*post-command-hook*
+   #:*exit-shell-hook*
    ;; (installation)
    #:make-standalone
    ;; shell options
@@ -47,6 +51,7 @@ it's shell features.
    #:shell
    #:lish-aliases
    #:lish-editor
+   #:lish-keymap
    #:lish-old-pwd
    #:lish-dir-list
    #:lish-suspended-jobs

@@ -1,21 +1,21 @@
-Lish TODO list							     -*- org -*-
+Lish TODO list							    -*- org -*-
 
 * Before pre-release:
 ** fix all bugs
 ** do essential features
-** deal with library / utils issue
+** deal with library / utils issue (OR NOT)
 * BUGS:
-** arg processing related:
-*** env builtin fails because of inadequate arg processing
-*** kill builtin arg processing
-*** argument parsing for commands
-**** fix edge cases, more testing for posix-to-lisp-args
 ** pipes
 *** piping from lisp command to system command
     gets no output, e.g.: grep defun *.lisp | /usr/bin/less
 *** pipes to lisp commands take too much memory
 *** pipes seem to fail when taking a long time and going to a pipe.
     e.g.: find -d ~/ -n foo | less  OR even: | pager
+** arg processing related:
+*** env builtin fails because of inadequate arg processing
+*** kill builtin arg processing
+*** argument parsing for commands
+**** fix edge cases, more testing for posix-to-lisp-args
 ** completion
 *** completion interning of partial symbol, so completing doesn't work right
     fixed with *read-intern*, but that's an even bigger problem.
@@ -44,6 +44,9 @@ Lish TODO list							     -*- org -*-
 ** some seemingly sbcl specific bug when reading a non existent symbol,
    during load-file, like: no-exist:or-this
    exhibited when loading .lishrc doc command?
+** how do lish paths work?
+*** resolve autoload vs. asdf ldir, vs PATH etc
+*** and completion thereof
 ** DONE fixed bugs
 *** DONE argument defaults don't work in lish commands? (see wc)
 *** DONE should probabbaly unset $PWD if we're not going to update it
@@ -82,17 +85,17 @@ Lish TODO list							     -*- org -*-
 *** operators and grouping in argument lists: :or :opt :and :repeat :case
 *** something like docargs
 ** give in and handle ENVVAR=value command -OR- make env builtin work
+** process stuff:
+   see (defimplementation background-save-image in slime/swank/sbcl.lisp
+*** chains: || &&
+*** background jobs: & fg bg jobs %n ^Z SIGTSTP etc
+*** jobs command
 ** at least handle ^Z of subprocess!
 *** code after fork
 **** must be able to run code (reset job signals) after fork
 **** -OR-
 **** make a spawn/fork/pipe in C which handles job signals
 *** make a small test to see which implementations support code after fork
-** process stuff:
-   see (defimplementation background-save-image in slime/swank/sbcl.lisp
-*** chains: || &&
-*** background jobs: & fg bg jobs %n ^Z SIGTSTP etc
-*** jobs command
 ** test portability
 *** windows native
 *** implementations
@@ -111,6 +114,7 @@ Lish TODO list							     -*- org -*-
 ** objects (return values) as pipeline data
    see doing
 ** figure out a syntax for multiple commands on a line (like posix ;)
+*** patially done with: ^^ && ||
 ** process substitution <(foo) >(foo)
 ** add more features to globbing (all the ignored arguments of glob)
 *** brace expansion: {foo,bar}
