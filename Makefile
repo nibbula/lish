@@ -42,7 +42,13 @@ clean_%:	%
 .PHONY:	lish
 lish:
 	echo "(l :tiny-repl) (l :tiny-debug) (l :lish) (lish:make-standalone)"\
-	 | $(LISP) -- -norl
+	 | $(LISP) $(LISP_FLAGS) -- -norl
+
+.PHONY:	lishfu
+lishfu:
+	echo "(l :tiny-repl) (l :tiny-debug) (l :lish) " \
+              '(load "fully-loaded.lisp") (lish:make-standalone)' \
+	 | $(LISP) $(LISP_FLAGS) -- -norl
 
 # plain, aka without my (or your) startup
 
