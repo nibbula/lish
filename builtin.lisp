@@ -64,8 +64,8 @@ from stack."
 
 (defun job-id-list ()
   "Return a list of suspended job ids."
-  (loop :for j :in (lish-suspended-jobs *shell*)
-     :collect (suspended-job-id j)))
+  (loop :for j :in (lish-jobs *shell*)
+     :collect (job-id j)))
 
 (defclass arg-job-descriptor (arg-lenient-choice)
   ()
@@ -73,57 +73,90 @@ from stack."
    :choice-func #'job-id-list)
   (:documentation "A job descriptor."))
 
+(defun find-job (job-descriptor)
+  "Return a job given a descriptor."
+  (cond
+    ;; Presumably this is a good guess.
+    ((null job-descriptor)
+     (first (lish-jobs *shell*)))
+    ((stringp job-descriptor)
+     (find job-descriptor (lish-jobs *shell*) :test #'equalp :key #'job-name))
+    ((numberp job-descriptor)
+     (find job-descriptor (lish-jobs *shell*) :test #'= :key #'job-id))
+    ((symbolp job-descriptor)
+     (find (string job-descriptor) (lish-jobs *shell*) :test #'equalp
+	   :key #'job-name))
+    (t
+     (find job-descriptor (lish-jobs *shell*) :test #'equalp
+	   :key #'job-name))))
+
 (defbuiltin resume
     (("job-descriptor" job-descriptor :optional t :help "Job to resume."))
   "Resume a suspended job."
   (let (job)
     (cond
-      ((or (null (lish-suspended-jobs *shell*))
-	   (= (length (lish-suspended-jobs *shell*)) 0))
+      ((or (null (lish-jobs *shell*))
+	   (= (length (lish-jobs *shell*)) 0))
        (format t "No jobs to resume.~%")
        (return-from !resume (values)))
-      ((= (length (lish-suspended-jobs *shell*)) 1)
-       (setf job (first (lish-suspended-jobs *shell*))))
-      ((stringp job-descriptor)
-       (setf job (find job-descriptor
-		       (lish-suspended-jobs *shell*)
-		       :test #'equalp
-		       :key #'suspended-job-name)))
-      ((numberp job-descriptor)
-       (setf job (find job-descriptor
-		       (lish-suspended-jobs *shell*)
-		       :test #'=
-		       :key #'suspended-job-id)))
-      ((symbolp job-descriptor)
-       (setf job (find (string job-descriptor)
-		       (lish-suspended-jobs *shell*)
-		       :test #'equalp
-		       :key #'suspended-job-name)))
+      ((= (length (lish-jobs *shell*)) 1)
+       (setf job (first (lish-jobs *shell*))))
       (t
-       (setf job (find job-descriptor
-		       (lish-suspended-jobs *shell*)
-		       :test #'equalp
-		       :key #'suspended-job-name))))
+       (setf job (find-job job-descriptor))))
     (if (not job)
 	(format t "Couldn't find a job matching ~a.~%" job-descriptor)
-	(if (suspended-job-resume-function job)
-	    (progn
-	      (setf (lish-suspended-jobs *shell*)
-		    (delete job (lish-suspended-jobs *shell*)))
-	      (funcall (suspended-job-resume-function job)))
-	    (format t "The job doesn't have a resume function ~a.~%"
-		    job-descriptor)))))
+	(cond
+	  ((job-resume-function job)
+	   (setf (lish-jobs *shell*)
+		 (delete job (lish-jobs *shell*)))
+	   (funcall (job-resume-function job)))
+	  ((job-pid job)
+	   #+unix
+	   (multiple-value-bind (result status)
+	       (os-unix::resume-pid (job-pid job))
+	     (handle-job-change job result status))
+	   )
+	  (t
+	   (format t "I don't know how to resume the job ~a.~%"
+		   job-descriptor))))))
+
+(defbuiltin bg
+    (("job-descriptor" job-descriptor :optional t :help "Job to backaground."))
+  "Put a job in the background."
+  (let ((job (find-job job-descriptor)))
+    ;; (format t "job-descriptor = ~s ~a job = ~s~%"
+    ;; 	    job-descriptor (type-of job-descriptor) job)
+    (if job
+	(cond
+	  ((job-pid job)
+	   #+unix
+	   (progn
+	     ;; (format t "job = ~s~%" job)
+	     (uos::background-pid (job-pid job))
+	     (setf (job-status job) :running)))
+	  (t
+	   (format t "I don't know how to background a non-system job.")))
+	(format t "Couldn't find a job matching ~a.~%" job-descriptor)))
+  (values))
 
 (defbuiltin jobs
   (("long" boolean :short-arg #\l
      :help "Show the longer output."))
   "Lists spawned processes that are active."
   ;; @@@ not working yet for system commands
-  (loop :for j :in (lish-suspended-jobs *shell*)
+  (loop :for j :in (lish-jobs *shell*)
      :do
-     (with-slots (id name command-line resume-function) j
-       (format t "~3d ~10a ~20a ~:[~;~a ~]~a~%"
-	       id "LISP" name long resume-function command-line)))
+     (with-slots (id name command-line resume-function pid status) j
+       (cond
+	 (resume-function
+	  (format t "~3d ~10a ~20a ~:[~;~a ~]~a~%"
+		  id "LISP" name long resume-function command-line))
+	 (pid
+	  (format t "~3d ~10a ~20a ~a ~:[~;~a ~]~a~%"
+		  id "SYSTEM" name status long pid command-line))
+	 (t
+	  (format t "~3d ~10a ~20a ~a ~a ~a~%"
+		  id "????" name status pid command-line)))))
   (when (find-package :bt)
     (loop :for j :in (ignore-errors (funcall (find-symbol "ALL-THREADS" :bt)))
        :do
@@ -311,7 +344,8 @@ Commands can be:
 (defun print-command-help (cmd)
   "Print documentation for a command."
   (format t "~a~%" (documentation cmd 'function))
-  (when (and (command-arglist cmd) (not (zerop (length (command-arglist cmd)))))
+  (when (and (command-arglist cmd)
+	     (not (zerop (length (command-arglist cmd)))))
     (format t "Arguments:~%")
     (table:nice-print-table
      (loop :for a :in (command-arglist cmd)
@@ -327,7 +361,7 @@ Commands can be:
   (when (and (command-accepts cmd)
 	     (not (eq (command-accepts cmd) :unspecified)))
     (format t "Accepts: ~a~%" (command-accepts cmd)))
-  (when (command-loaded-from cmd)
+  (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
     (format t "Loaded from: ~a~%" (command-loaded-from cmd))))
 
 (defbuiltin help (("subject" help-subject :help "Subject to get help on."))
@@ -520,16 +554,17 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
  |\|     ("arguments" string :repeating t
  |\|      :help "Variable assignments, commands and command arguments."))
  |\|
- +-|#
+
+Vauguely like how I would like:
 
 (defbuiltin env
-    (("ignore-environment" boolean :short-arg #\i
+    ((ignore-environment boolean :short-arg #\i
       :help "Ignore the environment.")
-     ("variable-assignment" string :repeating t
+     (variable-assignment string :repeating t
       :help "Assingment to make in the environment.")
-     ("shell-command" shell-command
+     (shell-command shell-command
       :help "Command to execute with the possibly modified environment.")
-     ("arguments" string :repeating t
+     (arguments string :repeating t
       :help "Variable assignments, commands and command arguments."))
   "Modify the command environment. If ignore-environment"
   (if (and (not shell-command) (not arguments))
@@ -557,6 +592,57 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 	(apply #'do-system-command
 	       `(,`(,shell-command ,@arguments)
 		   ,@(if ignore-environment '(nil nil nil)))))))
+
+But instead we have to to a kludgey version:
+|#
+
+(defbuiltin env
+    ((ignore-environment boolean :short-arg #\i
+      :help "Ignore the environment.")
+     (arguments string :repeating t
+      :help "Variable assignments, commands and command arguments."))
+  "Modify the command environment. If ignore-environment is true, only
+variables explicitly set in arguments are passed to the commands."
+  (if arguments
+      ;; Set variables and execute command
+      (let (pos env new-env cmd (a arguments) args)
+	;; Accumulate environment modifications in env
+	(loop
+	   :while (and a (setf pos (position #\= (car a))))
+	   :do
+	   (let* ((seq (split-sequence #\= (car a)))
+		  (var (first seq))
+		  (val (second seq)))
+	     (when var
+	       ;; (format t "push env var=~s val=~s~%" var val)
+	       (push (cons var val) env)))
+	   (setf a (cdr a)))
+	;; Set the command and arguments
+	(setf cmd (car a)
+	      args (cdr a))
+	(when (not ignore-environment)
+	  (setf new-env (environment)))
+	;; Set the variables
+	;; (format t "cmd = ~s~%args = ~s~%env = ~s~%" cmd args env)
+	;; (finish-output)
+	(loop :with e
+	   :for (var . val) :in env
+	   :do
+	   (setf e (assoc (intern var :keyword) new-env))
+	   (if e
+	       (rplacd e val)
+	       (setf new-env (acons (intern var :keyword) val new-env))))
+	;; Unixify the new-env
+	;;(setf new-env
+	;;      (mapcar (_ (format nil "~a=~a" (car _) (cdr _))) new-env))
+	;; Run the command
+	;; @@@ This should respect piping!!!
+	(when cmd
+	  (apply #'do-system-command
+		 `(,`(,cmd ,@args) nil nil ,new-env))))
+      ;; Just print the variables
+      (loop :for e :in (environment)
+	 :do (format t "~a=~a~%" (car e) (cdr e)))))
 
 (defun get-cols ()
   (let ((tty (tiny-rl::line-editor-terminal (lish::lish-editor *shell*))))
@@ -734,7 +820,15 @@ symbolic format, otherwise output in octal."
 
 (defbuiltin wait ()
   "Wait for commands to terminate."
-  (values))
+  #+unix
+  (let (job)
+    (multiple-value-bind (pid result status) (uos::wait)
+      (when pid
+	(if (setf job (find pid (lish-jobs *shell*)
+			    :test #'eql :key #'job-pid))
+	    (handle-job-change job result status)
+	    (format t "Unknown job changed ~a~%" pid)))))
+  #-unix (values))
 
 (defbuiltin exec (("command-words" t :repeating t
                     :help "Words of the command to execute."))
@@ -1010,7 +1104,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
     :help "True to output options that are re-readable by the shell.")
    ("name"  option :help "Option to set.")
    ("value" object :help "Value to set option to." :use-supplied-flag t))
-  "Examine or set shell options."
+  "Examine or set shell options. Type 'help options' for descriptions."
   (if name
       (if value-supplied-p
 	  (set-option *shell* name value)

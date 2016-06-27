@@ -46,9 +46,9 @@
     :accessor lish-dir-list
     :initform nil
     :documentation "Directory list for pushd and popd.")
-   (suspended-jobs
-    :accessor lish-suspended-jobs :initarg :suspended-jobs :initform nil
-    :documentation "List of suspended jobs.")
+   (jobs
+    :accessor lish-jobs :initarg :jobs :initform nil
+    :documentation "List of jobs.")
    (options
     :initarg :options :accessor lish-options :initform nil
     :documentation "Operator configurable options."))
@@ -117,12 +117,13 @@ is like Lish arguments, e.g.:
 
 (setf *options* nil)
 
-(defoption prompt-char character
-  :help "Normal prompt character. Output if there is no prompt string."
-  :default #\@)
-(defoption prompt-string string
-  :help "Normal prompt string. Output if there is no prompt function. Output
-with FORMAT-PROMPT, which see."
+;; (defoption prompt-char character
+;;   :help "Normal prompt character. Output if there is no prompt string."
+;;   :default #\@)
+(defoption prompt object
+  :help "Normal prompt. Output if there is no prompt function. Output
+with SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
+those functions for more detail about prompt formatting."
   :default nil)
 (defoption prompt-function function
   :help "Function which takes a SHELL and returns a string to output as the

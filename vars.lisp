@@ -127,11 +127,14 @@ end points in the original string."
   quoted				; boolean, true if word quoted
   eval)					; boolean, true to evaluate word
 
-(defstruct suspended-job
+(defstruct job
   id					; unique integer
   name					; string
   command-line				; string
-  resume-function)			; closure to resume
+  resume-function			; closure to resume
+  pid					; process ID
+  process-group				; process group ID
+  status)				; what's going on with the job?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hooks

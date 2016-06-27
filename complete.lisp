@@ -222,14 +222,21 @@ literally in shell syntax."
 (defun first-mandatory-or-non-flag-arg (past arglist)
   (or (loop :with i = 0
 	 :for a :in arglist :do
-;;;	 (format t "~a ~a ~s~%" i (>= i (1- past)) a)
+	 ;;(format t "~a ~a ~s~%" i (>= i (1- past)) a)
 	 (when (and (>= i (1- past))
 		    (not (arg-optional a)))
 	   (return-from first-mandatory-or-non-flag-arg a))
 	 (incf i))
+      ;; @@@ Unfortunately this makes the wrong choice for non-boolean
+      ;; args. It should only pick a non-boolean arg which has a flag if we
+      ;; are past the flag, but the simple numeric PAST count can't indicate
+      ;; that. I'm not really sure what a workable way to patch this is. This
+      ;; really shows how I need to totally redesign the argument code to do
+      ;; proper parsing. Then we can reliably show what are the choices from a
+      ;; given parse state.
       (loop :with i = 0
 	 :for a :in arglist :do
-;;;	 (format t "~a ~a ~s~%" i (>= i (1- past)) a)
+	 ;;(format t "~a ~a ~s~%" i (>= i (1- past)) a)
 	 (when (and (>= i (1- past))
 		    (not (and (or (arg-short-arg a)
 				  (arg-long-arg a)

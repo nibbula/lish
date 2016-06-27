@@ -14,8 +14,10 @@ Lish TODO list							    -*- org -*-
 ** arg processing related:
 *** env builtin fails because of inadequate arg processing
 *** kill builtin arg processing
+*** strings arg completion fail
 *** argument parsing for commands
 **** fix edge cases, more testing for posix-to-lisp-args
+**** Really need to re-design! See extract commands in "Essential features"
 ** completion
 *** completion interning of partial symbol, so completing doesn't work right
     fixed with *read-intern*, but that's an even bigger problem.
@@ -47,6 +49,12 @@ Lish TODO list							    -*- org -*-
 ** how do lish paths work?
 *** resolve autoload vs. asdf ldir, vs PATH etc
 *** and completion thereof
+** implementation specific bugs
+*** ccl
+**** under style completion doesn't go back up enough lines
+**** lisp symbol completion, probably read-intern related, since it works in repl
+*** sbcl
+**** job control : crashy as fuck
 ** DONE fixed bugs
 *** DONE argument defaults don't work in lish commands? (see wc)
 *** DONE should probabbaly unset $PWD if we're not going to update it
@@ -70,21 +78,26 @@ Lish TODO list							    -*- org -*-
 **** DONE ?Seems to fail when taking a long time and going to a pipe.
      e.g.: find -d ~/ -n foo | less  OR even: | pager
 * Essential festures
-** EXTRACT COMMANDS!!
-   I know it seems crazy, but, I want to separate commands from lish,
-   so that other things can use commands, command argument completion,
-   etc. Should work for things bound to keys (keymaps) in apps, as well
-   as commmand line things, as well as imbedded app commands (like the
-   extended commands in pager), neox (of course), etc.
-   Think of other examples, like commands with sub comands, like macports
-   port, crap like dscl, openssl, old style ftp, etc.
-   Command sub-commands should somehow integrate seemlessly.
-   The shell specific things like posix-to-lisp args can stay in lish,
-   and other things specific to shell syntax.
-** Better argument specification
-*** operators and grouping in argument lists: :or :opt :and :repeat :case
-*** something like docargs
-** give in and handle ENVVAR=value command -OR- make env builtin work
+** Command & argument redesign
+   see posix-args.lisp
+*** EXTRACT COMMANDS!!
+    I know it seems crazy, but, I want to separate commands from lish,
+    so that other things can use commands, command argument completion,
+    etc. Should work for things bound to keys (keymaps) in apps, as well
+    as commmand line things, as well as imbedded app commands (like the
+    extended commands in pager), neox (of course), etc.
+    Think of other examples, like commands with sub comands, like macports
+    port, crap like dscl, openssl, old style ftp, etc.
+    Command sub-commands should somehow integrate seemlessly.
+    The shell specific things like posix-to-lisp args can stay in lish,
+    and other things specific to shell syntax.
+*** Better argument specification
+**** operators and grouping in argument lists: :or :opt :and :repeat :case
+**** something like docargs
+*** argument parser!
+**** Argument specification should be able to be a full blown grammar
+     down to the character level, but making it easy for normal posix style
+     arguments. Hopefully not too much different than the current style.
 ** process stuff:
    see (defimplementation background-save-image in slime/swank/sbcl.lisp
 *** chains: || &&
@@ -167,6 +180,7 @@ Lish TODO list							    -*- org -*-
 *** umask
 *** wait
 * DONE completed features
+** DONE give in and handle ENVVAR=value command -OR- make env builtin work
 ** DONE argument name can be either string or symbol
 ** DONE replace under the prompt style, instead of scrolling style
 ** DONE redirections: < > <<

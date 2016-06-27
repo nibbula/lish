@@ -40,8 +40,7 @@ it's shell features.
    ;; (installation)
    #:make-standalone
    ;; shell options
-   #:lish-prompt-char
-   #:lish-prompt-string
+   #:lish-prompt
    #:lish-prompt-function
    #:lish-sub-prompt
    #:lish-ignore-eof
@@ -97,6 +96,7 @@ it's shell features.
    #:shell-read
    #:shell-eval
    #:format-prompt
+   #:symbolic-prompt-to-string
    #:load-file
    #:suspend-job
    #:accepts

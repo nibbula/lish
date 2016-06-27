@@ -50,6 +50,12 @@ an EOF on SOURCE."
        :while (= pos *buffer-size*))))
 |#
 
+(defun byte-copy-stream (source destination)
+  "This seems like a slow thing that will only work on bivalent streams?"
+  (loop :with b
+     :while (setf b (read-byte source nil nil))
+     :do (write-byte b destination)))
+
 (defun run-with-output-to (file-or-stream commands &key supersede append)
   "Run commands with output to a file or stream. COMMANDS can be a SHELL-EXPR,
 or a list to be converted by LISP-ARGS-TO-COMMAND."
@@ -65,16 +71,20 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
       (declare (ignore show-vals))
       (unwind-protect
 	   (when (and vals (> (length vals) 0))
-	     (with-open-file-or-stream (out-stream file-or-stream
-						   :direction :output
-						   :if-exists
-						   (if supersede
-						       :supersede
-						       (if append
-							   :append
-							   :error))
-						   :if-does-not-exist :create)
-	       (copy-stream in-stream out-stream))
+	     (with-open-file-or-stream
+		 (out-stream file-or-stream
+			     :direction :output
+			     :if-exists
+			     (if supersede
+				 :supersede
+				 (if append
+				     :append
+				     :error))
+			     :if-does-not-exist :create
+			     #+sbcl :element-type #+sbcl :default
+			     #-sbcl :element-type #-sbcl '(unsigned-byte 8)
+			     )
+	       (byte-copy-stream in-stream out-stream))
 	     (setf result vals))
 	(close in-stream)))
     result))

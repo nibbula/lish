@@ -2,11 +2,13 @@
 ;; lish.lisp - Unix Shell & Lisp somehow smushed together
 ;;
 
+;; This file contains the basic REPL and dispatch, and some other odd and ends.
+
 (in-package :lish)
 
-;(declaim (optimize (debug 3)))
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
-;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
+;; (declaim (optimize (debug 3)))
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+		   (compilation-speed 0)))
 
 ;; The "result" argument is not for the caller, but rather so we can detect
 ;; cycles in the package inheritance graph.
@@ -30,9 +32,9 @@
        ;; Things directly in lish-user are uninterned in favor of one
        ;; in cl-user.
        (unintern-conflicts *lish-user-package* p)
-       ;; Conflicts in inherited symbols are resolved by having the "explicitly"
-       ;; used package symbol (i.e. things used by :lish-user such as :lish)
-       ;; interned and made shadowing.
+       ;; Conflicts in inherited symbols are resolved by having the
+       ;; "explicitly" used package symbol (i.e. things used by :lish-user
+       ;; such as :lish) interned and made shadowing.
        (do-symbols (sym p)
 	 (setf (values esym esymbol-type)
 	       (find-symbol (symbol-name sym) p)
@@ -173,6 +175,15 @@ Not implemented yet:
     out))
 
 (defun symbolic-prompt-to-string (symbolic-prompt &optional ts-in)
+  "Take a symbolic prompt and turn it into a string. A symbolic prompt can be
+any printable lisp object, which is converted to a string. If it is a list, it
+translates sublists starting with certain keywords, to terminal codes to do
+text effects to the enclosed objects. The keywords recognized are:
+  :BOLD :UNDERLINE :INVERSE
+and the colors
+  :BLACK :RED :GREEN :YELLOW :BLUE :CYAN :WHITE and :DEFAULT.
+The colors can be prefixed by :FG- or :BG- for the foreground or background.
+Symbols will be replaced by their value."
   (with-output-to-string (str)
     (if (not (consp symbolic-prompt))
 	(princ symbolic-prompt str)
@@ -276,7 +287,8 @@ Not implemented yet:
 		     (otherwise
 		      (error "Unrecognized attribute ~a" (car s)))))
 		  ((and (symbolp (car s)) (fboundp (car s)))
-		   ;; (tt-format ts "~a" (apply (symbol-function (car s)) (cdr s))))
+		   ;; (tt-format ts "~a"
+		   ;;   (apply (symbol-function (car s)) (cdr s))))
 		   (tt-format ts "~a" (eval s)))
 		  (t
 		   (error "Unrecognized thing in attribute list ~a" (car s))
@@ -306,19 +318,22 @@ Not implemented yet:
 
 |#
 
+(defvar *fallback-prompt* "Lish> "
+  "Prompt to use as a last resort.")
+
 (defgeneric make-prompt (shell)
   (:documentation "Return a string to prompt with."))
 (defmethod make-prompt ((sh shell))
   "Return a string to prompt with."
-  (or (and (lish-prompt-string sh)
+  (or (and (lish-prompt sh)
 	   (format-prompt
-	    sh (symbolic-prompt-to-string (lish-prompt-string sh))))
-      (if (and (lish-prompt-char sh)
-	       (characterp (lish-prompt-char sh)))
-	  (format nil "~a "
-		  (make-string (+ 1 *lish-level*)
-			       :initial-element (lish-prompt-char sh)))
-	  "> ")))
+	    sh (symbolic-prompt-to-string (lish-prompt sh))))
+      ;; (if (and (lish-prompt-char sh)
+      ;; 	       (characterp (lish-prompt-char sh)))
+      ;; 	  (format nil "~a "
+      ;; 		  (make-string (+ 1 *lish-level*)
+      ;; 			       :initial-element (lish-prompt-char sh)))
+	  *fallback-prompt*))
 
 ;; @@@ I know how stupid and unnecessary this is
 (defparameter *real-eof-symbol* :Z-REAL-EOF)
@@ -350,319 +365,6 @@ Not implemented yet:
   |#
      :when (in-shell-word exp w pos)
      :return w))
-
-(defun read-string (s)
-  "Read a lish string. It has similar syntax to a lisp string. ~
-Assumes the opening double quote has already been read. ~
-Read until a double quote. Backslash escapes the special meaning of ~
-the following character. Return the string and how long it is. If we got to ~
-the end and didn't get a close quote, the third value is true.~
-"
-  (let ((v (make-stretchy-string 10))
-	(i 0)
-	(end-quote nil)
-	(do-quote nil))
-    (loop :for c :across s :do
-       (setf end-quote (and (eql c #\") (not do-quote)))
-       :while (not end-quote)
-       :do
-       (if (and (eql c #\\) (not do-quote))
-	   (setf do-quote t)
-	   (progn
-	     (setf do-quote nil)
-	     (vector-push-extend c v)))
-       (incf i))
-    (values v i (not end-quote))))
-
-;; I'm not so old fashioned that I think ^L should be in here, but are there
-;; any other unicode things that should?
-(defparameter *whitespace* #(#\space #\newline #\tab #\return)
-  "Word separators for lish.")
-
-(defun contains-whitespace-p (s)
-  (position-if #'(lambda (x) (position x *whitespace*)) s))
-
-(defparameter *reader-quote-char*
-  ;; I don't think #\\ should be in here.
-  #(#\" #\( #\! #\space #\; #\| #\< #\> #\& #\^) 
-  "Characters which the reader interprets specially if not quoted.")
-
-(defun shell-read (line &key partial (package *lish-user-package*))
-  "Read objects in shell syntax and return them. If PARTIAL is true, don't 
-signal an error if we can't read a full expression.
-The syntax is vaguely like:
-  ; comment
-  command [arg...]
-  command \"string\" !*lisp-object* !(lisp-code)
-  command word\ with\ spaces \"string \\\" with a double quote\"
-  command | command | ...
-  command < file-name
-  command > file-name
-  ([lisp expressions...])"
-;  (setf line (expand-global-aliases line))
-  (let (word-start word-end word-quoted word-eval words
-	(c nil)				; current char
-	(i 0)				; index in line
-	(len (length line))
-	(args '())
-	(sub-expr '())
-	(w (make-stretchy-string 12))	; temp word
-	(in-word nil)			; t if in word
-	(in-first-word t)		; t if in the first word on the line
-	(do-quote nil)
-	(in-compound nil)
-	(did-quote nil))		;
-    (labels ((finish-word ()
-	       "Finish the current word."
-	       (when in-word
-		 (if sub-expr
-		     (progn
-		       (push (copy-seq w) sub-expr)
-		       (setf sub-expr (nreverse sub-expr))
-		       (push t word-eval)
-		       (push sub-expr args))
-		     (progn
-		       (push (copy-seq w) args)
-		       (push nil word-eval)))
-		 (push i word-end)
-		 (push did-quote word-quoted)
-		 (setf (fill-pointer w) 0
-		       in-word nil
-		       in-first-word nil
-		       did-quote nil)))
-	     (ignore-word ()
-	       "Ignore the current word."
-	       (when in-word
-		 (setf (fill-pointer w) 0
-		       in-word nil
-		       in-first-word nil
-		       did-quote nil)))
-	     (add-to-word ()
-	       "Add the character to the current word or start a new one."
-	       (when (not in-word)
-		 (push i word-start))
-	       (setf in-word t)
-	       (vector-push-extend c w)
-	       (incf i))
-	     (read-lisp-expr ()
-	       (handler-bind
-		   ((end-of-file (_  (declare (ignore _)) (do-continue)))
-		    (reader-error (_ (do-reader-error _))))
-		 ;; read a form as a separate word
-		 (multiple-value-bind (obj pos)
-		     (with-package package
-		       (if partial
-			   (clean-read-from-string line *junk-package* nil
-						   *continue-symbol* :start i)
-			   (read-from-string line nil
-					     *continue-symbol* :start i)))
-		   (push i word-start)
-		   (setf i pos)
-		   (push obj args)
-		   (push i word-end)
-		   (push nil word-quoted)
-		   (push nil word-eval))))
-	     (return-partial ()
-	       (push i word-start)
-	       (push (subseq line i) args)
-	       (push (length line) word-end)
-	       (push nil word-quoted)
-	       (push nil word-eval)
-	       (return-from shell-read
-		 (make-shell-expr
-		  :line line
-		  :words (nreverse args)
-		  :word-start (reverse word-start)
-		  :word-end (nreverse word-end) 
-		  :word-quoted (nreverse word-quoted)
-		  :word-eval (nreverse word-eval)
-		  )))
-	     (do-continue ()
-	       "Handle when the expression is incomplete."
-	       (if partial
-		   (return-partial)
-		   (return-from shell-read *continue-symbol*)))
-	     (do-reader-error (c)
-	       "Handle when the expression has an error."
-	       ;; (format t "lish-read error ~a~%" c)
-	       (if partial
-		   (return-partial)
-		   (signal c)))
-	     (next-char ()
-	       "Return the next character or NIL."
-	       (when (< (+ i 1) len) (aref line (1+ i))))
-	     (reverse-things ()
-	       "Reverse the things we've been consing, so they're in order."
-	       (setf word-start  (reverse word-start)
-		     word-end    (nreverse word-end)
-		     word-quoted (nreverse word-quoted)
-		     word-eval   (nreverse word-eval)
-		     words       (nreverse args)))
-	     (make-the-expr ()
-	       "Make an expression, with it's own copy of the lists."
-	       (setf in-compound nil)
-	       (make-shell-expr
-		:line line
-		:words (copy-seq words)
-		:word-start (copy-seq word-start)
-		:word-end (copy-seq word-end)
-		:word-quoted (copy-seq word-quoted)
-		:word-eval (copy-seq word-eval)))
-	     (make-compound (key &optional (inc 2))
-	       "Make a compound expression with type KEY."
-	       ;; (finish-word)
-	       ;; (reverse-things)
-	       ;; (let ((e (list key (make-the-expr))))
-	       ;; 	 (setf args (list e)))
-	       ;; (setf word-start (list i))
-	       ;; (incf i inc)
-	       ;; (setf word-end (list i)
-	       ;; 	     word-quoted (list nil)
-	       ;; 	     word-eval (list nil)
-	       ;; 	     in-compound t)))
-	       (ignore-word)
-	       (reverse-things)
-	       (let ((e (list key (make-the-expr))))
-	       	 (setf args (list e)))
-	       (incf i inc)
-	       (setf word-start '(0)
-		     word-end '(0)
-	       	     word-quoted '(nil)
-	       	     word-eval '(nil)
-	       	     in-compound t)))
-      (loop
-	 :named tralfaz
-	 :while (< i len)
-	 :do
-	 (setf c (aref line i))
-	 (cond
-	   ;; quoted char
-	   (do-quote
-	     ;; @@@ Actually I think we should leave some quote chars in until
-	     ;; after expansion. That way we can expand part of word, while
-	     ;; having some chars protected from expansion, e.g. glob chars
-	     ;; can be quoted.
-	     (when (not (position c *reader-quote-char*))
-	       (vector-push-extend #\\ w))
-	     (vector-push-extend c w)
-	     (when (not in-word)
-	       (push (1- i) word-start))
-	     (setf in-word t)
-	     (setf do-quote nil)
-	     (incf i))
-	   ;; a string
-	   ((eql c #\")
-	    (finish-word)
-	    ;; read a string as a separate word
-	    (multiple-value-bind (str ink cont)
-		(read-string (subseq line (1+ i)))
-	      (when (and cont (not partial))
-		(return-from shell-read *continue-symbol*))
-	      (push i word-start)
-	      (push str args)
-	      (incf i (+ 2 ink))
-	      (push i word-end)
-	      (push t word-quoted)
-	      (push nil word-eval)))
-	   ;; a lisp function application
-	   ((eql c #\()
-	    (finish-word)
-	    (read-lisp-expr))
-	   ((eql c #\#)
-	    ;; This is so we can use the Lisp reader interpretation of # at
-	    ;; the beginning of a shell line, but otherwise, in the rest of
-	    ;; the line ‘#’ is treated as a normal character.
-	    ;; This means we can do #+foo etc. before an expressin in scripts
-	    ;; and but still have command arguments, like filenames, that
-	    ;; begin with ‘#’. Of course ‘#’ in Lisp sub-expressions still
-	    ;; should work.
-	    (cond
-	     (in-word
-	      ;; # doesn't break words, like (
-	      (add-to-word))
-	     (in-first-word
-	      (read-lisp-expr))
-	     (t
-	      (add-to-word))))
-	   ;; a lisp expr
-	   ((eql c #\!)
-	    (when (not sub-expr)
-	      (push 's+ sub-expr))	; !!!
-	    (when (length w)
-	      (push (copy-seq w) sub-expr)
-	      (setf (fill-pointer w) 0))
-	    ;; read a form as a separate word
-	    (handler-bind
-		((end-of-file (_  (declare (ignore _)) (do-continue)))
-		 (reader-error (_ (do-reader-error _))))
-	      (multiple-value-bind (obj pos)
-		  (with-package package
-		    (if partial
-			(clean-read-from-string line *junk-package* nil
-						*continue-symbol*
-						:start (+ i 1))
-			(read-from-string line nil *continue-symbol*
-					  :start (+ i 1))))
-		(setf i pos)
-		(setf in-word t) ; so it gets output
-		(push obj sub-expr))))
-	   ;; quote char
-	   ((eql c #\\)
-	    (setf do-quote t)
-	    (incf i))
-	   ;; whitespace
-	   ((position c *whitespace*)
-	    (finish-word)
-	    (incf i))
-	   ;; comment
-	   ((eql c #\;)
-	    (finish-word)
-	    (loop :for j :from i :below len
-	       :while (not (eql (aref line j) #\newline))
-	       :do (incf i)))
-	   ;; pipe
-	   ((and (eql c #\|) (not (eql (next-char) #\|)))
-	    (make-compound :pipe 1))
-	   ;; redirect
-	   ((or (eql c #\<) (eql c #\>))
-	    (finish-word)
-	    (reverse-things)
-	    ;; @@@ need to get the file name as a word
-	    (let ((e (list
-		      (if (eql c #\>)
-			  (if (eql (next-char) #\>)
-			      (progn (incf i) :append-to)
-			      :redirect-to)
-			  :redirect-from)
-		      (make-the-expr))))
-	      (setf args (list e)))
-	    (setf word-start (list i))
-	    (incf i)
-	    (setf word-end (list i)
-		  word-quoted (list nil)
-		  word-eval (list t)))
-	   ;; and
-	   ((and (eql c #\&) (eql (next-char) #\&))
-	    (make-compound :and))
-	   ;; or
-	   ((and (eql c #\|) (eql (next-char) #\|))
-	    (make-compound :or))
-	   ;; sequence
-	   ((eql c #\^)
-	    (make-compound :sequence 1))
-	   ;; any other character: add to word
-	   (t
-	    (add-to-word)))
-        :finally
-	(progn
-	  (finish-word)
-	  (reverse-things)))
-      (if (and (= (length words) 1) (consp (first words))
-	       (not in-compound))
-	  ;; just a lisp expression to be evaluated
-	  (first words)
-	  ;; a normal shell expression
-	  (make-the-expr)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Job control
@@ -698,7 +400,7 @@ The syntax is vaguely like:
 
 ;(defun run (cmd args)
   ; block sigchld & sigint
-  ; give terminal to child if not running it bg?
+  ; give terminal to child if not running in bg?
   ; fork
   ; in the child:
   ;   unblock sigchld & sigint
@@ -759,52 +461,104 @@ The syntax is vaguely like:
 	;; failed
 	nil)))
 
+(defun handle-job-change (job result status)
+  "Take appropriate action when JOB changes status."
+  (case status
+    (:exited
+     ;;(format t ";; Exited ~a~%" result)
+     (finish-output)
+     (delete-job job)
+     result)
+    ((:signaled :coredump)
+     (format t ";; Killed ~a ~a" (job-name job) (job-pid job))
+     #+unix (progn
+	      (when (and result (integerp result))
+		(format t "~a" (os-unix:signal-description result)))
+	      (when (eq status :coredump)
+		(format t " Core dump")))
+     (terpri)
+     (finish-output)
+     (delete-job job)
+     nil)
+    (:error
+     (format t ";; Error ~a" result)
+     #+unix (when (and result (integerp result))
+	      (format t " ~a" (os-unix:error-message result)))
+     (terpri)
+     (finish-output)
+     ;; (delete-job job) ;; ??? Should we?
+     result)
+    (:stopped
+     (format t ";; Stopped ~a ~a~%" (job-name job) (job-pid job))
+     (finish-output)
+     (setf (job-status job) :suspended)
+     nil)))
+
 (defun do-system-command (words
 			  &optional in-pipe out-pipe
 			    (environment nil env-p))
-  "Run a system command. IN-PIPE is an input stream to read from, if non-nil.
+  "Run a system command.
+WORDS is a list of shell-words or strings.
+IN-PIPE is an input stream to read from, if non-nil.
 OUT-PIPE is T to return a input stream which the output of the command can be
 read from."
   ;; Since run-program can't throw an error when the program is not found, we
   ;; try to do it here.
   (let* ((command-line
 	  ;; System command arguments must be strings
-	  (mapcar (_ (princ-to-string (shell-word-word _))) words))
+	  (mapcar (_ (or (and (stringp _) _)
+			 (princ-to-string (shell-word-word _))))
+		     words))
 	 (program (car command-line))
 	 (args    (cdr command-line))
 	 (path    (get-command-path program))
-	 result result-stream)
-    (if (not path)
-	(error 'unknown-command-error
-	       :command-string program :format "not found.")
+	 result result-stream pid status job)
+    (when (not path)
+      (error 'unknown-command-error
+	     :command-string program :format "not found."))
+
+    ;; This actually should be in the child process:
+    ;;(set-default-job-sigs)
+    (if (or in-pipe out-pipe)
 	(progn
-	  (set-default-job-sigs)
-	  (if (or in-pipe out-pipe)
-	      (progn
-		;; (when in-pipe
-		;;   (format t "thingy: ~s~%would have been: ~s~%"
-		;; 	  in-pipe
-		;; 	  (slurp in-pipe))
-		;;   (file-position in-pipe 0))
-		(setf result-stream
-		      (apply #'nos:pipe-program
-			     `(,path ,args
+	  ;; (when in-pipe
+	  ;;   (format t "thingy: ~s~%would have been: ~s~%"
+	  ;; 	  in-pipe
+	  ;; 	  (slurp in-pipe))
+	  ;;   (file-position in-pipe 0))
+	  (setf result-stream
+		(apply #'nos:pipe-program
+		       `(,path ,args
 			       ,@(when in-pipe `(:in-stream ,in-pipe))
 			       ,@(when (not out-pipe) '(:out-stream t))
 			       ,@(when env-p `(:environment ,environment)))))
-		(when (not out-pipe)
-		  (setf result-stream nil)))
-	      (setf result
-		    #+(or clisp ecl lispworks)
-		    (apply #'fork-and-exec
-		     `(,path ,args
-		       ,@(when env-p `(:environment ,environment))))
-		    #-(or clisp ecl lispworks)
-		    (apply
-		     #'nos:run-program
-		     `(,path ,args
-		       ,@(when env-p `(:environment ,environment))))
-		   ))))
+	  (when (not out-pipe)
+	    (setf result-stream nil)))
+	;; No pipes
+	(let ((tail (last args))
+	      background)
+	  ;;(format t "tail = ~s~%" tail)
+	  (when (equal (car tail) "&")
+	    (setf args (nbutlast args))
+	    (setf background t)
+	    ;; (format t "background = ~a~%args = ~s~%" background args)
+	    )
+	  (setf pid
+		(apply
+		 ;; #+(or clisp ecl lispworks) #'fork-and-exec
+		 ;; #-(or clisp ecl lispworks) #'nos:run-program
+		 #'uos::forky
+		 `(,path ,args
+			 ,@(when env-p
+				 `(:environment ,environment))
+			 :background ,background))
+		job (add-job program (join command-line #\space) pid))
+	  (if background
+	    (setf (job-status job) :running)
+	    ;; Wait for it...
+	    (progn
+	      (multiple-value-setq (result status) (uos::wait-and-chill pid))
+	      (handle-job-change job result status)))))
     (values (or result '(0)) result-stream)))
 
 (defun unquoted-string-p (w expr i)
@@ -1374,7 +1128,20 @@ probably fail, but perhaps in similar way to other shells."
 	     (if (> (length (shell-expr-word-start expr)) 1)
 		 ;; (subseq (shell-expr-line expr)
 		 ;; 	 (elt (shell-expr-word-start expr) 1))
-		 (join (subseq (shell-expr-words expr) 1) " ")
+		 ;; (join (subseq (shell-expr-words expr) 1) " ")
+		 (with-output-to-string (str)
+		   (loop :with first = t
+		      :for w :in (rest (shell-expr-words expr))
+		      :for q :in (rest (shell-expr-word-quoted expr))
+		      :if first
+		        :do (setf first nil)
+		      :else
+		        :do (princ " " str)
+		      :end
+		      :if q
+		        :do (print w str) ; make strings be strings
+		      :else
+		        :do (princ w str)))
 		 ""))
 	   (run-fun (func line)
 	     "Apply the func to the line, and return the proper values."
@@ -1422,10 +1189,10 @@ probably fail, but perhaps in similar way to other shells."
 		   ;; Just try a system command anyway, which will likely fail.
 		   (sys-cmd)))))
 	((functionp cmd)
-	 (format t "CHOWZA ~s~%" (rest-of-the-line expr))
+	 ;; (format t "CHOWZA ~s~%" (rest-of-the-line expr))
 	 (run-fun cmd (rest-of-the-line expr)))
 	((and (symbolp cmd) (fboundp cmd))
-	 (format t "FLEOOP ~s~%" (rest-of-the-line expr))
+	 ;; (format t "FLEOOP ~s~%" (rest-of-the-line expr))
 	 (run-fun (symbol-function cmd) (rest-of-the-line expr)))
 	(t ;; Some other type, just return it, like it's self evaluating.
 	 ;;(values (multiple-value-list (eval cmd)) nil t))))))
@@ -1474,21 +1241,51 @@ probably fail, but perhaps in similar way to other shells."
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
   (loop :for i = 1 :then (1+ i)
-     :if (not (position i (lish-suspended-jobs shell)
-			:key #'suspended-job-id))
+     :if (not (position i (lish-jobs shell)
+			:key #'job-id))
      :return i
      :if (> i 10000)
      :do (error "Something probably went wrong with finding a job ID.")))
-  
+
+(defun add-job (name command-line thing &key (status :running))
+  "Add a job with the given NAME and COMMAND-LINE. THING is either an integer
+process ID or a resume function designator. STATUS defaults to :RUNNING."
+  (let ((job (make-job
+	      :id (find-id *shell*)
+	      :name name
+	      :command-line command-line
+	      :status status)))
+    (etypecase thing
+      (integer
+       (setf (job-pid job) thing
+	     (job-process-group job) thing))
+      ((or symbol function)
+       (setf (job-resume-function job) thing)))
+    (push job (lish-jobs *shell*))
+    job))
+
 (defun suspend-job (name command-line resume-function)
   "Suspend a job. This should be called by the program that wants to
 suspend itself."
-  (push (make-suspended-job
-	 :id (find-id *shell*)
-	 :name name
-	 :command-line command-line
-	 :resume-function resume-function)
-	(lish-suspended-jobs *shell*)))
+  (add-job name command-line resume-function))
+
+(defun delete-job (job)
+  "Delete the job. JOB is either a JOB struct or a JOB-ID."
+  (when (not (or (job-p job) (integerp job)))
+    (error "JOB must be a JOB or an integer JOB-ID."))
+  (let ((job-id (if (integerp job) job (job-id job))))
+    (setf (lish-jobs *shell*)
+	  (delete job-id
+		  (lish-jobs *shell*) :test #'= :key #'job-id))))
+
+(defun check-job-status (sh)
+  (let (job)
+    (multiple-value-bind (pid result status)
+	(uos::check-jobs)
+      (when pid
+	(if (setf job (find pid (lish-jobs sh) :test #'eql :key #'job-pid))
+	    (handle-job-change job result status)
+	    (format t "Unknown job changed ~a~%" pid))))))
 
 (defvar *shell-non-word-chars*
   #(#\space #\tab #\newline #\linefeed #\page #\return
@@ -1498,12 +1295,17 @@ suspend itself."
 
 (defun safety-prompt (sh)
   "Return a prompt, in a manner unlikely to fail."
-  (if (lish-prompt-function sh)
-      (or (ignore-errors
-	    (funcall (lish-prompt-function sh) sh))
-	  "Your prompt function failed> ")
-      (or (ignore-errors (make-prompt sh))
-	  "Your prompt is broken> ")))
+  (when (lish-prompt-function sh)
+    (or (ignore-errors
+	  (return-from safety-prompt (funcall (lish-prompt-function sh) sh)))
+	(format t "Your prompt function failed.~%")))
+  (or (ignore-errors (make-prompt sh))
+      (progn
+	(format t "Your prompt is broken.~%")
+	*fallback-prompt*)))
+	;; (when (lish-prompt-char sh)
+	;;   (string (lish-prompt-char sh))
+	;;   "> "))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
@@ -1634,7 +1436,7 @@ handling errors."
 	       (format t "~a~%" c))))))))
 
 (defun confirm-quit ()
-  (if (lish-suspended-jobs *shell*)
+  (if (lish-jobs *shell*)
       (progn
 	(format t "There are stopped jobs. ")
 	(confirm "quit the shell"))
@@ -1667,46 +1469,47 @@ handling errors."
 			 :local-keymap (lish-keymap sh)
 			 :prompt-func nil))
     (unwind-protect
-	 (progn
-	   (start-job-control)
-	   (when (not (eq :lish-quick-exit (catch :lish-quick-exit
-             (loop
-		:named pippy
-		:with result = nil
-		:and lvl = *lish-level*
-		:and eof-count = 0
-		:if (lish-exit-flag sh)
-		  :if (confirm-quit)
-		    :return (values-list (lish-exit-values sh))
-		  :else
-		    :do (setf (lish-exit-flag sh) nil)
-		  :end
-		:end
-		:do
-		(restart-case
-		    (progn
-		      (setf result (lish-read sh state))
-		      (when (and (eq result *real-eof-symbol*) (confirm-quit))
-			(return-from pippy result))
-		      (if (eq result *quit-symbol*)
-			  (if (and (not (lish-ignore-eof sh)) (confirm-quit))
-			      (return-from pippy result)
-			      (progn
-				(when (numberp (lish-ignore-eof sh))
-				  (if (< eof-count (lish-ignore-eof sh))
-				      (incf eof-count)
-				      (if (confirm-quit)
-					  (return-from pippy result)
-					  (setf eof-count 0))))
-				(format t "Type 'exit' to exit the shell.~%")))
-			  (lish-eval sh result state)))
-		  (abort ()
-		    :report
-		    (lambda (stream)
-		      (format stream
-			      "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
-			      (= lvl 0) (/= lvl 0) lvl))
-		    nil))))))))
+      (progn
+	(start-job-control)
+	(when (not (eq :lish-quick-exit (catch :lish-quick-exit
+          (loop
+           :named pippy
+	   :with result = nil
+	   :and lvl = *lish-level*
+	   :and eof-count = 0
+	   :if (lish-exit-flag sh)
+	     :if (confirm-quit)
+	       :return (values-list (lish-exit-values sh))
+	     :else
+	       :do (setf (lish-exit-flag sh) nil)
+	     :end
+	   :end
+	   :do
+	   (restart-case
+	     (progn
+	       (check-job-status sh)
+	       (setf result (lish-read sh state))
+	       (when (and (eq result *real-eof-symbol*) (confirm-quit))
+		 (return-from pippy result))
+	       (if (eq result *quit-symbol*)
+		   (if (and (not (lish-ignore-eof sh)) (confirm-quit))
+		       (return-from pippy result)
+		       (progn
+			 (when (numberp (lish-ignore-eof sh))
+			   (if (< eof-count (lish-ignore-eof sh))
+			       (incf eof-count)
+			       (if (confirm-quit)
+				   (return-from pippy result)
+				   (setf eof-count 0))))
+			 (format t "Type 'exit' to exit the shell.~%")))
+		   (lish-eval sh result state)))
+	     (abort ()
+	       :report
+	       (lambda (stream)
+		 (format stream
+			 "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
+			 (= lvl 0) (/= lvl 0) lvl))
+	       nil))))))))
       (stop-job-control saved-sigs))
     ;;(save-command-stats)
     (run-hooks *exit-shell-hook*)

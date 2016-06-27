@@ -782,8 +782,8 @@ become keyword arguments, in a way specified in the command's arglist."
 become keyword arguments, in a way specified in the command's arglist."
   ;; (when (= (length p-args) 0)
   ;;   (return-from new-posix-to-lisp-args nil))
-  (when (equal (command-name command) "env")
-    (break))
+  ;; (when (equal (command-name command) "env")
+  ;;   (break))
   (let ((i 0)            ; Where we are in the old list, so effectively
 	                 ; a count of how many posix args we've skipped.
 ;;;	(new-list        '())
@@ -852,6 +852,7 @@ become keyword arguments, in a way specified in the command's arglist."
 				   (dbug "short arg ~s~%" arg)
 				   (move-flag old-list new-flags i arg))))))
 		    (when (not flag-taken)
+		      (incf i)
 		      (warn "Unrecognized option ~a" (char a cc))))
 		  (if boolean-taken
 		      (setf old-list (delete-nth i old-list))
