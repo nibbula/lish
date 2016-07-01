@@ -117,9 +117,6 @@ is like Lish arguments, e.g.:
 
 (setf *options* nil)
 
-;; (defoption prompt-char character
-;;   :help "Normal prompt character. Output if there is no prompt string."
-;;   :default #\@)
 (defoption prompt object
   :help "Normal prompt. Output if there is no prompt function. Output
 with SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
@@ -142,6 +139,10 @@ number ignore it that many times before exiting."
 (defoption collect-stats boolean
   :help "True to collect statistics on commands."
   :default nil)
+(defoption autoload-from-asdf boolean
+  :help
+  "True to try to load unknown commands from an ASDF system of the same name."
+  :default t)
 
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.

@@ -8,6 +8,7 @@ Lish TODO list							    -*- org -*-
 ** pipes
 *** piping from lisp command to system command
     gets no output, e.g.: grep defun *.lisp | /usr/bin/less
+    see (defimplementation background-save-image in slime/swank/sbcl.lisp
 *** pipes to lisp commands take too much memory
 *** pipes seem to fail when taking a long time and going to a pipe.
     e.g.: find -d ~/ -n foo | less  OR even: | pager
@@ -19,22 +20,21 @@ Lish TODO list							    -*- org -*-
 **** fix edge cases, more testing for posix-to-lisp-args
 **** Really need to re-design! See extract commands in "Essential features"
 ** completion
-*** completion interning of partial symbol, so completing doesn't work right
-    fixed with *read-intern*, but that's an even bigger problem.
 *** completion should work in pipelines
    when completing in a pipeline, e.g.: cat file | grep 
    It doesn't seem to do anything, is probably trying to complete args
    for the first command, not the last command in the pipeline
+*** completion interning of partial symbol, so completing doesn't work right
+    fixed with *read-intern*, but that's an even bigger problem.
 *** completion (globbing) doesn't work on non-ASCII file names? e.g. résumé
 **** need unicode normalizer (see char-util.lisp)
 **** WORKAROUND: use C-x 9 to type un-normalized combining version
     e.g. '_ for combining COMBINING_ACUTE_ACCENT
-** resume doesn't work
-   resume only works when one job, doesn't get jobs spec arguments right
 ** valence element-type (and encoding) issues with pipes and redirect
 *** cat < words - not a binary input stream
 *** /bin/cat < words - CR or NL doesn't get mapped right
-** parsing < in first word?
+** when below completion, temporary prompts and messages should go below too
+*** for exmaple when M-=, binding-of-key
 ** newly defined commands don't get recognized in completion?
 ** tiny-rl display bugs
 *** still problems clearing later lines after delete on long lines
@@ -46,16 +46,15 @@ Lish TODO list							    -*- org -*-
 ** some seemingly sbcl specific bug when reading a non existent symbol,
    during load-file, like: no-exist:or-this
    exhibited when loading .lishrc doc command?
-** how do lish paths work?
-*** resolve autoload vs. asdf ldir, vs PATH etc
-*** and completion thereof
 ** implementation specific bugs
 *** ccl
 **** under style completion doesn't go back up enough lines
 **** lisp symbol completion, probably read-intern related, since it works in repl
-*** sbcl
-**** job control : crashy as fuck
 ** DONE fixed bugs
+*** DONE sbcl job control
+**** crashy as fuck
+*** DONE resume doesn't work
+    resume only works when one job, doesn't get jobs spec arguments right
 *** DONE argument defaults don't work in lish commands? (see wc)
 *** DONE should probabbaly unset $PWD if we're not going to update it
 *** DONE completion with absolute path and stuff following, e.g.:
@@ -77,6 +76,10 @@ Lish TODO list							    -*- org -*-
      "There is no slot named SB-KERNEL:FORMAT-CONTROL in #<SB-KERNEL::CONDITION-CLASSOID OPSYS:POSIX-ERROR>"
 **** DONE ?Seems to fail when taking a long time and going to a pipe.
      e.g.: find -d ~/ -n foo | less  OR even: | pager
+** HOLD don't bother
+*** < or > in first word?
+    This doesn't fail, but do nothing useful.
+    Specificly "> file" doesn't zero out or create an empty file.
 * Essential festures
 ** Command & argument redesign
    see posix-args.lisp
@@ -98,17 +101,6 @@ Lish TODO list							    -*- org -*-
 **** Argument specification should be able to be a full blown grammar
      down to the character level, but making it easy for normal posix style
      arguments. Hopefully not too much different than the current style.
-** process stuff:
-   see (defimplementation background-save-image in slime/swank/sbcl.lisp
-*** chains: || &&
-*** background jobs: & fg bg jobs %n ^Z SIGTSTP etc
-*** jobs command
-** at least handle ^Z of subprocess!
-*** code after fork
-**** must be able to run code (reset job signals) after fork
-**** -OR-
-**** make a spawn/fork/pipe in C which handles job signals
-*** make a small test to see which implementations support code after fork
 ** test portability
 *** windows native
 *** implementations
@@ -126,14 +118,12 @@ Lish TODO list							    -*- org -*-
 *** scrape --help output or man pages?
 ** objects (return values) as pipeline data
    see doing
-** figure out a syntax for multiple commands on a line (like posix ;)
-*** patially done with: ^^ && ||
-** process substitution <(foo) >(foo)
 ** add more features to globbing (all the ignored arguments of glob)
 *** brace expansion: {foo,bar}
 *** recursive globbing: **
     but please let's not do too much crazy globbing, like zsh
     let's just make find-file good with symbolic query syntax
+** process substitution <(foo) >(foo)
 ** add shell errors and restarts
 *** appropriate errors should be continuable, restartable
 *** all errors should be with shell-error or something
@@ -141,6 +131,9 @@ Lish TODO list							    -*- org -*-
    unfinished exprs, etc
    mostly in rl
    rl enter command shouldn't exit
+** refine the mechanism for loading/finding commands
+*** resolve autoload vs. asdf ldir, vs PATH etc
+*** and completion thereof
 * Non-essential features
 ** port to windows
 ** syntax colorization
@@ -148,7 +141,7 @@ Lish TODO list							    -*- org -*-
 ** be able to call lish functions from not in the shell, ! etc
 ** shell specific key actions, e.g.
 *** M-. cycle through pasting the last word of previous commands
-*** M-o expand shell line (like bash)
+*** figure out proper key to put SHELL-EXPAND-LINE on, it's on ^V now.
 ** smarter completion, specifically:
 *** completion should use proper completion for command line argument types
     need to implement posix arg list to shell arg list parsing
@@ -184,9 +177,22 @@ Lish TODO list							    -*- org -*-
 ** DONE argument name can be either string or symbol
 ** DONE replace under the prompt style, instead of scrolling style
 ** DONE redirections: < > <<
+** DONE job control
+*** at least handle ^Z of subprocess!
+*** code after fork
+**** must be able to run code (reset job signals) after fork
+**** -OR-
+**** make a spawn/fork/pipe in C which handles job signals
+*** make a small test to see which implementations support code after fork
+*** background jobs: & fg bg jobs %n ^Z SIGTSTP etc
+*** jobs command
+** DONE chains: || &&
+** DONE expand shell line (like bash)
+** DONE figure out a syntax for multiple commands on a line (like posix ;)
+*** patially done with: ^^ && ||
 * COMMENT org
 #+SEQ_TODO: TODO DONE
-#+SEQ_TODO: LATER NO
+#+SEQ_TODO: LATER NO HOLD
 * COMMENT MeTaDaTa
 creation date: [2014-12-01 Mon 00:20:33]
 creator: "Nibby Nebbulous" <nibbula@gmail.com>

@@ -639,7 +639,7 @@ variables explicitly set in arguments are passed to the commands."
 	;; @@@ This should respect piping!!!
 	(when cmd
 	  (apply #'do-system-command
-		 `(,`(,cmd ,@args) nil nil ,new-env))))
+		 `(,`(,cmd ,@args) :environment ,new-env))))
       ;; Just print the variables
       (loop :for e :in (environment)
 	 :do (format t "~a=~a~%" (car e) (cdr e)))))
@@ -726,7 +726,7 @@ variables explicitly set in arguments are passed to the commands."
 
 (defbuiltin time (("command" string :repeating t :help "Command to time."))
   "Shows some time statistics resulting from the execution of COMMNAD."
-  (time (shell-eval *shell* (make-shell-expr :words command))))
+  (time (shell-eval *shell* (make-shell-expr :words command) *context*)))
 
 #|
 (defun print-timeval (tv &optional (stream t))
@@ -1077,7 +1077,8 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	      (setf did-one t)))
 	  (let ((x (gethash n (lish-commands))))
 	    (when x
-	      (format t "~a is the command ~a~%" n x)
+	      (format t "~a is the ~:[~;builtin ~]command ~a~%"
+		      n (command-built-in-p x) x)
 	      (setf did-one t)))
 	  (let ((paths (command-paths n)))
 	    (when paths

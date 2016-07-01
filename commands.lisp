@@ -471,8 +471,8 @@ and the name of the external program. ARGLIST is a shell argument list."
 ;;;     (format t "(convert-arg ~s ~s) = ~s~%" ,arg (nth ,i ,old)
 ;;;	     (convert-arg ,arg (nth ,i ,old)))
 ;;;     (setf ,new (push (convert-arg ,arg (nth (1+ ,i) ,old)) ,new))
-     (dbug "before i=~s old=~s~%" ,i ,old)
-     (dbug "~s -> ~s~%" (nth (1+ ,i) ,old)
+     (dbugf 'lish-arg "before i=~s old=~s~%" ,i ,old)
+     (dbugf 'lish-arg "~s -> ~s~%" (nth (1+ ,i) ,old)
 	   (convert-arg ,arg (nth (1+ ,i) ,old)))
      (setf ,new (push (convert-arg ,arg
 				   (shell-word-word (nth (1+ ,i) ,old))
@@ -480,7 +480,7 @@ and the name of the external program. ARGLIST is a shell argument list."
 		      ,new))
      (setf ,old (delete-nth ,i ,old)) ; flag
      (setf ,old (delete-nth ,i ,old)) ; arg
-     (dbug "after i=~s old=~s~%" ,i ,old)
+     (dbugf 'lish-arg "after i=~s old=~s~%" ,i ,old)
      (setf possible-flags (delete ,arg possible-flags))))
 
 (defmacro move-boolean-2 (old new i arg)
@@ -561,7 +561,7 @@ a list of the converted boolean options."
 	     (if (and (eql (arg-short-arg arg) (char a cc))
 		      (eq (arg-type arg) 'boolean))
 		 (progn
-		   (dbug "short boolean arg ~s~%" arg)
+		   (dbugf 'lish-arg "short boolean arg ~s~%" arg)
 		   (push (arg-key arg) option-list)
 		   (push boolean-value option-list)
 		   (setf boolean-taken t))))
@@ -588,7 +588,7 @@ a list of the converted boolean options."
 	  (if (and (string-equal (arg-long-arg arg) a :start2 2)
 		   (eq (arg-type arg) 'boolean))
 	      (progn
-		(dbug "long boolean arg ~s~%" arg)
+		(dbugf 'lish-arg "long boolean arg ~s~%" arg)
 		(push (arg-key arg) option-list)
 		(push boolean-value option-list)
 		(setf flag-taken t))))
@@ -659,7 +659,7 @@ become keyword arguments, in a way specified in the command's arglist."
 			    :collect a))
 	#| (optionals '()) |#)
     ;; Flagged arguments (optional or manditory)
-    (dbug "considering flagged: ~s~%" old-list)
+    (dbugf 'lish-arg "considering flagged: ~s~%" old-list)
     (loop :with a
        :while (< i (length old-list)) :do
        #| (setf a (car old-list)) |#
@@ -677,10 +677,10 @@ become keyword arguments, in a way specified in the command's arglist."
 		    (when (equalp (subseq a 2) (arg-long-arg arg))
 		      (if (eq (arg-type arg) 'boolean)
 			  (progn
-			    (dbug "boolean long arg ~s~%" arg)
+			    (dbugf 'lish-arg "boolean long arg ~s~%" arg)
 			    (move-boolean-2 old-list new-flags i arg))
 			  (progn
-			    (dbug "long arg ~s~%" arg)
+			    (dbugf 'lish-arg "long arg ~s~%" arg)
 			    (move-flag old-list new-flags i arg)))
 		      (setf flag-taken t)))
 		 (when (not flag-taken)
@@ -698,14 +698,14 @@ become keyword arguments, in a way specified in the command's arglist."
 			 ;; @@@ have to deal with repeating?
 			 (if (eq (arg-type arg) 'boolean)
 			     (progn
-			       (dbug "short boolean arg ~s~%" arg)
+			       (dbugf 'lish-arg "short boolean arg ~s~%" arg)
 			       (move-boolean old-list new-flags i arg
 					     boolean-value)
 			       (setf boolean-taken t))
 			     (if (/= cc (1- (length a)))
 				 (error "Unrecognized flag ~a." a)
 				 (progn
-				   (dbug "short arg ~s~%" arg)
+				   (dbugf 'lish-arg "short arg ~s~%" arg)
 				   (move-flag old-list new-flags i arg))))))
 		    (when (not flag-taken)
 		      (warn "Unrecognized option ~a" (char a cc))))
@@ -713,12 +713,13 @@ become keyword arguments, in a way specified in the command's arglist."
 		      (setf old-list (delete-nth i old-list))
 		      (progn
 			;;(incf i)
-			(dbug "skipping flag value ~a ~w~%" i (nth i old-list))
+			(dbugf 'lish-arg "skipping flag value ~a ~w~%"
+			       i (nth i old-list))
 			;;(setf old-list (delete-nth i old-list))
 			))))
 	   ;; Arg doesn't start with a dash, so skip it
 	   (progn
-	     (dbug "skipping arg ~a ~w~%" i a)
+	     (dbugf 'lish-arg "skipping arg ~a ~w~%" i a)
 	     (incf i))))
 #|    ;; Default any left over defaultable flags
     (loop :for a :in possible-flags :do
@@ -728,7 +729,7 @@ become keyword arguments, in a way specified in the command's arglist."
     (setf new-flags (nreverse new-flags))
     ;; Non-flagged mandatories.
     (setf i 0)
-    (dbug "considering non-flagged: ~s~%" old-list)
+    (dbugf 'lish-arg "considering non-flagged: ~s~%" old-list)
     (loop
        :for arg :in (command-arglist command) :do
        (if (not (or (arg-optional arg)
@@ -736,14 +737,14 @@ become keyword arguments, in a way specified in the command's arglist."
 		    (arg-repeating arg)))
 	   (if (> (length old-list) 0)
 	       (progn
-		 (dbug "found mandatory arg ~a~%" arg)
+		 (dbugf 'lish-arg "found mandatory arg ~a~%" arg)
 		 (move-arg old-list new-mandatories 0 arg))
 	       (error "Missing mandatory argument: ~a." (arg-name arg)))
 	   ;; skip
 	   (incf i)))
     (setf new-mandatories (nreverse new-mandatories))
     ;; Non-flagged optionals
-    (dbug "considering non-flagged optionals: ~s~%" old-list)
+    (dbugf 'lish-arg "considering non-flagged optionals: ~s~%" old-list)
     (loop
        :for arg :in (command-arglist command) :do
        (if (and (arg-optional arg) (not (arg-repeating arg))
@@ -803,7 +804,7 @@ become keyword arguments, in a way specified in the command's arglist."
 			    :collect a))
 	#| (optionals '()) |#)
     ;; Flagged arguments (optional or manditory)
-    (dbug "considering flagged: ~s~%" old-list)
+    (dbugf 'lish-arg "considering flagged: ~s~%" old-list)
     (loop :with a
        :while (< i (length old-list)) :do
        #| (setf a (car old-list)) |#
@@ -821,10 +822,10 @@ become keyword arguments, in a way specified in the command's arglist."
 		    (when (equalp (subseq a 2) (arg-long-arg arg))
 		      (if (eq (arg-type arg) 'boolean)
 			  (progn
-			    (dbug "boolean long arg ~s~%" arg)
+			    (dbugf 'lish-arg "boolean long arg ~s~%" arg)
 			    (move-boolean-2 old-list new-flags i arg))
 			  (progn
-			    (dbug "long arg ~s~%" arg)
+			    (dbugf 'lish-arg "long arg ~s~%" arg)
 			    (move-flag old-list new-flags i arg)))
 		      (setf flag-taken t)))
 		 (when (not flag-taken)
@@ -842,14 +843,14 @@ become keyword arguments, in a way specified in the command's arglist."
 			 ;; @@@ have to deal with repeating?
 			 (if (eq (arg-type arg) 'boolean)
 			     (progn
-			       (dbug "short boolean arg ~s~%" arg)
+			       (dbugf 'lish-arg "short boolean arg ~s~%" arg)
 			       (move-boolean old-list new-flags i arg
 					     boolean-value)
 			       (setf boolean-taken t))
 			     (if (/= cc (1- (length a)))
 				 (error "Unrecognized flag ~a." a)
 				 (progn
-				   (dbug "short arg ~s~%" arg)
+				   (dbugf 'lish-arg "short arg ~s~%" arg)
 				   (move-flag old-list new-flags i arg))))))
 		    (when (not flag-taken)
 		      (incf i)
@@ -858,12 +859,13 @@ become keyword arguments, in a way specified in the command's arglist."
 		      (setf old-list (delete-nth i old-list))
 		      (progn
 			;;(incf i)
-			(dbug "skipping flag value ~a ~w~%" i (nth i old-list))
+			(dbugf 'lish-arg "skipping flag value ~a ~w~%"
+			       i (nth i old-list))
 			;;(setf old-list (delete-nth i old-list))
 			))))
 	   ;; Arg doesn't start with a dash, so skip it
 	   (progn
-	     (dbug "skipping arg ~a ~w~%" i a)
+	     (dbugf 'lish-arg "skipping arg ~a ~w~%" i a)
 	     (incf i))))
 #|    ;; Default any left over defaultable flags
     (loop :for a :in possible-flags :do
@@ -873,7 +875,7 @@ become keyword arguments, in a way specified in the command's arglist."
     (setf new-flags (nreverse new-flags))
     ;; Non-flagged mandatories.
     (setf i 0)
-    (dbug "considering non-flagged: ~s~%" old-list)
+    (dbugf 'lish-arg "considering non-flagged: ~s~%" old-list)
     (loop
        :for arg :in (command-arglist command) :do
        (if (not (or (arg-optional arg)
@@ -881,14 +883,14 @@ become keyword arguments, in a way specified in the command's arglist."
 		    (arg-repeating arg)))
 	   (if (> (length old-list) 0)
 	       (progn
-		 (dbug "found mandatory arg ~a~%" arg)
+		 (dbugf 'lish-arg "found mandatory arg ~a~%" arg)
 		 (move-arg old-list new-mandatories 0 arg))
 	       (error "Missing mandatory argument: ~a." (arg-name arg)))
 	   ;; skip
 	   (incf i)))
     (setf new-mandatories (nreverse new-mandatories))
     ;; Non-flagged optionals
-    (dbug "considering non-flagged optionals: ~s~%" old-list)
+    (dbugf 'lish-arg "considering non-flagged optionals: ~s~%" old-list)
     (loop
        :for arg :in (command-arglist command) :do
        (if (and (arg-optional arg) (not (arg-repeating arg))

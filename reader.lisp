@@ -68,6 +68,7 @@ The syntax is vaguely like:
 	(did-quote nil))		;
     (labels ((finish-word ()
 	       "Finish the current word."
+	       (dbugf 'reader "finish-word ~a~%" w)
 	       (when in-word
 		 (if sub-expr
 		     (progn
@@ -154,6 +155,7 @@ The syntax is vaguely like:
 		     words       (nreverse args)))
 	     (make-the-expr ()
 	       "Make an expression, with it's own copy of the lists."
+	       (dbugf 'reader "make-the-expr ~s~%" words)
 	       (setf in-compound nil)
 	       (make-shell-expr
 		:line line
@@ -174,15 +176,16 @@ The syntax is vaguely like:
 	       ;; 	     word-quoted (list nil)
 	       ;; 	     word-eval (list nil)
 	       ;; 	     in-compound t)))
+	       (dbugf 'reader "make-compound ~s~%" key)
 	       (ignore-word)
 	       (reverse-things)
 	       (let ((e (list key (make-the-expr))))
 	       	 (setf args (list e)))
 	       (incf i inc)
-	       (setf word-start '(0)
-		     word-end '(0)
-	       	     word-quoted '(nil)
-	       	     word-eval '(nil)
+	       (setf word-start	 (list 0)
+		     word-end	 (list 0)
+	       	     word-quoted (list nil)
+	       	     word-eval	 (list nil)
 	       	     in-compound t)))
       (loop
 	 :named tralfaz
@@ -207,6 +210,7 @@ The syntax is vaguely like:
 	   ;; a string
 	   ((eql c #\")
 	    (finish-word)
+	    (dbugf 'reader "read-string~%")
 	    ;; read a string as a separate word
 	    (multiple-value-bind (str ink cont)
 		(read-string (subseq line (1+ i)))
@@ -240,9 +244,11 @@ The syntax is vaguely like:
 	      (add-to-word))))
 	   ;; a lisp expr
 	   ((eql c #\!)
+	    (dbugf 'reader "sub-expr")
 	    (when (not sub-expr)
 	      (push 's+ sub-expr))	; !!!
 	    (when (length w)
+	      (dbugf 'reader " ~s" w)
 	      (push (copy-seq w) sub-expr)
 	      (setf (fill-pointer w) 0))
 	    ;; read a form as a separate word
@@ -259,6 +265,7 @@ The syntax is vaguely like:
 					  :start (+ i 1))))
 		(setf i pos)
 		(setf in-word t) ; so it gets output
+		(dbugf 'reader " ~s~%" obj)
 		(push obj sub-expr))))
 	   ;; quote char
 	   ((eql c #\\)
@@ -307,10 +314,11 @@ The syntax is vaguely like:
 	   ;; any other character: add to word
 	   (t
 	    (add-to-word)))
-        :finally
-	(progn
-	  (finish-word)
-	  (reverse-things)))
+	 :finally
+	 (progn
+	   (dbugf 'reader "Finally!~%")
+	   (finish-word)
+	   (reverse-things)))
       (if (and (= (length words) 1) (consp (first words))
 	       (not in-compound))
 	  ;; just a lisp expression to be evaluated

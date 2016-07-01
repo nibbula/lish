@@ -67,7 +67,7 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 		    (if (shell-expr-p commands)
 			commands
 			(shell-read (lisp-args-to-command commands)))
-		    :out-pipe t)
+		    (modified-context *context* :out-pipe t))
       (declare (ignore show-vals))
       (unwind-protect
 	   (when (and vals (> (length vals) 0))
@@ -84,9 +84,18 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 			     #+sbcl :element-type #+sbcl :default
 			     #-sbcl :element-type #-sbcl '(unsigned-byte 8)
 			     )
-	       (byte-copy-stream in-stream out-stream))
+	       #+sbcl
+	       (if (and
+		    (or (eq (stream-element-type in-stream) :default)
+			(eq (stream-element-type in-stream) 'unsigned-byte))
+		    (or (eq (stream-element-type out-stream) :default)
+			(eq (stream-element-type out-stream) 'unsigned-byte)))
+		   (byte-copy-stream in-stream out-stream)
+		   (copy-stream in-stream out-stream))
+	       #-sbcl (copy-stream in-stream out-stream))
 	     (setf result vals))
-	(close in-stream)))
+	(when in-stream
+	  (close in-stream))))
     result))
 
 (defun run-with-input-from (file-or-stream commands)
@@ -99,7 +108,7 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 		      (if (shell-expr-p commands)
 			  commands
 			  (shell-read (lisp-args-to-command commands)))
-		      :in-pipe in-stream)
+		      (modified-context *context* :in-pipe in-stream))
 	(declare (ignore stream show-vals))
 	(setf result vals)))
     result))
@@ -126,7 +135,8 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 line of COMMAND. COMMAND should probably be a string, and FUNC should take one
 string as an argument."
   (multiple-value-bind (vals stream show-vals)
-      (shell-eval *shell* (shell-read command) :out-pipe t)
+      (shell-eval *shell* (shell-read command)
+		  (modified-context *context* :out-pipe t))
     (declare (ignore show-vals))
     (when (and vals (> (length vals) 0))
       (loop :with l = nil
@@ -152,7 +162,7 @@ string as an argument."
 	     )
 	;; (nos:with-process-output (proc cmd args)
 	(multiple-value-bind (vals stream show-vals)
-	    (shell-eval *shell* expr :out-pipe t)
+	    (shell-eval *shell* expr (modified-context *context* :out-pipe t))
 	  (declare (ignore show-vals))
 	  (when (and vals (> (length vals) 0))
 	    (convert-to-words stream s)))))))
@@ -166,8 +176,9 @@ string as an argument."
   (labels ((sub (cmds &optional stream)
 	     (multiple-value-bind (vals stream show-vals)
 		 (shell-eval *shell* (shell-read (car cmds))
-			     :in-pipe stream
-			     :out-pipe (and (cadr cmds) t))
+			     (modified-context *context*
+					       :in-pipe stream
+					       :out-pipe (and (cadr cmds) t)))
 	       (declare (ignore show-vals))
 	       (if (and vals (listp vals) (> (length vals) 0))
 		   (if (cdr cmds)
@@ -190,7 +201,7 @@ string as an argument."
 ;;   "Temporary file name output substitution."
 ;;   (multiple-value-bind (vals stream show-vals)
 ;;       (shell-eval *shell* (shell-read (lisp-args-to-command commands))
-;;                   :out-pipe t)
+;;                   (modified-context *context* :out-pipe t))
 ;;     (declare (ignore show-vals))
 ;;     (if (and vals (> (length vals) 0))
 ;; 	(let ((fn (nos:mktemp "lish")))
@@ -207,12 +218,14 @@ string as an argument."
 
 (defun ! (&rest args)
   "Evaluate the shell command."
-  (shell-eval *shell* (shell-read (lisp-args-to-command args))))
+  (shell-eval *shell* (shell-read (lisp-args-to-command args)) *context*))
 
 (defun !? (&rest args)
   "Evaluate the shell command, converting Unix shell result code into boolean.
 This means the 0 is T and anything else is NIL."
-  (let ((result (shell-eval *shell* (shell-read (lisp-args-to-command args)))))
+  (let ((result
+	 (shell-eval *shell* (shell-read (lisp-args-to-command args))
+		     *context*)))
     (and (numberp result) (zerop result))))
 
 (defun !$ (&rest command)
@@ -252,7 +265,7 @@ like $(command) in bash."
   "Pipe output of commands. Return a stream of the output."
   (multiple-value-bind (vals stream show-vals)
       (shell-eval *shell* (shell-read (lisp-args-to-command commands))
-		  :out-pipe t)
+		  (modified-context *context* :out-pipe t))
     (declare (ignore show-vals))
     (if (and vals (> (length vals) 0))
 	stream
@@ -298,8 +311,7 @@ like $(command) in bash."
   (with-open-file-or-stream (in-stream file-or-stream)
     (multiple-value-bind (vals stream show-vals)
 	(shell-eval *shell* (shell-read (lisp-args-to-command commands))
-		    :out-pipe t
-		    :in-pipe in-stream)
+		    (modified-context *context* :out-pipe t :in-pipe in-stream))
       (declare (ignore show-vals))
       (if (and vals (> (length vals) 0))
 	  stream

@@ -136,6 +136,20 @@ end points in the original string."
   process-group				; process group ID
   status)				; what's going on with the job?
 
+(defstruct context
+  "The context for a command. It's input and output streams and environment
+variables."
+  ;; These are a stream or NIL for the default.
+  in-pipe
+  out-pipe
+  ;; This is NIL for unspecified, :empty, or an alist environement.
+  environment)
+
+(defvar *context* nil
+  "The dynamic command context. If it is NIL it is equivalent to all the
+slots of the context being NIL, and so therefore equivalent to the default
+input, output and environment.")
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hooks
 
