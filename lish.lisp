@@ -800,22 +800,23 @@ expanded array of shell-words."
 (defun get-accepts (expr)
   (typecase expr
     (shell-expr
-     ;;(format t "shell-expr ~s~%" expr)
+     (dbugf :accepts "get-accepts: shell-expr ~s~%" expr)
      (get-accepts (elt (shell-expr-words expr) 0)))
     (list
-     (format t "list ~s~%" expr)
+     (dbugf :accepts "get-accepts: list ~s~%" expr)
      (get-accepts (if (keywordp (car expr))
 		      (cdr expr)
 		      (car expr))))
     (string
-     ;;(format t "string ~s~%" expr)
+     ;;(dbugf :accepts "get-accepts: string ~s~%" expr)
      (let* ((cmd-name (resolve-command expr))
 	    (cmd (get-command cmd-name)))
-       ;;(when cmd
-       ;;  (format t "command ~a accepts ~s~%" cmd-name (command-accepts cmd)))
+       (when cmd
+         (dbugf :accepts "command ~a accepts ~s~%"
+		cmd-name (command-accepts cmd)))
        (and cmd (command-accepts cmd))))
     (t
-     ;;(format t "-T- ~s ~s~%" (type-of expr) expr)
+     (dbugf :accepts "get-accepts: -T- ~s ~s~%" (type-of expr) expr)
      :unspecified)))
 
 (defun accepts (first-type &rest other-types)
@@ -895,6 +896,7 @@ If OUT-PIPE is true, return the values:
 If IN-PIPE is true, it should be an input stream to which *STANDARD-INPUT* is
 bound during command."
   (with-slots (in-pipe out-pipe environement) context
+    (dbugf :accepts "command ~s ~s~%" (command-name command) *accepts*)
     (labels ((runky (command args)
 	       (let ((lisp-args (posix-to-lisp-args command args))
 		     (cmd-func (symbol-function (command-function command)))
@@ -1099,21 +1101,27 @@ probably fail, but perhaps in similar way to other shells."
 	 ;; re-read and re-eval the line with the alias expanded
 	 (shell-eval sh (expand-alias alias expanded-words) context
 		     :no-expansions t))
-	;; Autoload
-	((and (in-lisp-path cmd)
-	      (lish-autoload-from-asdf sh)
-	      (setf command (load-lisp-command cmd)))
-	 ;; now try it as a command
-	 (run-hooks *pre-command-hook* cmd :command)
-	 (multiple-value-prog1
-	     (call-command command (subseq expanded-words 1) context)
-	   (run-hooks *post-command-hook* cmd :command)))
 	;; Lish command
 	(command
 	 (run-hooks *pre-command-hook* cmd :command)
 	 (multiple-value-prog1
 	     (call-command command (subseq expanded-words 1) context)
 	   (run-hooks *post-command-hook* cmd :command)))
+	;; Autoload
+	((and (lish-autoload-from-asdf sh)
+	      (in-lisp-path cmd)
+	      (setf command (load-lisp-command cmd)))
+	 ;; now try it as a command
+	 (run-hooks *pre-command-hook* cmd :command)
+	 (multiple-value-prog1
+	     (call-command command (subseq expanded-words 1) context)
+	   (run-hooks *post-command-hook* cmd :command)))
+	((functionp cmd)
+	 ;; (format t "CHOWZA ~s~%" (rest-of-the-line expr))
+	 (run-fun cmd (rest-of-the-line expr)))
+	((and (symbolp cmd) (fboundp cmd))
+	 ;; (format t "FLEOOP ~s~%" (rest-of-the-line expr))
+	 (run-fun (symbol-function cmd) (rest-of-the-line expr)))
 	((stringp cmd)
 	 ;; If we can find a command in the path, try it first.
 	 (if (get-command-path cmd)
@@ -1130,12 +1138,6 @@ probably fail, but perhaps in similar way to other shells."
 			      ))
 		   ;; Just try a system command anyway, which will likely fail.
 		   (sys-cmd)))))
-	((functionp cmd)
-	 ;; (format t "CHOWZA ~s~%" (rest-of-the-line expr))
-	 (run-fun cmd (rest-of-the-line expr)))
-	((and (symbolp cmd) (fboundp cmd))
-	 ;; (format t "FLEOOP ~s~%" (rest-of-the-line expr))
-	 (run-fun (symbol-function cmd) (rest-of-the-line expr)))
 	(t ;; Some other type, just return it, like it's self evaluating.
 	 ;;(values (multiple-value-list (eval cmd)) nil t))))))
 	 (values (multiple-value-list
@@ -1170,11 +1172,13 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	      part of the command gets done. NEW-PIPE is true to make a~
 	      new pipe."
 	     `(multiple-value-bind (vals out-stream show-vals)
-		  (shell-eval sh (second first-word)
-			      (make-context
-			       :in-pipe in-pipe
-			       :out-pipe ,new-pipe
-			       :environment environment))
+		  (let ((*accepts*
+			 (get-accepts (elt (shell-expr-words expr) 1))))
+		    (shell-eval sh (second first-word)
+				(make-context
+				 :in-pipe in-pipe
+				 :out-pipe ,new-pipe
+				 :environment environment)))
 		(declare (ignore show-vals) (ignorable vals))
 		(when ,test
 		  (with-package *lish-user-package*
@@ -1210,12 +1214,10 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (dbug "~w~%" expr)
 	   (case (first first-word)
 	     (:pipe
-	      (setf *accepts*
-		    (get-accepts (elt (shell-expr-words expr) 1))
-		    *input* *output*
+	      (setf *input* *output*
 		    *output* nil)
 	      (dbug "*input* = ~s~%" *input*)
-	      (dbug "*accepts* = ~s~%" *accepts*)
+	      ;;(dbugf :accepts "*accepts* = ~s~%" *accepts*)
 	      (setf (values vals out-stream show-vals)
 		    (eval-compound (successful vals) t))
 	      (dbug "*output* = ~s~%" *output*)
@@ -1240,8 +1242,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (with-package *lish-user-package*
 	     ;; accepts is :unspecified because we're last in the
 	     ;; pipeline.
-	     (setf *accepts* :unspecified ;; (get-accepts expr) 
-		   *input* *output*
+	     (setf *input* *output*
 		   *output* nil)
 	     (dbug "*input* = ~s~%" *input*)
 	     (setf (values vals out-stream show-vals)
