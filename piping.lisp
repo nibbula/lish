@@ -256,10 +256,10 @@ like $(command) in bash."
   (declare (ignore commands))
   )
 
-(defun !bg (&rest commands)
-  "Run commands in the background."
-  (declare (ignore commands))
-  )
+;; (defun !bg (&rest commands)
+;;   "Run commands in the background."
+;;   (declare (ignore commands))
+;;   )
 
 (defun !! (&rest commands)
   "Pipe output of commands. Return a stream of the output."
