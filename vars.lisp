@@ -143,7 +143,9 @@ variables."
   in-pipe
   out-pipe
   ;; This is NIL for unspecified, :empty, or an alist environement.
-  environment)
+  environment
+  ;; True if we flipped *input* to *output* for a pipeline.
+  flipped-io)
 
 (defvar *context* nil
   "The dynamic command context. If it is NIL it is equivalent to all the

@@ -591,7 +591,9 @@ Vauguely like how I would like:
 	       (setf (nos:environment-variable var) val))))
 	(apply #'do-system-command
 	       `(,`(,shell-command ,@arguments)
-		   ,@(if ignore-environment '(nil nil nil)))))))
+		   ,(if ignore-environment
+			(modified-context *context* :environment nil)
+			*context*))))))
 
 But instead we have to to a kludgey version:
 |#
@@ -639,7 +641,8 @@ variables explicitly set in arguments are passed to the commands."
 	;; @@@ This should respect piping!!!
 	(when cmd
 	  (apply #'do-system-command
-		 `(,`(,cmd ,@args) :environment ,new-env))))
+		 `(,`(,cmd ,@args)
+		     ,(modified-context *context* :environment new-env)))))
       ;; Just print the variables
       (loop :for e :in (environment)
 	 :do (format t "~a=~a~%" (car e) (cdr e)))))
