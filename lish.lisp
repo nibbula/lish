@@ -347,17 +347,20 @@ Symbols will be replaced by their value."
 			 &key
 			   (in-pipe nil in-pipe-p)
 			   (out-pipe nil out-pipe-p)
-			   (environment nil environment-p))
+			   (environment nil environment-p)
+			   (flipped-io nil flipped-io-p))
   "Return a new context based on CONTEXT, with the given slots."
   (if (not context)
       (make-context 
        :in-pipe in-pipe
        :out-pipe out-pipe
-       :environment environment)
+       :environment environment
+       :flipped-io flipped-io)
       (let ((c (copy-structure context)))
 	(when in-pipe-p     (setf (context-in-pipe     c) in-pipe))
 	(when out-pipe-p    (setf (context-out-pipe    c) out-pipe))
 	(when environment-p (setf (context-environment c) environment))
+	(when flipped-io-p  (setf (context-flipped-io  c) flipped-io))
 	c)))
 
 ;; (defstruct lisp-expression
@@ -1165,7 +1168,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 "
   (let ((*context* (or context (make-context)))
 	first-word vals out-stream show-vals)
-    (with-slots (in-pipe out-pipe environment) *context*
+    (with-slots (in-pipe out-pipe environment flipped-io) *context*
       (macrolet
 	  ((eval-compound (test new-pipe)
 	     "Do a compound command. TEST determines whether the next~
@@ -1178,7 +1181,8 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 				(make-context
 				 :in-pipe in-pipe
 				 :out-pipe ,new-pipe
-				 :environment environment)))
+				 :environment environment
+				 :flipped-io flipped-io)))
 		(declare (ignore show-vals) (ignorable vals))
 		(when ,test
 		  (with-package *lish-user-package*
@@ -1214,13 +1218,15 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (dbug "~w~%" expr)
 	   (case (first first-word)
 	     (:pipe
-	      (setf *input* *output*
-		    *output* nil)
-	      (dbug "*input* = ~s~%" *input*)
+	      (when (not flipped-io)
+		(setf *input* *output*
+		      *output* nil
+		      flipped-io t))
+	      (dbugf 'pipe "*input* = ~s~%" *input*)
 	      ;;(dbugf :accepts "*accepts* = ~s~%" *accepts*)
 	      (setf (values vals out-stream show-vals)
 		    (eval-compound (successful vals) t))
-	      (dbug "*output* = ~s~%" *output*)
+	      (dbugf 'pipe "*output* = ~s~%" *output*)
 	      (values vals out-stream show-vals))
 	     (:and      (eval-compound (successful vals) nil))
 	     (:or       (eval-compound (not (successful vals)) nil))
@@ -1242,39 +1248,49 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (with-package *lish-user-package*
 	     ;; accepts is :unspecified because we're last in the
 	     ;; pipeline.
-	     (setf *input* *output*
-		   *output* nil)
-	     (dbug "*input* = ~s~%" *input*)
+	     (when (not flipped-io)
+	       (setf *input* *output*
+		     *output* nil
+		     flipped-io t))
+	     (dbugf 'pipe "*input* = ~s~%" *input*)
 	     (setf (values vals out-stream show-vals)
 		   (shell-eval-command sh expr *context*
 				       :no-alias no-expansions))
-	     (dbug "*output* = ~s~%" *output*)
+	     (dbugf 'pipe "*output* = ~s~%" *output*)
 	     (values vals out-stream show-vals))))))))
 
 (defun load-file (sh file)
   "Load a lish syntax file."
-  (with-open-file (stream file :direction :input)
-    (with-package *lish-user-package*
-      (let ((*load-pathname* (pathname file)))
-	(loop :with line = nil
-	   :and new-line = t
-	   :and expr = nil
-	   :while (and (setf line (read-line stream nil)) new-line)
-	   :do
-	   (loop :with i = 0
-	      :while (and (eql (setf expr (shell-read line))
-			       *continue-symbol*)
-			  (setf new-line (read-line stream nil)))
-	      :do
-	      (setf line (s+ line #\newline new-line))
-	      ;; (when (> i 100)
-	      ;;    (break))
-	      (incf i))
-	   (shell-eval sh expr *context*))))))
-      ;; (loop :while (setf line (read-line stream nil))
-      ;; 	 :do
-      ;; 	 (if (eql line *continue-symbol*)
-      ;; 	     (shell-read line
+  (let ((*load-pathname* (pathname file))
+	(line-number 1)
+	expression-start-line
+	expr)
+    (with-open-file (stream file :direction :input)
+      (with-package *lish-user-package*
+	(labels
+	    ((read-a-line ()
+	       (prog1 (read-line stream nil)
+		 (incf line-number))))
+	  (loop :with line = nil
+	     :and new-line = t
+	     :while (and (setf line (read-a-line)) new-line)
+	     :do
+	     (loop :while (and (eql (setf expr (shell-read line))
+				    *continue-symbol*)
+			       (setf new-line (read-a-line)))
+		:do
+		;; Keep track of the start line of a continued expression.
+		(when (and expr
+			   (eql expr *continue-symbol*)
+			   (not expression-start-line))
+		  (setf expression-start-line line-number))
+		(setf line (s+ line #\newline new-line)))
+	     (when (and expr (not (eql expr *continue-symbol*)))
+	       (setf expression-start-line nil))
+	     (shell-eval sh expr *context*))
+	  (when (eql expr *continue-symbol*)
+	    (error "End of file in expression. Probably starting at line ~a."
+		   expression-start-line)))))))
 
 (defun load-rc-file (sh)
   "Load the users start up (a.k.a. run commands) file, if it exists."
