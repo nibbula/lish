@@ -37,7 +37,7 @@ the end and didn't get a close quote, the third value is true.~
 
 (defparameter *reader-quote-char*
   ;; I don't think #\\ should be in here.
-  #(#\" #\( #\! #\space #\; #\| #\< #\> #\& #\^) 
+  #(#\" #\( #\) #\! #\space #\; #\| #\< #\> #\& #\^) 
   "Characters which the reader interprets specially if not quoted.")
 
 (defun shell-read (line &key partial (package *lish-user-package*))
