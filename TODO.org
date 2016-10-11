@@ -76,6 +76,14 @@ Lish TODO list							    -*- org -*-
      "There is no slot named SB-KERNEL:FORMAT-CONTROL in #<SB-KERNEL::CONDITION-CLASSOID OPSYS:POSIX-ERROR>"
 **** DONE ?Seems to fail when taking a long time and going to a pipe.
      e.g.: find -d ~/ -n foo | less  OR even: | pager
+*** DONE completion bug?
+    ▶ m /etc/ini<TAB>
+    -> gives
+    ▶ m /etc/initramfs-tools
+    but shoud give:
+    ▶ m /etc/init
+    because:
+    init  init.d  initramfs-tools
 ** HOLD don't bother
 *** < or > in first word?
     This doesn't fail, but do nothing useful.

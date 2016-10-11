@@ -19,7 +19,7 @@
 
 (defun complete-user-name (str all)
   (complete-list str (length str) all
-		 (mapcar (_ (nos:user-name _)) (nos:user-list))))
+		 (mapcar (_ (nos:user-info-name _)) (nos:user-list))))
 
 ;; @@@ Consider caching this.
 ;; @@@ In fact we should probably require a "rehash", like other shells.
