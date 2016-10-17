@@ -887,6 +887,7 @@ expanded."
 	  (format nil "~{~a ~}" (shell-expr-words new-expr)))
     new-expr))
 
+#|
 (defun call-command (command args context)
   "Call a command with the given POSIX style arguments.
 COMMAND is a COMMAND object.
@@ -926,6 +927,51 @@ bound during command."
 	      (let ((*standard-input* in-pipe))
 		(runky command args))
 	      (runky command args))))))
+|#
+
+(defun call-thing (thing args context)
+  "Call a command with the given POSIX style arguments.
+THING is a COMMAND object or a function/callable symbol.
+ARGS is a list of POSIX style arguments, which are converted to Lisp arguments
+by POSIX-TO-LISP-ARGS and given to the COMMAND's function.
+If OUT-PIPE is true, return the values:
+ a list of the values returned by COMMAND
+ a input stream from which can be read the output of command
+ and NIL.
+If IN-PIPE is true, it should be an input stream to which *STANDARD-INPUT* is
+bound during command."
+  (with-slots (in-pipe out-pipe environement) context
+    (let ((command-p (typep thing 'command)))
+      (when command-p
+	(dbugf :accepts "command ~s ~s~%" (command-name thing) *accepts*))
+      (labels ((runky (thing args)
+		 (if command-p
+		     (let ((lisp-args (posix-to-lisp-args thing args))
+			   (cmd-func (symbol-function (command-function thing)))
+			   (*context* context))
+		       (if (> (length lisp-args) 0)
+			   (apply cmd-func lisp-args)
+			   (funcall cmd-func)))
+		     (eval thing))))
+      (if out-pipe
+	  (let ((out-str (make-stretchy-string 20)))
+	    (values
+	     ;; @@@ This is probably inefficient.
+	     (list (with-output-to-string (*standard-output* out-str)
+		     (if in-pipe
+			 (let ((*standard-input* in-pipe))
+			   (runky thing args))
+			 (runky thing args))))
+	     (let ((oo (make-string-input-stream out-str)))
+	       ;; (format t "out-str = ~w~%" out-str)
+	       ;; (format t "(slurp oo) = ~w~%" (slurp oo))
+	       ;; (file-position oo 0)
+	       oo)
+	     nil))
+	  (if in-pipe
+	      (let ((*standard-input* in-pipe))
+		(runky thing args))
+	      (runky thing args)))))))
 
 (defun call-parenless (func line context)
   "Apply the function to the line, and return the proper values. If there are
@@ -963,6 +1009,7 @@ OUT-PIPE is T to return a input stream which the output of the command can be
 read from."
   ;; Since run-program can't throw an error when the program is not found, we
   ;; try to do it here.
+  (dbugf :lish-eval "system command ~w ~w~%" words context)
   (let* ((command-line
 	  ;; System command arguments must be strings
 	  (mapcar (_ (or (and (stringp _) _)
@@ -1049,8 +1096,8 @@ probably fail, but perhaps in similar way to other shells."
 	 (alias (gethash cmd (lish-aliases sh)))
 	 (expanded-words (lisp-exp-eval words))
 	 result result-stream)
-    (dbug "words = ~w~%" (shell-expr-words expr))
-    (dbug "expanded words = ~w~%" expanded-words)
+    (dbugf :lish-eval "words = ~w~%" (shell-expr-words expr))
+    (dbugf :lish-eval "expanded words = ~w~%" expanded-words)
     ;; These are in order of precedence, so:
     ;;  aliases, lisp path, commands, system path
     (flet ((sys-cmd ()
@@ -1064,7 +1111,7 @@ probably fail, but perhaps in similar way to other shells."
 		   ;; 	    ,@(when evp-p `(:environment ,environment)))))
 		   (do-system-command expanded-words context))
 	     (run-hooks *post-command-hook* cmd :system-command)
-	     (dbug "result = ~w~%" result)
+	     (dbugf :lish-eval "result = ~w~%" result)
 	     (when (not result)
 	       (format t "Command failed.~%"))
 	     (force-output)	   ; @@@ is this really a good place for this?
@@ -1101,31 +1148,37 @@ probably fail, but perhaps in similar way to other shells."
       (cond
 	;; Alias
 	((and alias (not no-alias))
+	 (dbugf :lish-eval "Expanding alias~%")
 	 ;; re-read and re-eval the line with the alias expanded
 	 (shell-eval sh (expand-alias alias expanded-words) context
 		     :no-expansions t))
 	;; Lish command
 	(command
+	 (dbugf :lish-eval "Calling command ~s ~s~%" command context)
 	 (run-hooks *pre-command-hook* cmd :command)
 	 (multiple-value-prog1
-	     (call-command command (subseq expanded-words 1) context)
+	     (call-thing command (subseq expanded-words 1) context)
 	   (run-hooks *post-command-hook* cmd :command)))
 	;; Autoload
 	((and (lish-autoload-from-asdf sh)
 	      (in-lisp-path cmd)
 	      (setf command (load-lisp-command cmd)))
+	 (dbugf :lish-eval "Trying autoload~%")
 	 ;; now try it as a command
 	 (run-hooks *pre-command-hook* cmd :command)
 	 (multiple-value-prog1
-	     (call-command command (subseq expanded-words 1) context)
+	     (call-thing command (subseq expanded-words 1) context)
 	   (run-hooks *post-command-hook* cmd :command)))
 	((functionp cmd)
+	 (dbugf :lish-eval "Function eval~%")
 	 ;; (format t "CHOWZA ~s~%" (rest-of-the-line expr))
 	 (run-fun cmd (rest-of-the-line expr)))
 	((and (symbolp cmd) (fboundp cmd))
+	 (dbugf :lish-eval "fbound symbol eval~%")
 	 ;; (format t "FLEOOP ~s~%" (rest-of-the-line expr))
 	 (run-fun (symbol-function cmd) (rest-of-the-line expr)))
 	((stringp cmd)
+	 (dbugf :lish-eval "String command~%")
 	 ;; If we can find a command in the path, try it first.
 	 (if (get-command-path cmd)
 	     (sys-cmd)
@@ -1143,9 +1196,13 @@ probably fail, but perhaps in similar way to other shells."
 		   (sys-cmd)))))
 	(t ;; Some other type, just return it, like it's self evaluating.
 	 ;;(values (multiple-value-list (eval cmd)) nil t))))))
-	 (values (multiple-value-list
-		  (with-first-value-to-output (eval cmd)))
-		 nil t))))))
+	 (dbugf :lish-eval "Self evaluating ~s ~s~%" cmd context)
+	 ;; (values (multiple-value-list
+	 ;; 	  ;;(with-first-value-to-output
+	 ;; 	  (call-thing (car cmd) (cdr cmd) context))
+	 ;; 	 nil t)
+	 (call-thing cmd nil context)
+	 )))))
 
 ;; This does normal expansions, sets up piping and redirections and
 ;; eventually calls shell-eval-command.
@@ -1205,17 +1262,19 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		     :no-expansions no-expansions))))))
 	(cond
 	  ((not (shell-expr-p expr))
+	   (dbugf :lish-eval "Evaluating a Lisp expression.~%")
 	   ;; A full Lisp expression all by itself
 	   (with-package *lish-user-package*
 	     (values (multiple-value-list (eval expr)) nil t)))
 	  ((= (length (shell-expr-words expr)) 0)
 	   ;; Quick return when no words
 	   (return-from shell-eval (values nil nil nil)))
-	  ((listp (setf first-word (elt (shell-expr-words expr) 0)))
-	   ;; First word is a list, so it's a compound command.
+	  ((and (listp (setf first-word (elt (shell-expr-words expr) 0)))
+		(keywordp (first first-word)))
+	   ;; First word is a list with a keyword, so it's a compound command.
+	   (dbugf :lish-eval "Evaluating a compound expression ~a.~%" first-word)
 	   (unless no-expansions
 	     (do-expansions expr))
-	   (dbug "~w~%" expr)
 	   (case (first first-word)
 	     (:pipe
 	      (when (not flipped-io)
@@ -1239,9 +1298,12 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	       (elt (shell-expr-words expr) 1) (elt first-word 1) :append t))
 	     (:redirect-from
 	      (run-with-input-from
-	       (elt (shell-expr-words expr) 1) (elt first-word 1)))))
+	       (elt (shell-expr-words expr) 1) (elt first-word 1)))
+	     (t
+	      (error "Unknown compound command type."))))
 	  (t
 	   ;; The first word is not a list, so it's a ‘simple’ command.
+	   (dbugf :lish-eval "Evaluating a simple command.~%")
 	   (unless no-expansions
 	     (do-expansions expr))
 	   (dbug "~w~%" expr)

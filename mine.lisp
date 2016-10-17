@@ -2,8 +2,6 @@
 ;; mine.lisp - Dig for command data
 ;;
 
-;; $Revision$
-
 (in-package :lish)
 
 (defvar *command-sections* '("man1" "man6" "man8")

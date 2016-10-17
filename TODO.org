@@ -76,7 +76,7 @@ Lish TODO list							    -*- org -*-
      "There is no slot named SB-KERNEL:FORMAT-CONTROL in #<SB-KERNEL::CONDITION-CLASSOID OPSYS:POSIX-ERROR>"
 **** DONE ?Seems to fail when taking a long time and going to a pipe.
      e.g.: find -d ~/ -n foo | less  OR even: | pager
-*** DONE completion bug?
+*** DONE completion bug? FIXED IN ../complete.lisp
     ▶ m /etc/ini<TAB>
     -> gives
     ▶ m /etc/initramfs-tools
@@ -145,6 +145,7 @@ Lish TODO list							    -*- org -*-
 * Non-essential features
 ** port to windows
 ** syntax colorization
+** consider adding default --help (and maybe --version) args?
 ** suggestions from history?
 ** be able to call lish functions from not in the shell, ! etc
 ** shell specific key actions, e.g.
