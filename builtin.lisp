@@ -341,12 +341,12 @@ Commands can be:
 			     doc))))))
     (print-columnar-help rows)))
 
-(defun print-command-help (cmd)
+(defun print-command-help (cmd &optional (stream *standard-output*))
   "Print documentation for a command."
-  (format t "~a~%" (documentation cmd 'function))
+  (format stream "~a~%" (documentation cmd 'function))
   (when (and (command-arglist cmd)
 	     (not (zerop (length (command-arglist cmd)))))
-    (format t "Arguments:~%")
+    (format stream "Arguments:~%")
     (table:nice-print-table
      (loop :for a :in (command-arglist cmd)
 	:when (not (arg-hidden a))
@@ -357,12 +357,19 @@ Commands can be:
 	      (string-downcase (arg-type a))
 	      (or (and (slot-boundp a 'help) (arg-help a))
 		  (arg-name a))))
-     nil :trailing-spaces nil))
+     nil :trailing-spaces nil :stream stream))
   (when (and (command-accepts cmd)
 	     (not (eq (command-accepts cmd) :unspecified)))
-    (format t "Accepts: ~a~%" (command-accepts cmd)))
+    (format stream "Accepts: ~a~%" (command-accepts cmd)))
   (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
-    (format t "Loaded from: ~a~%" (command-loaded-from cmd))))
+    (format stream "Loaded from: ~a~%" (command-loaded-from cmd))))
+
+;; For use by other things. Like my "doc" command.
+(defmethod documentation ((symbol symbol) (type (eql :command)))
+  (let ((cmd (get-command (string-downcase (symbol-name symbol)))))
+    (when cmd
+      (with-output-to-string (str)
+	(print-command-help cmd str)))))
 
 (defbuiltin help (("subject" help-subject :help "Subject to get help on."))
   "Show help on the subject. Without a subject show some subjects that are
