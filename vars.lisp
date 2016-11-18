@@ -26,7 +26,8 @@
 (define-constant +version-file-name+ "version.lisp")
 
 (defparameter *version-file*
-  (or (probe-file (s+ (dirname
+  (or (asdf:system-relative-pathname :lish +version-file-name+)
+      (probe-file (s+ (dirname
 		       (or *compile-file-truename* *load-truename*))
 		      *directory-separator* +version-file-name+))
       (probe-file (s+ (dirname (or *compile-file-truename* *load-truename*))
