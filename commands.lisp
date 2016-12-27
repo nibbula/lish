@@ -287,7 +287,7 @@ BODY recognizes some special keywords:
   "Define an external command for the shell. NAME is the name it is invoked by
 and the name of the external program. ARGLIST is a shell argument list."
   `(%defcommand ,name t (,@arglist)
-     (! (string name))))
+     (! (string-downcase ,name))))
 
 (defun undefine-command (name)
   (unset-command name)

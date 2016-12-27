@@ -134,14 +134,18 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
   "Return a list of the results of calling the function FUNC with each output
 line of COMMAND. COMMAND should probably be a string, and FUNC should take one
 string as an argument."
-  (multiple-value-bind (vals stream show-vals)
-      (shell-eval *shell* (shell-read command)
-		  (modified-context *context* :out-pipe t))
-    (declare (ignore show-vals))
-    (when (and vals (> (length vals) 0))
-      (loop :with l = nil
-	 :while (setf l (read-line stream nil nil))
-	 :collect (funcall func l)))))
+  (let (vals stream show-vals)
+    (unwind-protect
+      (progn
+	(multiple-value-setq (vals stream show-vals)
+	  (shell-eval *shell* (shell-read command)
+		      (modified-context *context* :out-pipe t)))
+	(when (and vals (> (length vals) 0))
+	  (loop :with l = nil
+	     :while (setf l (read-line stream nil nil))
+	     :collect (funcall func l))))
+      (when stream
+	(close stream)))))
 
 ;; This is basically backticks #\` or $() in bash.
 (defun command-output-words (command &optional quoted)
@@ -161,11 +165,16 @@ string as an argument."
 ;	     (args (cdr seq))
 	     )
 	;; (nos:with-process-output (proc cmd args)
-	(multiple-value-bind (vals stream show-vals)
-	    (shell-eval *shell* expr (modified-context *context* :out-pipe t))
-	  (declare (ignore show-vals))
-	  (when (and vals (> (length vals) 0))
-	    (convert-to-words stream s)))))))
+	(let (vals stream show-vals)
+	  (unwind-protect
+	     (progn
+	       (multiple-value-setq (vals stream show-vals)
+		 (shell-eval *shell* expr
+			     (modified-context *context* :out-pipe t)))
+	       (when (and vals (> (length vals) 0))
+		 (convert-to-words stream s)))
+	    (when stream
+	      (close stream))))))))
 
 (defun command-output-list (command)
   "Return lines output from command as a list."
@@ -173,22 +182,24 @@ string as an argument."
 
 (defun pipe (&rest commands)
   "Send output from commands to subsequent commands."
-  (labels ((sub (cmds &optional stream)
-	     (multiple-value-bind (vals stream show-vals)
-		 (shell-eval *shell* (shell-read (car cmds))
-			     (modified-context *context*
-					       :in-pipe stream
-					       :out-pipe (and (cadr cmds) t)))
-	       (declare (ignore show-vals))
-	       (if (and vals (listp vals) (> (length vals) 0))
-		   (if (cdr cmds)
-		       (apply #'pipe stream (cdr cmds))
-		       (values-list vals))
-		   (progn
-		     (when stream
-		       (finish-output stream)
-		       (close stream))
-		     nil)))))
+  (labels ((sub (cmds &optional in-stream)
+	     (let (vals stream show-vals)
+	       (unwind-protect
+	         (progn
+		   (multiple-value-setq (vals stream show-vals)
+		     (shell-eval *shell* (shell-read (car cmds))
+				 (modified-context
+				  *context*
+				  :in-pipe in-stream
+				  :out-pipe (and (cadr cmds) t))))
+		   (if (and vals (listp vals) (> (length vals) 0))
+		       (if (cdr cmds)
+			   (apply #'pipe stream (cdr cmds))
+			   (values-list vals))
+		       nil))
+		 (when stream
+		   (finish-output stream)
+		   (close stream))))))
     (if (streamp (car commands))
 	(sub (cdr commands) (car commands))
 	(sub commands))))

@@ -82,39 +82,39 @@ LISH_LEVEL environment variable.")
 (defun format-prompt (sh prompt &optional (escape-char #\%))
   "Return the prompt string with bash-like formatting character replacements.
 So far we support:
-%%	A percent.
-%a	#\\bell
-%e	#\\escape
-%n	#\\newline
-%r	#\\return
-%NNN	The character whose ASCII code is the octal value NNN.
-%s	The name of the shell, which is usually “Lish”.
-%v	Shell version.
-%V	Even more shell version.
-%u	User name.
-%h	Host name truncated at the first dot.
-%H	Host name.
-%w	Working directory, tildified.
-%W	The basename of `$PWD', tildified.
-%$	If the effective UID is 0, `#', otherwise `$'.
+%%      A percent.
+%a      #\\bell
+%e      #\\escape
+%n      #\\newline
+%r      #\\return
+%NNN    The character whose ASCII code is the octal value NNN.
+%s      The name of the shell, which is usually “Lish”.
+%v      Shell version.
+%V      Even more shell version.
+%u      User name.
+%h      Host name truncated at the first dot.
+%H      Host name.
+%w      Working directory, tildified.
+%W      The basename of `$PWD', tildified.
+%$      If the effective UID is 0, `#', otherwise `$'.
 %i      The lisp implementation nickname.
 %p      The shortest nickname of *lish-user-package*.
 %P      The current value of *lish-user-package*.
 %d      <3 char weekday> <3 char month name> <date>.
-%t	24 hour HH:MM:SS
-%T	12 hour HH:MM:SS
-%@	The time, in 12-hour am/pm format.
-%A	The time, in 24-hour HH:MM format.
+%t      24 hour HH:MM:SS
+%T      12 hour HH:MM:SS
+%@      The time, in 12-hour am/pm format.
+%A      The time, in 24-hour HH:MM format.
 Not implemented yet:
-%!	The history number of this command.
-%#	The command number of this command.
-%[	Start of non-printing characters.
-%]	End of non-printing characters.
-%l	The basename of the shell's terminal device name.
+%!      The history number of this command.
+%#      The command number of this command.
+%[      Start of non-printing characters.
+%]      End of non-printing characters.
+%l      The basename of the shell's terminal device name.
 %D{FORMAT}
-	Some date formated by Unix strftime. Without the FORMAT just put some
-	locale-specific date.
-%j	The number of jobs currently managed by the shell.
+        Some date formated by Unix strftime. Without the FORMAT just put some
+        locale-specific date.
+%j      The number of jobs currently managed by the shell.
 "
   (declare (ignore sh))
   (let ((out (make-stretchy-string 80)))
@@ -190,116 +190,116 @@ Symbols will be replaced by their value."
 	(let ((ts (or ts-in (make-terminal-stream str 'terminal-ansi))))
 	  (loop :for s :in symbolic-prompt :do
 	     (typecase s
-	       (string (tt-write-string ts s))
-	       (character (tt-write-char ts s))
+	       (string (terminal-write-string ts s))
+	       (character (terminal-write-char ts s))
 	       (cons
 		(cond
 		  ((keywordp (car s))
 		   (case (car s)
 		     (:normal
-		      (tt-normal ts)
+		      (terminal-normal ts)
 		      (symbolic-prompt-to-string (cdr s) ts))
 		     (:bold
-		      (tt-bold ts t)
+		      (terminal-bold ts t)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-bold ts nil))
+		      (terminal-bold ts nil))
 		     (:underline
-		      (tt-underline ts t)
+		      (terminal-underline ts t)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-underline ts nil))
+		      (terminal-underline ts nil))
 		     (:inverse
-		      (tt-inverse ts t)
+		      (terminal-inverse ts t)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-inverse ts nil))
+		      (terminal-inverse ts nil))
 		     ((:black :fg-black)
-		      (tt-color ts :black nil)
+		      (terminal-color ts :black nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ((:red :fg-red)
-		      (tt-color ts :red nil)
+		      (terminal-color ts :red nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ((:green :fg-green)
-		      (tt-color ts :green nil)
+		      (terminal-color ts :green nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ((:yellow :fg-yellow)
-		      (tt-color ts :yellow nil)
+		      (terminal-color ts :yellow nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ((:blue :fg-blue)
-		      (tt-color ts :blue nil)
+		      (terminal-color ts :blue nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ((:magenta :fg-magenta)
-		      (tt-color ts :magenta nil)
+		      (terminal-color ts :magenta nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ((:cyan :fg-cyan)
-		      (tt-color ts :cyan nil)
+		      (terminal-color ts :cyan nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ((:white :fg-white)
-		      (tt-color ts :white nil)
+		      (terminal-color ts :white nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ((:default :fg-default)
-		      (tt-color ts :default nil)
+		      (terminal-color ts :default nil)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts :default nil))
+		      (terminal-color ts :default nil))
 		     ;; background
 		     ((:bg-black)
-		      (tt-color ts nil :black)
+		      (terminal-color ts nil :black)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     ((:bg-red)
-		      (tt-color ts nil :red)
+		      (terminal-color ts nil :red)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     ((:bg-green)
-		      (tt-color ts nil :green)
+		      (terminal-color ts nil :green)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     ((:bg-yellow)
-		      (tt-color ts nil :yellow)
+		      (terminal-color ts nil :yellow)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     ((:bg-blue)
-		      (tt-color ts nil :blue)
+		      (terminal-color ts nil :blue)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     ((:bg-magenta)
-		      (tt-color ts nil :magenta)
+		      (terminal-color ts nil :magenta)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     ((:bg-cyan)
-		      (tt-color ts nil :cyan)
+		      (terminal-color ts nil :cyan)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     ((:bg-white)
-		      (tt-color ts nil :white)
+		      (terminal-color ts nil :white)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     ((:bg-default)
-		      (tt-color ts nil :default)
+		      (terminal-color ts nil :default)
 		      (symbolic-prompt-to-string (cdr s) ts)
-		      (tt-color ts nil :default))
+		      (terminal-color ts nil :default))
 		     (otherwise
 		      (error "Unrecognized attribute ~a" (car s)))))
 		  ((and (symbolp (car s)) (fboundp (car s)))
-		   ;; (tt-format ts "~a"
+		   ;; (terminal-format ts "~a"
 		   ;;   (apply (symbol-function (car s)) (cdr s))))
-		   (tt-format ts "~a" (eval s)))
+		   (terminal-format ts "~a" (eval s)))
 		  (t
 		   (error "Unrecognized thing in attribute list ~a" (car s))
 		   )))
 	       (symbol
 		(when (boundp s)
-		  (tt-format ts "~a" (symbol-value s))))
+		  (terminal-format ts "~a" (symbol-value s))))
 	       (t
-		(tt-format ts "~a" s)
+		(terminal-format ts "~a" s)
 		)))
-	  (tt-finish-output ts)))))
+	  (terminal-finish-output ts)))))
 
 #|
 (defun fill-prompt ()
@@ -466,6 +466,8 @@ Symbols will be replaced by their value."
   ;;    :for dir :in *lisp-path* :do
   ;;    (when (setf path (probe-file (s+ dir command)))
   ;;      (asdf::resolve-symlinks path))))	; XXX I know, this is cheating.
+  ;; Maybe we should make our own system search function?
+  ;;  i.e. push on asdf:*system-definition-search-functions*
   (typecase command
     ((or string keyword symbol)
      (ignore-errors (asdf:find-component nil command)))

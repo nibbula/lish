@@ -6,6 +6,7 @@ Lish TODO list							    -*- org -*-
 ** deal with library / utils issue (OR NOT)
 * BUGS:
 ** pipes
+*** make sure stuff in piping.lisp closes pipes
 *** piping from lisp command to system command
     gets no output, e.g.: grep defun *.lisp | /usr/bin/less
     see (defimplementation background-save-image in slime/swank/sbcl.lisp

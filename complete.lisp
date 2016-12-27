@@ -47,6 +47,34 @@ probably means it's a regular file and we have execute permission on it."
 		  (position (file-status-gid stat) (get-groups)))))))
 |#
 
+(defvar *last-update* nil
+  "An alist of (:<facility> . <time-code>) for storing last time we updated the
+*VERB-LIST* for various facilites. The structure of <time-code> depends on the
+facility. Usually it's a universal-time, or an alist of (<thing> . <time>).")
+
+(defun verb-list-needs-upadating-p ()
+  (with-spin ()
+    (loop :for dir :in (split-sequence
+			nos:*path-separator*
+			(nos:environment-variable *path-variable*))
+       :do (spin)
+       :if (probe-directory dir)
+       :append (loop :for f :in (nos:read-directory
+				 :dir dir :full t
+				 :omit-hidden t)
+		  :if (without-access-errors
+			  (is-executable
+			   (s+ dir *directory-separator*
+			       (nos:dir-entry-name f))))
+		  :collect (nos:dir-entry-name f)))))
+
+(defun update-verb-thing (thing)
+  (ecase thing
+    (:aliases)
+    (:commands)
+    (:path))
+  )
+
 (defun verb-list (shell)
   "Return the command list for the current shell: *shell*."
   (if (not *verb-list*)
