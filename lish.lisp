@@ -367,7 +367,7 @@ Symbols will be replaced by their value."
 ;;   "Nothing fancy. Just a wrapper for a lisp value for now."
 ;;   object)
 
-(defun in-shell-word (exp word-num position)
+(defun in-shell-word-p (exp word-num position)
   (declare (type shell-expr exp)
 	   (type number word-num position))
   "Return true if the POSITION is in the shell word numbered WORD-NUM."
@@ -384,7 +384,7 @@ Symbols will be replaced by their value."
   :when (and (>= pos (elt (shell-expr-word-start exp) w))
      (<= pos (elt (shell-expr-word-end exp) w))) 
   |#
-     :when (in-shell-word exp w pos)
+     :when (in-shell-word-p exp w pos)
      :return w))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -245,6 +245,8 @@ The syntax is vaguely like:
 	   ;; a lisp expr
 	   ((eql c #\!)
 	    (dbugf 'reader "sub-expr")
+	    (when (not in-word)
+	      (push i word-start))
 	    (when (not sub-expr)
 	      (push 's+ sub-expr))	; !!!
 	    (when (length w)
