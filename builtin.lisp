@@ -716,7 +716,7 @@ variables explicitly set in arguments are passed to the commands."
 ;;; make printf an alias
 (defbuiltin format
     (("format-string" string :optional nil :help "Format control string.")
-     ("args" t :repeating t :help "Format arguments."))
+     ("args" object :repeating t :help "Format arguments."))
   "Formatted output."
   ;; @@@ totally faked & not working
   (apply #'format t format-string args))
