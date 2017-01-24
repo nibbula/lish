@@ -1426,17 +1426,13 @@ suspend itself."
 
 (defun safety-prompt (sh)
   "Return a prompt, in a manner unlikely to fail."
-  (when (lish-prompt-function sh)
-    (or (ignore-errors
-	  (return-from safety-prompt (funcall (lish-prompt-function sh) sh)))
-	(format t "Your prompt function failed.~%")))
-  (or (ignore-errors (make-prompt sh))
-      (progn
-	(format t "Your prompt is broken.~%")
-	*fallback-prompt*)))
-	;; (when (lish-prompt-char sh)
-	;;   (string (lish-prompt-char sh))
-	;;   "> "))))
+  (or (and (lish-prompt-function sh)
+	   (or (ignore-errors (funcall (lish-prompt-function sh) sh))
+	       (format t "Your prompt function failed.~%")))
+      (or (ignore-errors (make-prompt sh))
+	  (progn
+	    (format t "Your prompt is broken.~%")
+	    *fallback-prompt*))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
@@ -1586,7 +1582,7 @@ handling errors."
 	(confirm "quit the shell"))
       t))
 
-(defun lish (&key debug terminal-name)
+(defun lish (&key debug terminal-name (init-file *lishrc* init-file-supplied-p))
   "Unix Shell & Lisp somehow smushed together."
   (let* ((*shell* (make-instance 'shell :debug debug))
 	 (sh *shell*)		; shorthand
@@ -1601,7 +1597,8 @@ handling errors."
       (update-user-package))
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
-    (load-rc-file sh)
+    (when (or (not init-file-supplied-p) init-file)
+      (load-rc-file sh))
     ;; Make a customized line editor
     (setf (lish-editor sh)
 	  (make-instance 'tiny-rl:line-editor
