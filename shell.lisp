@@ -125,7 +125,7 @@ those functions for more detail about prompt formatting."
 (defoption prompt-function function
   :help "Function which takes a SHELL and returns a string to output as the
 prompt."
-  :default #'make-prompt)
+  :default make-prompt)		       ; N.B.: #'make-prompt doesn't work here
 (defoption sub-prompt string
   :help "String to print when prompting for more input."
   :default "- ")	; @@@ maybe we need sub-prompt-char & sub-prompt-func?
