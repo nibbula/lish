@@ -10,6 +10,9 @@
    ))
 (in-package :lish-test)
 
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+		   (compilation-speed 0)))
+
 (defun sort-of-equal (a b)
   "Like equalp, but ignoring symbol package differences."
   (typecase a
@@ -27,12 +30,11 @@
 (defun vuvu (str l-args)
   (let ((aa (command-to-lisp-args (command-arglist (get-command str)))))
     (format t "~w ~{~w ~}~%~w~%~%" str (command-arglist (get-command str)) aa)
-    (assert (sort-of-equal aa l-args))))
+    (sort-of-equal aa l-args)))
 
 ;; You probably have to say: (with-package :lish (test-stla))
 ;; Unfortunately this may fail if not updated to reflect builtin changes.
-(defun test-shell-to-lisp-args ()
-  "Test COMMAND-TO-LISP-ARGS."
+(deftests (shell-to-lisp-args-1 :doc "Test COMMAND-TO-LISP-ARGS.")
   (vuvu "cd"      '(&optional directory))
   (vuvu "pwd"     '())
   (vuvu "pushd"   '(&optional directory))
@@ -76,7 +78,7 @@
 	     (get-command str)
 	     (lish::expr-to-words (lish:shell-read p-args)))))
     (format t "~w ~{~w ~}~%~w~%~%" str p-args aa)
-    (assert (equalp aa l-args))))
+    (equalp aa l-args)))
 
 (defcommand tata
     (("one" boolean :short-arg #\1)
@@ -97,7 +99,7 @@
   "Test argument conversion."
   (format t "entry = ~s section = ~s~%" entry section))
 
-(defun test-posix-to-lisp-args ()
+(deftests (posix-to-lisp-args-1 :doc "Test POSIX-TO-LISP-ARGS.")
   ;; (vivi ":" '() '())
   ;; (vivi ":"
   ;; 	'("(format t \"egg~a~%\" (lisp-implementation-type))")
@@ -166,12 +168,10 @@
   (equal (lish::expand-variables "$}") "$}")
   )
 
-(deftests (lish-all :doc "All the tests.")
-  expand-variables-1)
+(deftests (lish-all :doc "Test all the things!.")
+  shell-to-lisp-args-1 posix-to-lisp-args-1 expand-variables-1)
   
 (defun run ()
-  (test-shell-to-lisp-args)
-  (test-posix-to-lisp-args)
   (run-group-name 'lish-all :verbose t))
 
 ;; EOF
