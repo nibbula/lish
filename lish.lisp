@@ -335,12 +335,13 @@ Symbols will be replaced by their value."
       ;; 			       :initial-element (lish-prompt-char sh)))
 	  *fallback-prompt*))
 
-;; @@@ I know how stupid and unnecessary this is
-(defparameter *real-eof-symbol* :Z-REAL-EOF)
-(defparameter *continue-symbol* :Z-CONTINUE)
-(defparameter *empty-symbol* :Z-EMPTY)
-(defparameter *error-symbol* :Z-ERROR)
-(defparameter *quit-symbol* :Z-QUIT)
+;; These are my magic cookies. I would GENSYM them, but I would like them to
+;; be constant over loads or systems.
+(defparameter *real-eof-symbol* :Z-REAL-EOF-Z)
+(defparameter *continue-symbol* :Z-CONTINUE-Z)
+(defparameter *empty-symbol*    :Z-EMPTY-Z)
+(defparameter *error-symbol*    :Z-ERROR-Z)
+(defparameter *quit-symbol*     :Z-QUIT-Z)
 
 ;; Get rid of this is if it's unnecessary.
 (defun modified-context (context
@@ -829,7 +830,10 @@ expanded array of shell-words."
 This should be used rather than directly testing *ACCEPTS*."
   (let ((types (cons first-type other-types)))
     (labels ((is-like (x type)
-	       (or (equal x type) (subtypep x type))))
+	       (or (equal x type)
+		   #+clisp (ignore-errors (subtypep x type))
+		   #-clisp (subtypep x type)
+		   )))
       (typecase *accepts*
 	(sequence (some (_ (position _ *accepts* :test #'is-like)) types))
 	(keyword  (some (_ (eq       _ *accepts*)) types))
@@ -1075,7 +1079,7 @@ read from."
 ;; This ends up calling one of the following to do the actual work:
 ;;   do-system-command , if it's an external command
 ;;   call-parenless    , if it's a function
-;;   call-command      , if it's a Lish command
+;;   call-thing        , if it's a Lish command
 ;;   eval	       , if it's a object
 ;; This also directs alias expansion, and lisp sub-expression evaluation.
 
