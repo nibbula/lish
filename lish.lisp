@@ -335,14 +335,6 @@ Symbols will be replaced by their value."
       ;; 			       :initial-element (lish-prompt-char sh)))
 	  *fallback-prompt*))
 
-;; These are my magic cookies. I would GENSYM them, but I would like them to
-;; be constant over loads or systems.
-(defparameter *real-eof-symbol* :Z-REAL-EOF-Z)
-(defparameter *continue-symbol* :Z-CONTINUE-Z)
-(defparameter *empty-symbol*    :Z-EMPTY-Z)
-(defparameter *error-symbol*    :Z-ERROR-Z)
-(defparameter *quit-symbol*     :Z-QUIT-Z)
-
 ;; Get rid of this is if it's unnecessary.
 (defun modified-context (context
 			 &key

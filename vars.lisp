@@ -107,6 +107,14 @@ means every dumped executable.")
 (defvar ! nil
   "The previous command, so you can say e.g.: sudo !!")
 
+;; These are my magic cookies. I would GENSYM them, but I would like them to
+;; be constant over loads or systems.
+(defparameter *real-eof-symbol* :Z-REAL-EOF-Z)
+(defparameter *continue-symbol* :Z-CONTINUE-Z)
+(defparameter *empty-symbol*    :Z-EMPTY-Z)
+(defparameter *error-symbol*    :Z-ERROR-Z)
+(defparameter *quit-symbol*     :Z-QUIT-Z)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Types?
 
