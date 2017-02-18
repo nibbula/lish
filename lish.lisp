@@ -1151,12 +1151,20 @@ probably fail, but perhaps in similar way to other shells."
 	 (shell-eval sh (expand-alias alias expanded-words) context
 		     :no-expansions t))
 	;; Lish command
-	(command
+	((typep command 'internal-command)
 	 (dbugf :lish-eval "Calling command ~s ~s~%" command context)
 	 (run-hooks *pre-command-hook* cmd :command)
 	 (multiple-value-prog1
 	     (call-thing command (subseq expanded-words 1) context)
 	   (run-hooks *post-command-hook* cmd :command)))
+	;; external command
+	((typep command 'external-command)
+	 (dbugf :lish-eval "Calling external command ~s ~s~%" command context)
+	 (run-hooks *pre-command-hook* cmd :command)
+	 ;; (multiple-value-prog1
+	 ;;     (call-thing command (subseq expanded-words 1) context)
+	 ;;   (run-hooks *post-command-hook* cmd :command)))
+	 (sys-cmd))
 	;; Autoload
 	((and (lish-autoload-from-asdf sh)
 	      (in-lisp-path cmd)

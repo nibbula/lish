@@ -112,6 +112,22 @@
     ;; 				(format stream "<unnamed>"))))))
     (format stream "~a" (posix-synopsis o))))
 
+;; Command class hierarchy:
+;;
+;;  command
+;;    internal-command
+;;      shell-command
+;;      builtin-command
+;;    external-command
+
+(defclass internal-command (command)
+  ()
+  (:documentation "An command implemented in the shell."))
+
+(defclass shell-command (internal-command)
+  ()
+  (:documentation "A shell command."))
+
 ;; (defparameter *initial-commands* nil
 ;;   "List of initial commands.")
 
@@ -230,13 +246,13 @@ we want to use it for something in the future."
 (defparameter *special-body-tags* #(:accepts :keys-as)
   "Keywords with special meanings appearing first in the command body.")
 
-(defmacro %defcommand (name type (&rest arglist) &body body)
+(defmacro %defcommand (name type do-defun (&rest arglist) &body body)
   "See the documentation for DEFCOMMAND."
   (let ((func-name (command-function-name name))
 	(name-string (string-downcase name))
 	(accepts :unspecified)
 	(fixed-body body)
-	pass-keys-as params ignorables)
+	pass-keys-as params ignorables defun-clause)
     ;; Pull out special body tags:
     (loop :with tag
        :while (setf tag (find (car fixed-body) *special-body-tags*)) :do
@@ -251,11 +267,16 @@ we want to use it for something in the future."
 				       :pass-keys-as pass-keys-as)
 	  ignorables
 	  (when (and params pass-keys-as)
-	    `((declare (ignorable ,@(ignorable-filter params))))))
+	    `((declare (ignorable ,@(ignorable-filter params)))))
+	  defun-clause
+	  (if do-defun
+	      `((defun ,func-name ,params
+		 ,@ignorables
+		 ,@fixed-body))
+	      `((defun ,func-name ()
+		 ,@body))))
     `(progn
-       (defun ,func-name ,params
-	 ,@ignorables
-	 ,@fixed-body)
+       ,@defun-clause
        (pushnew ,name-string lish::*command-list* :test #'equal)
        (set-command ,name-string
 		    (make-instance ',type
@@ -276,9 +297,9 @@ BODY recognizes some special keywords:
            kind of things the command accepts from a pipeline.
   :KEYS-AS followed by a symbol which will be a list of the keywords and values
            given to the command function. "
-  `(%defcommand ,name command (,@arglist) ,@body))
+  `(%defcommand ,name shell-command t (,@arglist) ,@body))
 
-(defclass builtin-command (command)
+(defclass builtin-command (internal-command)
   ()
   (:documentation "A command that is considered parth of the shell."))
 
@@ -288,7 +309,7 @@ BODY recognizes some special keywords:
 
 (defmacro defbuiltin (name (&rest arglist) &body body)
   "Just like DEFCOMMAND, except it sets BUILT-IN-P to T."
-  `(%defcommand ,name builtin-command (,@arglist) ,@body))
+  `(%defcommand ,name builtin-command t (,@arglist) ,@body))
 
 (defclass external-command (command)
   (
@@ -308,11 +329,14 @@ BODY recognizes some special keywords:
 ;; 	(slot-value o 'command-name))
 ;;   )
 
-(defmacro defexternal (name (&rest arglist))
+(defmacro defexternal (name (&rest arglist) &body body)
   "Define an external command for the shell. NAME is the name it is invoked by
 and the name of the external program. ARGLIST is a shell argument list."
-  `(%defcommand ,name external-command (,@arglist)
-     (! (string-downcase ,name))))
+  `(%defcommand ,name external-command nil (,@arglist) ,@body
+    ;; This T is because we usually don't supply anything but a docstring,
+    ;; which would otherwise be interpreted as a string to return as the
+    ;; function's value.		
+    t))
 
 (defun undefine-command (name)
   (unset-command name)
@@ -1212,8 +1236,6 @@ become keyword arguments, in a way specified in the command's arglist."
 	   (format str "..."))
 	 (when (arg-optional a)
 	   (format str "]"))))))
-
-;(defmacro defexternal 
 
 #|
 (defmacro call-with-keywords (command-name func &rest kw)

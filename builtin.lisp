@@ -217,7 +217,7 @@ from stack."
     (format t "~%")))
 
 (defparameter *help-subjects*
-  '("commands" "builtins" "editor" "keys" "options" "syntax")
+  '("commands" "builtins" "external" "editor" "keys" "options" "syntax")
   "Subjects we have help about.")
 
 (defun help-choices ()
@@ -248,6 +248,7 @@ Lish version ~a help:
 Subjects:
   help builtins       Show help on built-in commands.
   help commands       Show help on added commands.
+  help external       Show help on external commands.
   help editor         Show help on the line editor.
   help keys           Show help on key bindings.
   help options	      Show help on shell options.
@@ -321,18 +322,23 @@ Commands can be:
 		     :omit-first-prefix t :cols (get-cols))
        (terpri))))
   
-(defun print-multiple-command-help (commands &key (built-in t))
+(defun command-list (type)
+  "Return a list of commands of TYPE."
+  (sort (loop :for k :being :the :hash-values :of (lish-commands)
+	   :when (typep k type)
+	   :collect k)
+	#'string-lessp
+	:key #'command-name))
+
+(defun print-multiple-command-help (commands)
   (let ((rows
-	 (loop :with b :and doc :and pos
+	 (loop :with doc :and pos
 	    :for k :in commands :do
-	    (setf b (get-command k)
-		 doc (documentation (command-function b) 'function)
-		 pos (position #\. doc))
-	    :when (and b (or (and built-in (command-built-in-p b))
-			     (and (not built-in) (not (command-built-in-p b)))))
+	    (setf doc (documentation (command-function k) 'function)
+		  pos (position #\. doc))
 	    :collect
 	    (list
-	     (command-name b)
+	     (command-name k)
 	     ;; Only the first sentance, i.e. up to the first period,
 	     ;; without newlines.
 	     (substitute #\space #\newline
@@ -363,6 +369,7 @@ Commands can be:
     (format stream "Accepts: ~a~%" (command-accepts cmd)))
   (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
     (format stream "Loaded from: ~a~%" (command-loaded-from cmd))))
+  
 
 ;; For use by other things. Like my "doc" command.
 (defmethod documentation ((symbol symbol) (type (eql :command)))
@@ -380,21 +387,14 @@ available."
       ;; topics
       (cond
 	((equalp subject "builtins")
-	 (let ((commands
-		(sort
-		 (loop :for k :being :the :hash-keys :of (lish-commands)
-		    :collect k)
-		 #'string-lessp)))
-	   (format t "Built-in commands:~%")
-	   (print-multiple-command-help commands :built-in t)))
+	 (format t "Built-in commands:~%")
+	 (print-multiple-command-help (command-list 'builtin-command)))
 	((equalp subject "commands")
-	 (let ((commands
-		(sort
-		 (loop :for k :being :the :hash-keys :of (lish-commands)
-		    :collect k)
-		 #'string-lessp)))
-	   (format t "Defined commands:~%")
-	   (print-multiple-command-help commands :built-in nil)))
+	 (format t "Defined commands:~%")
+	 (print-multiple-command-help (command-list 'shell-command)))
+	((equalp subject "external")
+	 (format t "Defined external commands:~%")
+	 (print-multiple-command-help (command-list 'external-command)))
 	((or (equalp subject "editor"))	 (format t *editor-help*))
 	((or (equalp subject "syntax"))	 (format t *syntax-help*))
 	((or (equalp subject "options"))
