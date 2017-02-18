@@ -70,6 +70,7 @@ it's shell features.
    ;; commands
    #:command #:command-name #:command-function #:command-arglist
    #:command-built-in-p #:command-loaded-from #:command-accepts
+   #:builtin-command #:external-command
    #:defcommand
    #:!cd #:!pwd #:!pushd #:!popd #:!dirs #:!suspend #:!history #:!echo
    #:!help #:!alias #:!unalias #:!type #:!exit #:!source #:!debug #:!bind

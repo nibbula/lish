@@ -87,9 +87,9 @@
      :UNSPECIFIED	We don't know. This is the default.
      <non-keyword>	A lisp type.
      NIL		Doesn't accept anything.")
-   (built-in-p
-    :accessor command-built-in-p  :initarg :built-in-p :initform nil
-    :documentation "True if the command is considered ‘built in’.")
+   ;; (built-in-p
+   ;;  :accessor command-built-in-p  :initarg :built-in-p :initform nil
+   ;;  :documentation "True if the command is considered ‘built in’.")
    (loaded-from
     :accessor command-loaded-from :initarg :loaded-from :initform nil
     :documentation "Where the command was loaded from."))
@@ -230,7 +230,7 @@ we want to use it for something in the future."
 (defparameter *special-body-tags* #(:accepts :keys-as)
   "Keywords with special meanings appearing first in the command body.")
 
-(defmacro %defcommand (name built-in-p (&rest arglist) &body body)
+(defmacro %defcommand (name type (&rest arglist) &body body)
   "See the documentation for DEFCOMMAND."
   (let ((func-name (command-function-name name))
 	(name-string (string-downcase name))
@@ -258,10 +258,9 @@ we want to use it for something in the future."
 	 ,@fixed-body)
        (pushnew ,name-string lish::*command-list* :test #'equal)
        (set-command ,name-string
-		    (make-instance (find-symbol "COMMAND" :lish)
+		    (make-instance ',type
 				   :name ,name-string
 				   :loaded-from *load-pathname*
-				   :built-in-p ,built-in-p
 				   :accepts ',accepts
 				   :pass-keys-as
 				   ,(and pass-keys-as `(quote ,pass-keys-as))
@@ -277,16 +276,42 @@ BODY recognizes some special keywords:
            kind of things the command accepts from a pipeline.
   :KEYS-AS followed by a symbol which will be a list of the keywords and values
            given to the command function. "
-  `(%defcommand ,name nil (,@arglist) ,@body))
+  `(%defcommand ,name command (,@arglist) ,@body))
+
+(defclass builtin-command (command)
+  ()
+  (:documentation "A command that is considered parth of the shell."))
+
+(defun command-built-in-p (command)
+  "Return true if a command is a “builtin” command."
+  (typep command 'builtin-command))
 
 (defmacro defbuiltin (name (&rest arglist) &body body)
   "Just like DEFCOMMAND, except it sets BUILT-IN-P to T."
-  `(%defcommand ,name t (,@arglist) ,@body))
+  `(%defcommand ,name builtin-command (,@arglist) ,@body))
+
+(defclass external-command (command)
+  (
+   ;; @@@ Not necessary?
+   ;; (program-name
+   ;;  :initarg :program-name :accessor external-command-program-name  
+   ;;  :documentation "The name of the external program implementing the command.")
+   )
+  (:documentation "A command that is an external program to the shell."))
+
+;; This was going to intialize program-name, but maybe it's not necessary.
+;; (defmethod initialize-instance
+;;     :after ((o external-command) &rest initargs &key &allow-other-keys)
+;;   "Initialize a external-command."
+;;   (declare (ignore initargs))
+;;   (setf (slot-value o 'program-name)
+;; 	(slot-value o 'command-name))
+;;   )
 
 (defmacro defexternal (name (&rest arglist))
   "Define an external command for the shell. NAME is the name it is invoked by
 and the name of the external program. ARGLIST is a shell argument list."
-  `(%defcommand ,name t (,@arglist)
+  `(%defcommand ,name external-command (,@arglist)
      (! (string-downcase ,name))))
 
 (defun undefine-command (name)
