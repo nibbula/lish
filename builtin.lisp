@@ -398,7 +398,9 @@ available."
 	((or (equalp subject "editor"))	 (format t *editor-help*))
 	((or (equalp subject "syntax"))	 (format t *syntax-help*))
 	((or (equalp subject "options"))
-	 (format t "Shell options:~%")
+	 (format t "~
+Options can be examined and changed with the ‘opt’ command.~%~
+Shell options:~%")
 	 (print-columnar-help 
 	  (loop :for o :in (lish-options *shell*) :collect
 	     `(,(arg-name o) ,(substitute #\space #\newline (arg-help o))))))
@@ -1110,22 +1112,51 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	      (format t "~a is unknown~%" n)))))
 	 (setf args (cdr args)))))
 
+(defun edit-opt (name &optional (value nil value-supplied-p))
+  (read-from-string
+   (tiny-rl :prompt (s+ name " := ")
+	    :string (prin1-to-string
+		     (if value-supplied-p
+			 value
+			 (get-option *shell* name))))
+   nil nil))
+
 (defbuiltin opt
-  (("readable" boolean :short-arg #\r
+  ((readable boolean :short-arg #\r
     :help "True to output options that are re-readable by the shell.")
-   ("name"  option :help "Option to set.")
-   ("value" object :help "Value to set option to." :use-supplied-flag t))
+   (edit boolean :short-arg #\e :help "True to edit the option's value.")
+   (help boolean :short-arg #\h :help "True to show help for the option.")
+   (name  option :help "Option to set.")
+   (value object :help "Value to set option to." :use-supplied-flag t))
   "Examine or set shell options. Type 'help options' for descriptions."
+  (when (and help edit)
+    (error "Please supply only one of --help or --edit."))
   (if name
       (if value-supplied-p
-	  (set-option *shell* name value)
-	  (format t "~w~%" (get-option *shell* name)))
-      (if readable
-	  (loop :for o :in (lish-options *shell*) :do
-	     (format t "opt ~a ~w~%" (arg-name o) (arg-value o)))
-	  (print-properties
-	   (loop :for o :in (lish-options *shell*)
-	      :collect (list (arg-name o) (format nil "~s" (arg-value o))))
-	   :de-lispify nil :right-justify t))))
+	  (set-option *shell* name (if edit (edit-opt name value) value))
+	  (cond
+	    (help
+	     (let ((o (find-option *shell* name)))
+	       (print-columnar-help
+		`((,name ,(substitute #\space #\newline (arg-help o)))))))
+	    (edit
+	     (set-option *shell* name (edit-opt name)))
+	    (t
+	     (format t "~w~%" (get-option *shell* name)))))
+      (cond
+	(edit
+	 (format t "I don't know how to edit all the options at once yet.~%"))
+	(help
+	 (print-columnar-help 
+	  (loop :for o :in (lish-options *shell*) :collect
+	     `(,(arg-name o) ,(substitute #\space #\newline (arg-help o))))))
+	(readable
+	 (loop :for o :in (lish-options *shell*) :do
+	    (format t "opt ~a ~w~%" (arg-name o) (arg-value o))))
+	(t
+	 (print-properties
+	  (loop :for o :in (lish-options *shell*)
+	     :collect (list (arg-name o) (format nil "~s" (arg-value o))))
+	  :de-lispify nil :right-justify t)))))
       
 ;; EOF
