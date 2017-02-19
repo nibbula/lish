@@ -305,7 +305,7 @@ Commands can be:
 (defun print-columnar-help (rows)
   ;; (with-input-from-string
   ;;     (in-str (with-output-to-string (str)
-  ;; 		(table:nice-print-table
+  ;; 		(nice-print-table
   ;; 		 rows nil :trailing-spaces nil
   ;; 		 :stream str)))
   ;;   (with-lines (l in-str)
@@ -353,7 +353,7 @@ Commands can be:
   (when (and (command-arglist cmd)
 	     (not (zerop (length (command-arglist cmd)))))
     (format stream "Arguments:~%")
-    (table:nice-print-table
+    (nice-print-table
      (loop :for a :in (command-arglist cmd)
 	:when (not (arg-hidden a))
 	:collect
@@ -505,7 +505,7 @@ NAME is replaced by EXPANSION before any other evaluation."
 ;;          (make-argument-list '(("state" boolean-toggle)))))
 
 #|
-;; Just use the version from dlib-misc	;
+;; Just use the version from dlib-interactive	;
 ;; @@@ Or maybe the version from there should live here, since it's shellish?? ;
   (defun printenv (&optional original-order) ; copied from dlib-misc ;
 "Like the unix command."
@@ -537,7 +537,7 @@ environment variables. If NAME and VALUE are converted to strings if necessary."
 	  (if value
 	      (setf (nos:environment-variable name) value)
 	      (nos:environment-variable name)))		; Actually does nothing
-      (printenv)))
+      (dlib-interactive:printenv)))
 
 #|-+
  |\|   So we have (from a man page):

@@ -11,8 +11,9 @@
     :licence            "GPLv3 or something."
     :long-description   "Lish is a Lisp shell. Don't hold your breath."
     :entry-point	"lish:shell-toplevel"
-    :depends-on (:dlib :opsys :dlib-misc :stretchy :glob :tiny-rl :cl-ppcre
-		 :chipz :fatchar)
+    :depends-on (:dlib :opsys :dlib-misc :stretchy :char-util :glob :table-print
+		 :dlib-interactive :completion :keymap :terminal :terminal-ansi
+		 :tiny-rl :cl-ppcre :chipz :fatchar)
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))

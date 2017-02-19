@@ -16,8 +16,9 @@ The motivation for writing Lish came from the annoyance of having to swtich
 between a Lisp REPL and a Unix shell. But you might just want to use Lish for
 it's shell features.
 ")
-  (:use :cl :dlib :dlib-misc :opsys :char-util :stretchy :glob :completion
-	:keymap :tiny-rl :cl-ppcre :terminal :terminal-ansi :fatchar)
+  (:use :cl :dlib :opsys :dlib-misc :stretchy :char-util :glob :table-print
+	:completion :keymap :terminal :terminal-ansi :tiny-rl :cl-ppcre
+	:fatchar)
   (:export
    ;; Main entry point(s)
    #:lish

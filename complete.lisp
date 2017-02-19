@@ -217,7 +217,7 @@ literally in shell syntax."
 (defun show-double-dash-arglist (arglist)
   (let ((result (make-stretchy-string 200)))
     (with-output-to-string (str result)
-      (table:nice-print-table
+      (nice-print-table
        (loop :for a :in arglist
 	  :when (and (arg-long-arg a)
 		     (not (arg-hidden a)))
