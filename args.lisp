@@ -71,19 +71,19 @@
     :type (or character null)
     :documentation "Command line argument, short form."
     :initarg :short-arg
-    :initform nil
+    ;;:initform nil
     :accessor arg-short-arg)
    (long-arg
     :type (or string null)
     :documentation "Command line argument, long form."
     :initarg :long-arg
-    :initform nil
+    ;;:initform nil
     :accessor arg-long-arg)
    (old-long-arg
     :type (or string null)
     :documentation "Command line argument, old long form, with a single dash."
     :initarg :old-long-arg
-    :initform nil
+    ;;:initform nil
     :accessor arg-old-long-arg)
    (pattern
     :type (or string null)
@@ -97,8 +97,20 @@
     ((o argument) &rest initargs &key &allow-other-keys)
   (declare (ignore initargs))
   ;; Make the long-arg default to the name if the short-arg is set.
-  (when (slot-value o 'short-arg)
-    (setf (slot-value o 'long-arg) (princ-to-string (slot-value o 'name)))))
+  (when (and (slot-boundp o 'short-arg)
+	     (slot-value o 'short-arg)
+	     (not (slot-boundp o 'long-arg)))
+    (setf (slot-value o 'long-arg) (princ-to-string (slot-value o 'name))))
+
+  (when (not (slot-boundp o 'short-arg))
+    (setf (slot-value o 'short-arg) nil))
+
+  (when (not (slot-boundp o 'long-arg))
+    (setf (slot-value o 'long-arg) nil))
+
+  (when (not (slot-boundp o 'old-long-arg))
+    (setf (slot-value o 'old-long-arg) nil)))
+
 
 (defvar *arg-normal-flag-char* #\-
   "Normal argument flag character.")
@@ -132,8 +144,10 @@
 	    (arg-repeating o)
 	    (arg-optional o)
 	    (arg-hidden o)
-	    *arg-normal-flag-char* (arg-short-arg o)
-	    *arg-normal-flag-char* *arg-normal-flag-char* (arg-long-arg o))))
+	    *arg-normal-flag-char*
+	    (and (slot-boundp o 'short-arg) (arg-short-arg o))
+	    *arg-normal-flag-char* *arg-normal-flag-char*
+	    (and (slot-boundp o 'long-arg) (arg-long-arg o)))))
 
 (defgeneric convert-arg (arg value &optional quoted)
   (:documentation "Convert an argument value from one type to another.")
@@ -523,7 +537,8 @@ value to be converted.
   `(%defargtype ,name :lish (,@superclasses) ,@body))
 
 (defun arg-has-flag (arg)
-  (or (arg-short-arg arg) (arg-long-arg arg)))
+  (or (and (slot-boundp arg 'short-arg) (arg-short-arg arg))
+      (and (slot-boundp arg 'long-arg) (arg-long-arg arg))))
 
 ;; They must be keyworded if there are any flagged arguments.
 (defun args-keyworded (args)
