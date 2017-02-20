@@ -31,8 +31,8 @@
   "Print the current working directory."
   (format t "~a~%" (nos:current-directory)))
 
-(defbuiltin pushd (("directory" directory
-				:help "Directory to push on the stack."))
+(defbuiltin pushd
+  (("directory" directory :help "Directory to push on the stack."))
   "Change the current directory to DIR and push it on the the front of the
 directory stack."
   (when (not directory)
@@ -358,12 +358,15 @@ Commands can be:
 	:when (not (arg-hidden a))
 	:collect
 	(list (if (arg-short-arg a) (s+ "  -" (arg-short-arg a)) "  ")
-	      (if (arg-long-arg a)  (s+ "--" (arg-long-arg a)) (arg-name a))
-	      (or (arg-default a) "")
+	      (if (arg-long-arg a)  (s+ "--" (arg-long-arg a))
+		  (if (arg-short-arg a) "" (arg-name a)))
+	      #| (or (arg-default a) "") |#
 	      (string-downcase (arg-type a))
 	      (or (and (slot-boundp a 'help) (arg-help a))
 		  (arg-name a))))
-     nil :trailing-spaces nil :stream stream))
+     '("short" "long" #| "default" |# "type" ("help" :wrap))
+     :long-titles nil :print-titles nil :max-width (get-cols)
+     :trailing-spaces nil :stream stream))
   (when (and (command-accepts cmd)
 	     (not (eq (command-accepts cmd) :unspecified)))
     (format stream "Accepts: ~a~%" (command-accepts cmd)))

@@ -174,10 +174,13 @@ literally in shell syntax."
 	       (second (shell-expr-words expr))
 	       nil))))))		; We couldn't find it?
 
+(defun term-cols ()
+  "Return the terminal columns."
+  (terminal-window-columns
+   (tiny-rl::line-editor-terminal (lish-editor *shell*))))
+
 (defun list-arg-choices (command doc choices)
-  (let* ((cols
-	  (terminal-window-columns
-	   (tiny-rl::line-editor-terminal (lish-editor *shell*))))
+  (let* ((cols (term-cols))
 	 (out-str (s+ (posix-synopsis command) #\newline
 		      (or doc "") #\newline
 		      (or (and choices
@@ -232,7 +235,8 @@ literally in shell syntax."
 		    (or (and (slot-boundp a 'help) (arg-help a))
 			(format nil "~s ~(~a~)"
 				(arg-default a) (arg-type a))))))
-       nil :stream str :trailing-spaces nil))
+       '("Arg" ("desc" :wrap)) :stream str :trailing-spaces nil
+       :print-titles nil :max-width (term-cols)))
     ;; Get rid of the final newline
     (when (char= #\newline (aref result (- (length result) 1)))
       (setf (fill-pointer result) (- (length result) 2)))
