@@ -2,6 +2,47 @@
 ;; mine.lisp - Dig for command data
 ;;
 
+;; This whole thing is an horrible hack.
+;;
+;; One could postulate a world in which it could be eliminated by having every
+;; developer that makes a command, also making a defexternal or some other
+;; agreed upon format which all shells could read. Either that or I and/or my
+;; minions would submit patches to every debian/ubuntu/macports/bsdports/cygwin
+;; etc. package which provides commands, to include a defexternal or similar.
+;; Oh, and then every maintainer would keep them up to date.
+;; I think it's safe to say, that's not going to happen.
+;;
+;; Another only slightly more feasible possibility would be that we would
+;; maintain a massive accurately hand-crafted database of definitions for
+;; every command. And then somehow keep it up to date. This also seems quite
+;; unlikely, mostly for the “up to date” part.
+;;
+;; I suppose if I could muster the enormous motivation for such a project, I
+;; could devise a format which would be a superset of the capabilities of
+;; bash, zsh, fish, (others?) and lish, and develop a combined database that
+;; would encompass all the combined knowledge, and then develop modules for
+;; each shell to read it, and then submit patches, then the ‘universal’
+;; command database might a hope of being maintained. But of course the
+;; maintenance of it should really lie with the individual command
+;; implementors. This also seems very far-fetched.
+;;
+;; So instead this.
+;; The general idea is we shamelessly try dig up the command line arguments from
+;; where ever they may reside. In order of authority/accuracy that would seem
+;; to be:
+;;  1. The command executable
+;;  2. The man page
+;;  3. Some other shell's definition.
+;;
+;; Generating the data on demand has the meager advantages of:
+;;   - Only having to store data for commands you have used.
+;;   - Hopefully being as up to date as the source that's stolen from.
+;;
+;; This approach has the disadvantages of:
+;;   - Likely to fail
+;;   - Slow
+;;   - Hackish and complex
+
 (in-package :lish)
 
 (defvar *command-sections* '("man1" "man6" "man8")
@@ -98,6 +139,39 @@ a known compression suffix, then the stream is appropriately decompressed."
 	   :do
 	   (format t "    ~a~%" (basename f))
 	   (mine-file f)))))
+
+;; This is the (im)moral equivalent of screen scaping.
+(defun get-binary-usage (file)
+  "Slyly try to extract the usage from strings in a binary executable."
+  (let ((type (magic:guess-file-type file))
+	contents start end usage str)
+    (when (and (or (equal "x-executable" (magic:content-type-name type))
+		   (equal "x-sharedlib" (magic:content-type-name type)))
+	       (equal "application" (magic:content-type-category type)))
+      (with-open-file (stream file :element-type '(unsigned-byte 8))
+	(setf contents (slurp stream)
+	      start (search "usage" contents
+			    :test (lambda (a b)
+				    (char-equal a (code-char b)))))
+	(flet ((read-null-terminated-string ()
+		 (setf end (position 0 contents :start start))
+		 (when end
+		   (prog1 (map 'string #'code-char (subseq contents start end))
+		     (setf start end))))
+	       (skip-zeros ()
+		 (loop :with len = (length contents)
+		    :while (and (< start len) (zerop (aref contents start)))
+		    :do (incf start))))
+	  (when start
+	    (loop :with i = 0
+	       :while (and (setf str (read-null-terminated-string))
+			   (< i 20)
+			   (eql #\newline (aref str (1- (length str)))))
+	       :do
+	       (push str usage)
+	       (skip-zeros)
+	       (incf i)))
+	  (nreverse usage))))))
 
 (defun mine-command-help ()
   )

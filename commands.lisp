@@ -2,15 +2,14 @@
 ;; commands.lisp - How Lish does commands
 ;;
 
-;; This defines structure of commands and command arguments for Lish.
-;; Lish commands have thier own style of arguments, which are different than
-;; Lisp function arguments and Unix command arguments, but can be converted
-;; between them. This allows us to keep useful information about command
-;; arguments, but still treat Unix programs and Lisp functions as commands.
-;; The extra infomation about arguments is most useful for completion and
-;; input help.
-;;
-;; The point is to give the user a lot of assistance entering commands.
+;; This defines the structure of commands and specification of command
+;; arguments. Lish commands have thier own style of arguments, which are
+;; different than Lisp function arguments and Unix command arguments, but can
+;; be usually converted between them. This allows us to keep useful
+;; information about command arguments, but still treat Unix programs and Lisp
+;; functions as commands. The extra infomation about arguments is most useful
+;; for completion and input help. The point is to give the user a lot of
+;; assistance entering commands.
 
 (in-package :lish)
 

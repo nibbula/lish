@@ -2,11 +2,8 @@
 ;; piping.lisp - Piping for Lish
 ;;
 
-;;||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
-;;|| Piping
-;;||
-;;|| Piping, I/O redirection, and I/O functions that are useful for using in
-;;|| a lish command line or script.
+;; Piping, I/O redirection, and I/O functions that are useful for using in
+;; a lish command line or script.
 
 (in-package :lish)
 

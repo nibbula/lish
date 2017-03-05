@@ -1033,15 +1033,6 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
     (let ((c (aref str 0)))
       (if (position c "aeiouAEIOU") "an" "a"))))
 
-(defun command-type (sh command)
-  "Return a string representing the command type of command."
-  (cond
-    ((gethash command (lish-commands))	        "command")
-    ((gethash command (lish-aliases sh))        "alias")
-    ((gethash command (lish-global-aliases sh)) "global alias")
-    ((get-command-path command)		        "file")
-    (t nil)))
-
 (defun describe-command (cmd)
   (let (x)
     (cond
@@ -1062,14 +1053,14 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	 (format t "~a is the function ~s~%" cmd (symbol-function x)))))))
 
 (defbuiltin type
-    (("type-only" boolean :short-arg #\t
-      :help "Show only the type of the name.")
-     ("path-only" boolean :short-arg #\p
-      :help "Show only the path of the name.")
-     ("all" 	  boolean :short-arg #\a
-      :help "Show all definitions of the name.")
-     ("names" 	  string  :repeating t
-      :help "Names to describe."))
+  (("type-only" boolean :short-arg #\t
+    :help "Show only the type of the name.")
+   ("path-only" boolean :short-arg #\p
+    :help "Show only the path of the name.")
+   ("all" 	boolean :short-arg #\a
+    :help "Show all definitions of the name.")
+   ("names" 	string  :repeating t
+    :help "Names to describe."))
   "Describe what kind of command the name is."
   (when names
     (loop :with args = names :and n = nil :and did-one
@@ -1105,10 +1096,11 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	      (format t "~a is the function ~s~%" n (symbol-function obj))
 	      (setf did-one t)))
 	  (when (not did-one)
-	    (format t "~a in unknown~%" n)))
+	    (format t "~a is unknown~%" n)))
 	 (t
-	  (let ((tt (command-type *shell* n)))
-	    (if tt
+	  (let* ((type (command-type *shell* n))
+		 (tt (string-downcase type)))
+	    (if type
 	      (if type-only
 		  (format t "~a~%" tt)
 		  (describe-command n))
