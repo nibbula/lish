@@ -13,7 +13,7 @@
     :entry-point	"lish:shell-toplevel"
     :depends-on (:dlib :opsys :dlib-misc :stretchy :char-util :glob :table-print
 		 :dlib-interactive :completion :keymap :terminal :terminal-ansi
-		 :tiny-rl :cl-ppcre :chipz :fatchar)
+		 :tiny-rl :cl-ppcre :chipz :fatchar :magic)
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))

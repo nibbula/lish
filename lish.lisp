@@ -885,6 +885,16 @@ expanded."
 	  (format nil "~{~a ~}" (shell-expr-words new-expr)))
     new-expr))
 
+(defun command-type (sh command)
+  "Return a keyword representing the command type of COMMAND, or NIL."
+  (cond
+    ((gethash command (lish-commands))	        :command)
+    ((gethash command (lish-aliases sh))        :alias)
+    ((gethash command (lish-global-aliases sh)) :global-alias)
+    ((get-command-path command)		        :file)
+    ((and (fboundp (symbolify command)))	:function)
+    (t nil)))
+
 #|
 (defun call-command (command args context)
   "Call a command with the given POSIX style arguments.
@@ -1270,8 +1280,32 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	  ((not (shell-expr-p expr))
 	   (dbugf :lish-eval "Evaluating a Lisp expression.~%")
 	   ;; A full Lisp expression all by itself
-	   (with-package *lish-user-package*
-	     (values (multiple-value-list (eval expr)) nil t)))
+	   (typecase expr
+	     (cons
+	      (case (command-type sh (string-downcase (car expr)))
+		((:command :file)
+		 (dbugf :lish-eval "command or file expr = ~s.~%" expr)
+		 (shell-eval
+		  sh (shell-read
+		      (join (cons
+			     (string-downcase (car expr))
+			     (with-package *lish-user-package*
+			       (let ((*print-case* :downcase)
+				     (*print-escape* nil))
+				 (mapcar #'prin1-to-string (cdr expr)))))
+		       #\space))
+		  context))
+		(t
+		 (dbugf :lish-eval "non command list expr = ~s.~%" expr)
+		 (with-package *lish-user-package*
+		   (values (multiple-value-list (eval expr)) nil t)))))
+	     (string
+	      (dbugf :lish-eval "string expr = ~s.~%" expr)
+	      (shell-eval sh (shell-read expr) context))
+	     (t
+	      (dbugf :lish-eval "other expr = ~s.~%" expr)
+	      (with-package *lish-user-package*
+		(values (multiple-value-list (eval expr)) nil t)))))
 	  ((= (length (shell-expr-words expr)) 0)
 	   ;; Quick return when no words
 	   (return-from shell-eval (values nil nil nil)))
@@ -1528,18 +1562,18 @@ handling errors."
      (incf i)
      :finally (format t "~&")))
 
-(defun lish-eval (sh result state)
-  "Evaluate the shell expressions in RESULT."
+(defun lish-eval (sh expr state)
+  "Evaluate the shell expressions in EXPR."
   (dbugf 'lish-repl
-	 "~s (~a) ~s~%" result (type-of result) (eq result *empty-symbol*))
+	 "~s (~a) ~s~%" expr (type-of expr) (eq expr *empty-symbol*))
   (with-slots ((str string) (pre-str prefix-string)) state
     (cond
-      ((eq result *continue-symbol*)
+      ((eq expr *continue-symbol*)
        (if (stringp pre-str)
 	   (setf pre-str (format nil "~a~%~a" pre-str str))
 	   (setf pre-str (format nil "~a" str)))
        (dbugf 'lish-repl "DO CONTIUE!!~%"))
-      ((or (eq result *empty-symbol*) (eq result *error-symbol*))
+      ((or (eq expr *empty-symbol*) (eq expr *error-symbol*))
        ;; do nothing
        (dbugf 'lish-repl "DO NOTHING!!~%"))
       (t
@@ -1566,7 +1600,7 @@ handling errors."
 			 (invoke-debugger c)))))
 	     (force-output)
 	     (multiple-value-bind (vals stream show-vals)
-		 (shell-eval sh result nil)
+		 (shell-eval sh expr nil)
 	       (declare (ignore stream))
 	       (when show-vals
 		 (lish-print vals))))
@@ -1618,7 +1652,7 @@ handling errors."
 	(when (not (eq :lish-quick-exit (catch :lish-quick-exit
           (loop
            :named pippy
-	   :with result = nil
+	   :with expr = nil
 	   :and lvl = *lish-level*
 	   :and eof-count = 0
 	   :if (lish-exit-flag sh)
@@ -1632,21 +1666,21 @@ handling errors."
 	   (restart-case
 	     (progn
 	       (check-job-status sh)
-	       (setf result (lish-read sh state))
-	       (when (and (eq result *real-eof-symbol*) (confirm-quit))
-		 (return-from pippy result))
-	       (if (eq result *quit-symbol*)
+	       (setf expr (lish-read sh state))
+	       (when (and (eq expr *real-eof-symbol*) (confirm-quit))
+		 (return-from pippy expr))
+	       (if (eq expr *quit-symbol*)
 		   (if (and (not (lish-ignore-eof sh)) (confirm-quit))
-		       (return-from pippy result)
+		       (return-from pippy expr)
 		       (progn
 			 (when (numberp (lish-ignore-eof sh))
 			   (if (< eof-count (lish-ignore-eof sh))
 			       (incf eof-count)
 			       (if (confirm-quit)
-				   (return-from pippy result)
+				   (return-from pippy expr)
 				   (setf eof-count 0))))
 			 (format t "Type 'exit' to exit the shell.~%")))
-		   (lish-eval sh result state)))
+		   (lish-eval sh expr state)))
 	     (abort ()
 	       :report
 	       (lambda (stream)

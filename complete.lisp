@@ -181,7 +181,9 @@ literally in shell syntax."
 
 (defun list-arg-choices (command doc choices)
   (let* ((cols (term-cols))
-	 (out-str (s+ (posix-synopsis command) #\newline
+	 (out-str (s+ (if (>= *completion-count* 1)
+			  (s+ (documentation command 'function) #\newline)
+			  (s+ (posix-synopsis command) #\newline))
 		      (or doc "") #\newline
 		      (or (and choices
 			       (with-output-to-string (str)
@@ -193,26 +195,48 @@ literally in shell syntax."
       (setf out-str (subseq out-str 0 (1- (length out-str)))))
     (list out-str)))
 
+;; (defun show-dash-arglist (arglist)
+;;   (list
+;;    (with-output-to-string (str)
+;;      (loop :with print-newline = nil
+;; 	:for a :in arglist
+;; 	:when (and (arg-short-arg a)
+;; 		   (not (arg-hidden a)))
+;; 	:do
+;; #|	(format str "~:[~;~%~]-~a ~:[~;[T] ~]~25a~@[ ~a~]"
+;; 		print-newline
+;; 		(arg-short-arg a) (arg-default a) (arg-name a)
+;; 		(and (slot-boundp a 'help) (arg-help a))) |#
+;; 	(format str "~:[~;~%~] -~a ~@[ ~a~] ~:[~;~1:*[~a] ~]"
+;; 		print-newline
+;; 		(arg-short-arg a)
+;; 		(or (and (slot-boundp a 'help) (arg-help a))
+;; 		    (arg-name a))
+;; 		(arg-default a))
+;; 	(when (not print-newline)
+;; 	  (setf print-newline t))))))
+
 (defun show-dash-arglist (arglist)
-  (list
-   (with-output-to-string (str)
-     (loop :with print-newline = nil
-	:for a :in arglist
-	:when (and (arg-short-arg a)
-		   (not (arg-hidden a)))
-	:do
-#|	(format str "~:[~;~%~]-~a ~:[~;[T] ~]~25a~@[ ~a~]"
-		print-newline
-		(arg-short-arg a) (arg-default a) (arg-name a)
-		(and (slot-boundp a 'help) (arg-help a))) |#
-	(format str "~:[~;~%~] -~a ~@[ ~a~] ~:[~;~1:*[~a] ~]"
-		print-newline
-		(arg-short-arg a)
-		(or (and (slot-boundp a 'help) (arg-help a))
-		    (arg-name a))
-		(arg-default a))
-	(when (not print-newline)
-	  (setf print-newline t))))))
+  (let ((result (make-stretchy-string 200)))
+    (with-output-to-string (str result)
+      (nice-print-table
+       (loop :for a :in arglist
+	  :when (and (arg-short-arg a)
+		     (not (arg-hidden a)))
+	  :collect
+	  (list (s+ " -" (arg-short-arg a))
+		(s+ (or (and (slot-boundp a 'help)
+			     (substitute #\space #\newline (arg-help a)))
+			(arg-name a))
+		    (if (arg-default a)
+			(s+ " [" (arg-default a) "]")
+			""))))
+       '("Arg" ("desc" :wrap)) :stream str :trailing-spaces nil
+       :print-titles nil :max-width (term-cols)))
+    ;; Get rid of the final newline
+    (when (char= #\newline (aref result (- (length result) 1)))
+      (setf (fill-pointer result) (- (length result) 2)))
+    (list result)))
 
 (defvar *long-double-dash-help* nil
   "True to show longer help for double dash arguments.")
@@ -232,7 +256,8 @@ literally in shell syntax."
 		    (or (and (slot-boundp a 'help) (arg-help a))
 			(arg-name a)))
 	      (list (s+ "--" (arg-long-arg a))
-		    (or (and (slot-boundp a 'help) (arg-help a))
+		    (or (and (slot-boundp a 'help)
+			     (substitute #\space #\newline (arg-help a)))
 			(format nil "~s ~(~a~)"
 				(arg-default a) (arg-type a))))))
        '("Arg" ("desc" :wrap)) :stream str :trailing-spaces nil
