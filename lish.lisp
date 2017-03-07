@@ -1280,10 +1280,17 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	  ((not (shell-expr-p expr))
 	   (dbugf :lish-eval "Evaluating a Lisp expression.~%")
 	   ;; A full Lisp expression all by itself
-	   (typecase expr
-	     (cons
+	   (cond
+	     ((and (consp expr) expr
+		   (and (symbolp (car expr)) (fboundp (car expr))))
+	      ;; Give precedence to functions
+	      (dbugf :lish-eval "fbound expr = ~s.~%" expr)
+	      (with-package *lish-user-package*
+		(values (multiple-value-list (eval expr)) nil t)))
+	     ((consp expr)
 	      (case (command-type sh (string-downcase (car expr)))
 		((:command :file)
+		 ;; Try to do a system command in s-exp syntax
 		 (dbugf :lish-eval "command or file expr = ~s.~%" expr)
 		 (shell-eval
 		  sh (shell-read
@@ -1292,14 +1299,17 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			     (with-package *lish-user-package*
 			       (let ((*print-case* :downcase)
 				     (*print-escape* nil))
-				 (mapcar #'prin1-to-string (cdr expr)))))
+				 (mapcar (_ (if (consp _)
+						(s+ #\" (prin1-to-string _) #\")
+						(prin1-to-string _)))
+					 (cdr expr)))))
 		       #\space))
 		  context))
 		(t
 		 (dbugf :lish-eval "non command list expr = ~s.~%" expr)
 		 (with-package *lish-user-package*
 		   (values (multiple-value-list (eval expr)) nil t)))))
-	     (string
+	     ((stringp expr)
 	      (dbugf :lish-eval "string expr = ~s.~%" expr)
 	      (shell-eval sh (shell-read expr) context))
 	     (t
