@@ -234,7 +234,8 @@ literally in shell syntax."
        '("Arg" ("desc" :wrap)) :stream str :trailing-spaces nil
        :print-titles nil :max-width (term-cols)))
     ;; Get rid of the final newline
-    (when (char= #\newline (aref result (- (length result) 1)))
+    (when (and (> (length result) 0)
+	       (char= #\newline (aref result (- (length result) 1))))
       (setf (fill-pointer result) (- (length result) 2)))
     (list result)))
 
@@ -263,7 +264,8 @@ literally in shell syntax."
        '("Arg" ("desc" :wrap)) :stream str :trailing-spaces nil
        :print-titles nil :max-width (term-cols)))
     ;; Get rid of the final newline
-    (when (char= #\newline (aref result (- (length result) 1)))
+    (when (and (> (length result) 0)
+	       (char= #\newline (aref result (- (length result) 1))))
       (setf (fill-pointer result) (- (length result) 2)))
     (list result)))
 
