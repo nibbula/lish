@@ -31,22 +31,6 @@ commands are added.")
 (defun probe-file-or-dir (p)
   (or (probe-directory p) (probe-file p)))
 
-#|
-;; Perhaps, this should be in OPSYS, but of course there's also access(2).
-(defun is-executable (pathname)
-  "Given a pathname, return true if it's likely to be executable, which
-probably means it's a regular file and we have execute permission on it."
-  (let* ((stat (stat pathname))
-	 (mode (file-status-mode stat)))
-    (and (is-regular-file mode)
-	 (or (is-other-executable mode)
-	     (and (is-user-executable mode)
-		  (eql (file-status-uid stat) (geteuid)))
-	     (and (is-group-executable mode)
-		  (or (eql (file-status-gid stat) (getegid)))
-		  (position (file-status-gid stat) (get-groups)))))))
-|#
-
 (defvar *last-update* nil
   "An alist of (:<facility> . <time-code>) for storing last time we updated the
 *VERB-LIST* for various facilites. The structure of <time-code> depends on the
