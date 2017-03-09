@@ -68,7 +68,7 @@ The syntax is vaguely like:
 	(did-quote nil))		;
     (labels ((finish-word ()
 	       "Finish the current word."
-	       (dbugf 'reader "finish-word ~a~%" w)
+	       (dbugf 'reader "finish-word ~s~%" w)
 	       (when in-word
 		 (if sub-expr
 		     (progn

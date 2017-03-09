@@ -1630,7 +1630,8 @@ handling errors."
 	(confirm "quit the shell"))
       t))
 
-(defun lish (&key debug terminal-name (init-file *lishrc* init-file-supplied-p))
+(defun lish (&key debug terminal-name (init-file *lishrc* init-file-supplied-p)
+	       command)
   "Unix Shell & Lisp somehow smushed together."
   (let* ((*shell* (make-instance 'shell :debug debug))
 	 (sh *shell*)		; shorthand
@@ -1647,6 +1648,10 @@ handling errors."
 	  (format nil "~d" lish::*lish-level*))
     (when (or (not init-file-supplied-p) init-file)
       (load-rc-file sh))
+
+    (when command
+      (return-from lish (shell-eval sh (shell-read command) nil)))
+
     ;; Make a customized line editor
     (setf (lish-editor sh)
 	  (make-instance 'tiny-rl:line-editor
@@ -1656,6 +1661,7 @@ handling errors."
 			 :terminal-device-name terminal-name
 			 :local-keymap (lish-keymap sh)
 			 :prompt-func nil))
+
     (unwind-protect
       (progn
 	(start-job-control)
@@ -1725,14 +1731,31 @@ handling errors."
       (flash-msg "You the man now dog.")
       (throw :lish-quick-exit :lish-quick-exit)))
 
+(defcommand lish
+  ((command   string   :short-arg #\c :help "Command to execute.")
+   (init-file pathname :default *lishrc* :help "File to execute on startup.")
+   (greeting  boolean  :short-arg #\g :help "True to print a greeting.")
+   (debug     boolean  :short-arg #\d :help "True to turn on debugging."))
+  "Lisp Shell"
+  (when (and greeting (not command))
+    (format t "Welcome to ~a ~a~%" *shell-name* *version*))
+  ;; (format t "command = ~s~%" command) (finish-output)
+  (lish :command command :init-file init-file :debug debug))
+
 (defun shell-toplevel (&key debug)
   "For being invoked as a standalone shell."
   (setf *standalone* t)
-  (format t "Welcome to ~a ~a~%" *shell-name* *version*)
+  ;;(format t "Welcome to ~a ~a~%" *shell-name* *version*)
+  ;;(format t "Yo yo!~%") (finish-output)
   (let* ((level-string (nos:environment-variable "LISH_LEVEL")))
     (when level-string
       (setf *lish-level* (parse-integer level-string)))
-    (lish :debug debug))
+    (apply #'!lish 
+	   `(,@(posix-to-lisp-args (get-command "lish")
+				   (expr-to-words
+				    (shell-read
+				     (join (cdr (nos:lisp-args)) #\space))))
+	     :debug ,debug :greeting t)))
   (nos:exit-lisp))
 
 (defun make-standalone (&optional (name "lish"))
