@@ -502,44 +502,32 @@ NAME is replaced by EXPANSION before any other evaluation."
 	    state))
   (format t "Debugging is ~:[OFF~;ON~].~%" (lish-debug *shell*)))
 
-;; WHY WHY WHY?
-;; (format t "----------> ~(~w~)~%"
-;;         (command-to-lisp-args
-;;          (make-argument-list '(("state" boolean-toggle)))))
-
-#|
-;; Just use the version from dlib-interactive	;
-;; @@@ Or maybe the version from there should live here, since it's shellish?? ;
-  (defun printenv (&optional original-order) ; copied from dlib-misc ;
-"Like the unix command."
-(let ((mv (reduce #'max (nos:environ)
-:key #'(lambda (x) (length (symbol-name (car x))))))
-(sorted-list (if original-order
-(nos:environ)
-(sort (nos:environ) #'string-lessp
-:key #'(lambda (x) (symbol-name (car x)))))))
-(loop :for v :in sorted-list
-:do (format t "~va ~30a~%" mv (car v) (cdr v)))))
-  |#
-
 (defbuiltin export
-    (("remove" boolean :short-arg #\n
-      :help "True to stop the NAME from being exported.")
-     ("name"  string :help "Name of the variable to export.")
-     ("value" string :help "Value of the variable to export."))
+  (("remove" boolean :short-arg #\n
+    :help "True to stop the NAME from being exported.")
+   ("name"  string :help "Name of the variable to export.")
+   ("value" string :help "Value of the variable to export."))
   "Set environment variable NAME to be VALUE. Omitting VALUE, just makes sure
 the current value of NAME is exported. Omitting both, prints all the exported
-environment variables. If NAME and VALUE are converted to strings if necessary."
+environment variables. If NAME and VALUE are converted to strings if necessary.
+If NAME has an equal sign ‘=’ in it, do the POSIX shell style of NAME=value."
   (when (and name (not (stringp name)))
     (setf name (princ-to-string name)))
   (when (and value (not (stringp value)))
     (setf value (princ-to-string value)))
   (if name
-      (if remove
-	  (setf (nos:environment-variable name) nil)
-	  (if value
-	      (setf (nos:environment-variable name) value)
-	      (nos:environment-variable name)))		; Actually does nothing
+      (let (pos)
+	(cond
+	  ((setf pos (position #\= name)) ; POSIX style
+	   (let ((n (subseq name 0 pos))
+		 (v (subseq name (1+ pos))))
+	     (setf (nos:environment-variable n) v)))
+	  (remove
+	   (setf (nos:environment-variable name) nil))
+	  (value
+	   (setf (nos:environment-variable name) value))
+	  (t
+	   (nos:environment-variable name)))) ; Actually does nothing
       (dlib-interactive:printenv)))
 
 #|-+
