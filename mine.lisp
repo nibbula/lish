@@ -140,8 +140,8 @@ a known compression suffix, then the stream is appropriately decompressed."
 	   (format t "    ~a~%" (basename f))
 	   (mine-file f)))))
 
-;; This is the (im)moral equivalent of screen scaping.
-(defun get-binary-usage (file)
+;; This is the equivalent of screen scaping.
+(defun get-binary-usage-strings (file)
   "Slyly try to extract the usage from strings in a binary executable."
   (let ((type (magic:guess-file-type file))
 	contents start end usage str)
@@ -165,13 +165,87 @@ a known compression suffix, then the stream is appropriately decompressed."
 	  (when start
 	    (loop :with i = 0
 	       :while (and (setf str (read-null-terminated-string))
-			   (< i 20)
+			   (< i 200) ;; @@@ some limit?
 			   (eql #\newline (aref str (1- (length str)))))
 	       :do
 	       (push str usage)
 	       (skip-zeros)
 	       (incf i)))
 	  (nreverse usage))))))
+
+(defun get-binary-usage (file)
+  (let ((strings (flatten (mapcar (_ (split-sequence #\newline _))
+				  (get-binary-usage-strings file))))
+	usage-line doc args arg)
+    (macrolet ((match (string)
+		 `(multiple-value-setq (b e starts ends)
+		    (ppcre:scan ,string line)))
+	       (slarg (&rest props)
+		 `(progn
+		    (when arg
+		      (push arg args))
+		    (setf arg (list ,@props)))))
+    (loop :with s = strings :and (line b e starts ends)
+       :while s
+       :do
+       (setf line (car s))
+       ;; (format t "line = ~s~%" line)
+       (cond
+	 ;; initial usage line
+	 ((and (not usage-line) (ppcre:all-matches "^[Uu]sage:" line))
+	  (setf usage-line line))
+	 ;; lines of documentation before main arguments
+	 ((and (not args) (not (ppcre:scan "^\\s*-" line)))
+	  (when (not (zerop (length line)))
+	    (push line doc)))
+	 ;; -e --example       Blah blah blah.
+	 ((match "^\\s*-([A-Za-z0-9?])[,]?\\s*--([-A-Za-z0-9_/:]+)(\\s+(.*)|\\s*)$")
+	  (slarg :name      (subseq line (aref starts 1) (aref ends 1))
+		 :type	    'boolean
+		 :short-arg (char line (aref starts 0))
+		 :long-arg  (subseq line (aref starts 1) (aref ends 1))
+		 :help      (trim (subseq line (aref starts 2) (aref ends 2)))))
+	 ;; -e --example=foo   Blah blah blah.
+	 ((match "^\\s*-([A-Za-z0-9?])[,]?\\s*--([-A-Za-z0-9_/:]+)[[]*=([A-Za-z]+)[]]*(\\s+(.*)|\\s*)$")
+	  (slarg :name      (subseq line (aref starts 1) (aref ends 1))
+		 :type	    'string
+		 :short-arg (char line (aref starts 0))
+		 :long-arg  (subseq line (aref starts 1) (aref ends 1))
+		 :help      (trim (subseq line (aref starts 3) (aref ends 3)))))
+	 ;; -e                 Blah blah blah.
+	 ((match "^\\s*-([A-Za-z0-9?])\\s+(.*)$")
+	  (slarg :name (s+ "dash-" (char line (aref starts 0)))
+		 :type 'boolean
+		 :short-arg (char line (aref starts 0))
+		 :help (subseq line (aref starts 1) (aref ends 1))))
+	 ;; --example          Blah blah blah.
+	 ((match "^\\s*--([-A-Za-z0-9_/:]+)(\\s+(.*)|\\s*)$")
+	  (slarg :name (subseq line (aref starts 0) (aref ends 0))
+		 :type 'boolean
+		 :long-arg (subseq line (aref starts 0) (aref ends 0))
+		 :help (trim (subseq line (aref starts 1) (aref ends 1)))))
+	 ;; --example=foo      Blah blah blah.
+	 ((match "^\\s*--([-A-Za-z0-9_/:]+)[[]*=([A-Za-z]+)[]]*(\\s+(.*)|\\s*)$")
+	  (slarg :name (subseq line (aref starts 0) (aref ends 0))
+		 :type 'string
+		 :long-arg (subseq line (aref starts 0) (aref ends 0))
+		 :help (trim (subseq line (aref starts 2) (aref ends 2)))))
+	 ;; lines starting with spaces after args
+	 ((and arg (ppcre:scan "^\\s+" line))
+	  (setf (getf arg :help)
+		(s+ (getf arg :help)
+		    (if (not (zerop (length (getf arg :help))))
+			" " "")
+		    (trim line))))
+	 ;; start a new arg after blank lines
+	 ((zerop (length line))
+	  (when arg
+	    (push arg args))
+	  (setf arg nil)))
+       (setf s (cdr s)))
+    (when arg
+      (push arg args))
+    (values usage-line (nreverse doc) (nreverse args)))))
 
 (defun mine-command-help ()
   )
