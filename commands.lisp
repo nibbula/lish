@@ -60,7 +60,7 @@
 (defclass command ()
   ((name
     :accessor command-name        :initarg :name
-   :documentation "The string word that invokes the command.")
+    :documentation "The string word that invokes the command.")
    (function
     :accessor command-function    :initarg :function
     :documentation "The function that performs the command.")
@@ -311,12 +311,22 @@ BODY recognizes some special keywords:
   `(%defcommand ,name builtin-command t (,@arglist) ,@body))
 
 (defclass external-command (command)
-  (
-   ;; @@@ Not necessary?
-   ;; (program-name
-   ;;  :initarg :program-name :accessor external-command-program-name  
-   ;;  :documentation "The name of the external program implementing the command.")
-   )
+  ((path
+    :initarg :path :accessor external-command-path  
+    :documentation "File system path of the command.")
+   (checksum
+    :initarg :checksum :accessor external-command-checksum  
+    :documentation "Checksum for the data in the command file.")
+   (checksum-type
+    :initarg :checksum-type :accessor external-command-checksum-type  
+    :documentation
+    "Keyword indicating the algorithm used to calculate the checksum.")
+   (manual
+    :initarg :manual :accessor external-command-manual
+    :initform t :type boolean
+    :documentation
+    "True if the comannd was defined manually. False if it was defined by
+mining command data."))
   (:documentation "A command that is an external program to the shell."))
 
 ;; This was going to intialize program-name, but maybe it's not necessary.
@@ -336,6 +346,16 @@ and the name of the external program. ARGLIST is a shell argument list."
     ;; which would otherwise be interpreted as a string to return as the
     ;; function's value.		
     t))
+
+(defun make-external-command (name path arglist doc)
+  (pushnew name *command-list* :test #'equal)
+  (set-command name
+	       (make-instance 'external-command
+			      :name name
+			      :arglist arglist
+			      :path path
+			      :manual nil))
+  (setf (documentation (command-function-name name) 'function) doc))
 
 (defun undefine-command (name)
   (unset-command name)

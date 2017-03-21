@@ -4,10 +4,12 @@
 
 (in-package :lish)
 
-; (defun quoted-start (str pos)
-;   "Check if we are inside a shell quoted string and return it's starting
-;  position."
-;   (
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
+
+;; (defun quoted-start (str pos)
+;;   "Check if we are inside a shell quoted string and return it's starting
+;;  position."
+;;   (
 
 (defun complete-env-var (str all)
   ;; (complete-string-sequence
@@ -362,6 +364,11 @@ literally in shell syntax."
 	(keywordp (first (first (shell-expr-words expr))))
 	(= word-num 1))))
 
+(defun try-command (command)
+  (or (get-command command)
+      (and (mine-command command) (get-command command))
+      (and (load-lisp-command command) (get-command command))))
+
 ;; Remember, a completion functions returns:
 ;;   One completion: completion and replacement starting position
 ;;   List:           sequence and sequence length
@@ -410,7 +417,7 @@ complete, and call the appropriate completion function."
 		  (let ((from-end (- (length context) pos)))
 		    (dbug "heyba~%")
 		    (multiple-value-bind (result new-pos)
-			(if (setf cmd (get-command first-word))
+			(if (setf cmd (try-command first-word))
 			    (progn
 			      (dbug "Baaa~%")
 			      (complete-command-arg context cmd exp pos all))
@@ -465,7 +472,7 @@ complete, and call the appropriate completion function."
 	      (let ((from-end (- (length context) pos)))
 		(dbug "hello ~a~%" word)
 		(multiple-value-bind (result new-pos)
-		    (if (setf cmd (get-command first-word))
+		    (if (setf cmd (try-command first-word))
 			(progn
 			  (dbug "blurgg~%")
 			  (complete-command-arg

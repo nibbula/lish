@@ -15,7 +15,8 @@
 ;; Another only slightly more feasible possibility would be that we would
 ;; maintain a massive accurately hand-crafted database of definitions for
 ;; every command. And then somehow keep it up to date. This also seems quite
-;; unlikely, mostly for the “up to date” part.
+;; unlikely, mostly for the “up to date” part. This is what other shells seem
+;; to do.
 ;;
 ;; I suppose if I could muster the enormous motivation for such a project, I
 ;; could devise a format which would be a superset of the capabilities of
@@ -42,6 +43,7 @@
 ;;   - Likely to fail
 ;;   - Slow
 ;;   - Hackish and complex
+;;   - Incomplete
 
 (in-package :lish)
 
@@ -128,8 +130,33 @@ a known compression suffix, then the stream is appropriately decompressed."
   (with-possibly-compressed-file (f file)
     (mine-page f)))
 
+(defun manpath ()
+  "Return the manual path."
+  (or (nos:environment-variable "MANPATH")
+      (!$ "manpath")
+      (error "Can't figure out the where the manuals are.")))
+
+(defun find-manual-file (name)
+  "Return the manual page file for something named NAME."
+  (loop :for dir :in (split-sequence #\: (manpath))
+     :do
+     ;;(format t "~a:~%" dir)
+     (loop :for sec :in *command-sections*
+	:do
+	;;(format t "  ~a:~%" sec)
+	(loop :for f :in (glob (s+ dir "/" sec "/*"))
+	   ;;:do
+	   ;; (format t "    ~a~%" (path-snip-ext
+	   ;; 			 (path-snip-ext (path-file-name f))))
+	   :when (equal name (path-snip-ext (path-snip-ext (path-file-name f))))
+	   :do (return-from find-manual-file f)))))
+
+(defun mine-manual (command-name)
+  (let ((file (find-manual-file command-name)))
+    (and file (mine-file file))))
+
 (defun mine-manual-pages ()
-  (loop :for dir :in (split-sequence #\: (environment-variable "MANPATH"))
+  (loop :for dir :in (split-sequence #\: (manpath))
      :do
      (format t "~a:~%" dir)
      (loop :for sec :in *command-sections*
@@ -144,7 +171,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 (defun get-binary-usage-strings (file)
   "Slyly try to extract the usage from strings in a binary executable."
   (let ((type (magic:guess-file-type file))
-	contents start end usage str)
+	contents start end usage str (no-nl-count 0))
     (when (and (or (equal "x-executable" (magic:content-type-name type))
 		   (equal "x-sharedlib" (magic:content-type-name type)))
 	       (equal "application" (magic:content-type-category type)))
@@ -160,13 +187,20 @@ a known compression suffix, then the stream is appropriately decompressed."
 		     (setf start end))))
 	       (skip-zeros ()
 		 (loop :with len = (length contents)
-		    :while (and (< start len) (zerop (aref contents start)))
-		    :do (incf start))))
+   		    :while (and (< start len) (zerop (aref contents start)))
+		    :do (incf start)))
+	       (check-newline ()
+		 (or (and (eql #\newline (aref str (1- (length str))))
+			  (setf no-nl-count 0))
+		     (and (< no-nl-count 5) (incf no-nl-count)))))
+	  (dbugf :bin-mine "got start ~s~%" start)
 	  (when start
 	    (loop :with i = 0
 	       :while (and (setf str (read-null-terminated-string))
 			   (< i 200) ;; @@@ some limit?
-			   (eql #\newline (aref str (1- (length str)))))
+			   ;;(eql #\newline (aref str (1- (length str))))
+			   (check-newline)
+			   )
 	       :do
 	       (push str usage)
 	       (skip-zeros)
@@ -201,33 +235,33 @@ a known compression suffix, then the stream is appropriately decompressed."
 	 ;; -e --example       Blah blah blah.
 	 ((match "^\\s*-([A-Za-z0-9?])[,]?\\s*--([-A-Za-z0-9_/:]+)(\\s+(.*)|\\s*)$")
 	  (slarg :name      (subseq line (aref starts 1) (aref ends 1))
-		 :type	    'boolean
+		 :type	    'arg-boolean
 		 :short-arg (char line (aref starts 0))
 		 :long-arg  (subseq line (aref starts 1) (aref ends 1))
 		 :help      (trim (subseq line (aref starts 2) (aref ends 2)))))
 	 ;; -e --example=foo   Blah blah blah.
 	 ((match "^\\s*-([A-Za-z0-9?])[,]?\\s*--([-A-Za-z0-9_/:]+)[[]*=([A-Za-z]+)[]]*(\\s+(.*)|\\s*)$")
 	  (slarg :name      (subseq line (aref starts 1) (aref ends 1))
-		 :type	    'string
+		 :type	    'arg-string
 		 :short-arg (char line (aref starts 0))
 		 :long-arg  (subseq line (aref starts 1) (aref ends 1))
 		 :help      (trim (subseq line (aref starts 3) (aref ends 3)))))
 	 ;; -e                 Blah blah blah.
 	 ((match "^\\s*-([A-Za-z0-9?])\\s+(.*)$")
 	  (slarg :name (s+ "dash-" (char line (aref starts 0)))
-		 :type 'boolean
+		 :type 'arg-boolean
 		 :short-arg (char line (aref starts 0))
 		 :help (subseq line (aref starts 1) (aref ends 1))))
 	 ;; --example          Blah blah blah.
 	 ((match "^\\s*--([-A-Za-z0-9_/:]+)(\\s+(.*)|\\s*)$")
 	  (slarg :name (subseq line (aref starts 0) (aref ends 0))
-		 :type 'boolean
+		 :type 'arg-boolean
 		 :long-arg (subseq line (aref starts 0) (aref ends 0))
 		 :help (trim (subseq line (aref starts 1) (aref ends 1)))))
 	 ;; --example=foo      Blah blah blah.
 	 ((match "^\\s*--([-A-Za-z0-9_/:]+)[[]*=([A-Za-z]+)[]]*(\\s+(.*)|\\s*)$")
 	  (slarg :name (subseq line (aref starts 0) (aref ends 0))
-		 :type 'string
+		 :type 'arg-string
 		 :long-arg (subseq line (aref starts 0) (aref ends 0))
 		 :help (trim (subseq line (aref starts 2) (aref ends 2)))))
 	 ;; lines starting with spaces after args
@@ -245,7 +279,56 @@ a known compression suffix, then the stream is appropriately decompressed."
        (setf s (cdr s)))
     (when arg
       (push arg args))
-    (values usage-line (nreverse doc) (nreverse args)))))
+
+    (when usage-line
+      (make-mined-cmd
+       :name (path-file-name file)
+       :short-description usage-line
+       :long-description (join (nreverse doc) #\newline)
+       :args (nreverse args))))))
+
+(defun convert-arglist (arglist)
+  (loop :with type
+     :for a :in arglist
+     :do
+     (setf type (getf a :type))
+     ;;(remf a :type)
+     :collect (apply #'make-instance type a)))
+
+;; @@@ Implement checksums 
+(defun mine-command (command-name)
+  (let* ((cmd (get-command command-name))
+	 (path (command-pathname command-name))
+	 (mined (or (and path (get-binary-usage path))
+		    (mine-manual command-name))))
+    (when mined
+      (cond
+	((not cmd)
+	 ;; make a new external command
+	 (make-external-command command-name
+				path
+				(convert-arglist (mined-cmd-args mined))
+				(join (flatten
+				       (append
+					(list
+					 (mined-cmd-short-description mined))
+					(list
+					 (mined-cmd-long-description mined))))
+				      #\newline)))
+	((typep cmd 'external-command)
+	 (cond
+	   ((external-command-manual cmd)
+	    (error "Won't override a manual command."))
+	   (t
+	    (setf (command-arglist cmd) (convert-arglist (mined-cmd-args mined))
+		  (documentation (command-function-name command-name) 'function)
+		  (join (flatten
+			 (append
+			  (list (mined-cmd-short-description mined))
+			  (list (mined-cmd-long-description mined))))
+			#\newline)))))
+	(t
+	 (error "Command must be external or undefined to mine it."))))))
 
 (defun mine-command-help ()
   )
