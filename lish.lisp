@@ -1404,17 +1404,13 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	    (error "End of file in expression. Probably starting at line ~a."
 		   expression-start-line)))))))
 
-(defun load-rc-file (sh)
+(defun load-rc-file (sh init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
-;;;  (without-warning
-  (let ((file (or *lishrc*
-		  (merge-pathnames (user-homedir-pathname)
-				   (make-pathname :name ".lishrc"))))
-	;; I don't like this special case, but ...
+  ;; I don't like this special case, but ...
+  (let ((file (expand-variables init-file))
 	(*lish-user-package* (find-package :lish-user)))
     (if (probe-file file)
 	(load-file sh file)
-	;(when (lish-debug sh)
 	(format t "Couldn't find RC file: ~s~%" file))))
 
 (defun find-id (shell)
@@ -1630,7 +1626,8 @@ handling errors."
 	(confirm "quit the shell"))
       t))
 
-(defun lish (&key debug terminal-name (init-file *lishrc* init-file-supplied-p)
+(defun lish (&key debug terminal-name
+	       (init-file *default-lishrc* init-file-supplied-p)
 	       command)
   "Unix Shell & Lisp somehow smushed together."
   (let* ((*shell* (make-instance 'shell :debug debug))
@@ -1647,10 +1644,16 @@ handling errors."
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
     (when (or (not init-file-supplied-p) init-file)
-      (load-rc-file sh))
+      (load-rc-file sh init-file))
 
     (when command
-      (return-from lish (shell-eval sh (shell-read command) nil)))
+      (start-job-control)
+      (let ((result (lish-eval sh (shell-read command) (make-read-state))))
+	(stop-job-control saved-sigs)
+	(run-hooks *exit-shell-hook*)
+	(return-from lish (if (lish-exit-values sh)
+			      (values-list (lish-exit-values sh))
+			      result))))
 
     ;; Make a customized line editor
     (setf (lish-editor sh)
@@ -1733,29 +1736,48 @@ handling errors."
 
 (defcommand lish
   ((command   string   :short-arg #\c :help "Command to execute.")
-   (init-file pathname :default *lishrc* :help "File to execute on startup.")
+   (init-file pathname :short-arg #\i
+    :default *default-lishrc* :use-supplied-flag t
+    :help "File to execute on startup.")
    (greeting  boolean  :short-arg #\g :help "True to print a greeting.")
    (debug     boolean  :short-arg #\d :help "True to turn on debugging."))
   "Lisp Shell"
   (when (and greeting (not command))
     (format t "Welcome to ~a ~a~%" *shell-name* *version*))
-  ;; (format t "command = ~s~%" command) (finish-output)
+  (when (not init-file-supplied-p)
+    (setf init-file *default-lishrc*))
+  ;;(format t "init-file = ~s~%" init-file)
+  ;;(format t "command = ~s~%" command) (finish-output)
   (lish :command command :init-file init-file :debug debug))
 
-(defun shell-toplevel (&key debug)
+(defun wordify-list (word-list)
+  "Return a list of shell words that is like the strings in word-list separated
+by spaces."
+  (loop :with pos = 0
+     :for w :in word-list
+     :collect (make-shell-word :word w :start pos :end (+ pos (length w)))
+     :do (incf pos (1+ (length w)))))
+
+(defun shell-toplevel ()
   "For being invoked as a standalone shell."
   (setf *standalone* t)
   ;;(format t "Welcome to ~a ~a~%" *shell-name* *version*)
-  ;;(format t "Yo yo!~%") (finish-output)
-  (let* ((level-string (nos:environment-variable "LISH_LEVEL")))
+  ;;(format t "Yo yo! ~s~%" (nos:lisp-args)) (finish-output)
+  ;;(trace lish)
+  ;;(trace !lish)
+  (let* ((level-string (nos:environment-variable "LISH_LEVEL"))
+	 ;;(args-expr (when (cdr (nos:lisp-args))
+	 ;;  (shell-read (join (cdr (nos:lisp-args)) #\space
+	 ;;(args-expr (wordify-list (nos:lisp-args)))
+	 )
     (when level-string
       (setf *lish-level* (parse-integer level-string)))
-    (apply #'!lish 
-	   `(,@(posix-to-lisp-args (get-command "lish")
-				   (expr-to-words
-				    (shell-read
-				     (join (cdr (nos:lisp-args)) #\space))))
-	     :debug ,debug :greeting t)))
+    (if (cdr (nos:lisp-args))
+	(apply #'!lish
+	       `(,@(posix-to-lisp-args (get-command "lish")
+				       (wordify-list (cdr (nos:lisp-args))))
+		   :greeting t))
+	(!lish :greeting t)))
   (nos:exit-lisp))
 
 (defun make-standalone (&optional (name "lish"))

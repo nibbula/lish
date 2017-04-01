@@ -4,6 +4,9 @@
 
 (in-package :lish)
 
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+		   (compilation-speed 0)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Versioning
 
@@ -97,6 +100,9 @@ means every dumped executable.")
 
 (defparameter *options* nil
   "List of options defined.")
+
+(defvar *default-lishrc* "$HOME/.lishrc"
+  "Default value for the start up file.")
 
 (defvar *lishrc* nil
   "Pathname of the start up file.")
