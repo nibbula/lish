@@ -59,8 +59,7 @@
 (defmacro with-possibly-compressed-file ((stream-var filename) &body body)
   "Evaluate the BODY with STREAM-VAR open on FILENAME. If FILENAME has
 a known compression suffix, then the stream is appropriately decompressed."
-  (let ((out-str   (gensym "wpcf-out-str"))
-	(in-stream (gensym "wpcf-in-stream"))
+  (let ((in-stream (gensym "wpcf-in-stream"))
 	(method    (gensym "wpcf-method")))
     `(let (,method)
        (if (setf ,method
@@ -71,13 +70,12 @@ a known compression suffix, then the stream is appropriately decompressed."
 	     (format t "Uncompressing~%")
 	     (with-input-from-string
 		 (,stream-var
-		  (with-output-to-string (,out-str
-					  nil :element-type '(unsigned-byte 8))
-		    (with-open-file (,in-stream
-				     ,filename
-				     :direction :input
-				     :element-type '(unsigned-byte 8))
-		      (chipz:decompress ,out-str ,method ,in-stream))))
+		  (map 'string #'code-char
+		       (with-open-file (,in-stream
+					,filename
+					:direction :input
+					:element-type '(unsigned-byte 8))
+			 (chipz:decompress nil ,method ,in-stream))))
 	       ,@body))
 	   (progn
 	     (format t "Plain~%")
@@ -98,32 +96,61 @@ a known compression suffix, then the stream is appropriately decompressed."
   long-description
   args)
 
+(defun get-request (line)
+  (let (req args)
+    (multiple-value-setq (req args) 
+      (ppcre:scan-to-strings "\\.([^ ]*)\\s+(.*)$" line))
+    (when req
+      args)))
+
 (defun mine-page (stream)
-  (let ((cmd (make-mined-cmd)) line next)
+  (let ((cmd (make-mined-cmd)) line next match strings)
     (loop
        :while (setf line (read-line stream nil nil))
        :do
        (cond
 	 ((eq next 'name)
+	  (dbugf :mine-man "blurg ~s~%" line)
 	  (cond
 	    ((begins-with ".Nm" line :test #'equalp)
 	     (setf (mined-cmd-name cmd) (subseq line 4)
 		   next 'short-description))
-	    ((ppcre:all-matches "^\\(\\w+\\s+\\\\-\\s+" line)
-	     (setf (mined-cmd-name cmd) (subseq line 4)
-		   next 'short-description))))
+	    ((multiple-value-setq (match strings)
+	       (ppcre:scan-to-strings "^\\s*(\\w+)\\s+\\\\-\\s+(.*)$" line))
+	     (dbugf :mine-man "got name~%")
+	     (setf (mined-cmd-name cmd) (aref strings 0)
+		   (mined-cmd-short-description cmd) (aref strings 1))))
+	  (setf next nil))
+	 ((eq next 'synopsis)
+	  (setf next nil))
 	 ((eq next 'short-description)
-	  (setf (mined-cmd-short-description cmd) (subseq line 4)))
-	 ((begins-with ".Sh" line :test #'equalp)
+	  (setf (mined-cmd-short-description cmd) (subseq line 4))
+	  (setf next nil))
+	 ((eq next 'long-description)
+	  (cond
+	    ((begins-with ".\\\"" line) #| ignore comment |# )
+	    ((begins-with ".B" line)
+	     (push (subseq line 3) (mined-cmd-long-description cmd))))
+	  (setf next nil))
+	 ((begins-with ".\\\"" line)
+	  ;; ignore comments
+	  )
+	 ((begins-with ".sh" line :test #'equalp)
 	  (cond
 	    ((equalp (subseq line 4) "NAME")
+	     (dbugf :mine-man "Name~%")
 	     (setf next 'name))
 	    ((equalp (subseq line 4) "DESCRIPTION")
+	     (dbugf :mine-man "Description~%")
+	     (setf next 'long-description))
+	    ((equalp (subseq line 4) "OPTIONS")
+	     (dbugf :mine-man "Options~%")
+	     (setf next 'options))
+	    ((equalp (subseq line 4) "SYNOPSIS")
+	     (dbugf :mine-man "Synopsis~%")
 	     (setf next 'long-description))))
 	 ((begins-with ".Nd" line :test #'equalp)
-	  (setf (mined-cmd-short-description cmd) (subseq line 4)))
-	 ((begins-with ".Nd" line :test #'equalp)
-	  )))
+	  (setf (mined-cmd-short-description cmd) (subseq line 4)))))
     cmd))
 	  
 (defun mine-file (file)
@@ -167,6 +194,9 @@ a known compression suffix, then the stream is appropriately decompressed."
 	   (format t "    ~a~%" (basename f))
 	   (mine-file f)))))
 
+(defparameter *newline-fudge* 5
+  "How many strings without newlines to prospectively tolerate.")
+
 ;; This is the equivalent of screen scaping.
 (defun get-binary-usage-strings (file)
   "Slyly try to extract the usage from strings in a binary executable."
@@ -192,8 +222,8 @@ a known compression suffix, then the stream is appropriately decompressed."
 	       (check-newline ()
 		 (or (and (eql #\newline (aref str (1- (length str))))
 			  (setf no-nl-count 0))
-		     (and (< no-nl-count 5) (incf no-nl-count)))))
-	  (dbugf :bin-mine "got start ~s~%" start)
+		     (and (< no-nl-count *newline-fudge*) (incf no-nl-count)))))
+	  (dbugf :mine-bin "got start ~s~%" start)
 	  (when start
 	    (loop :with i = 0
 	       :while (and (setf str (read-null-terminated-string))
@@ -230,8 +260,10 @@ a known compression suffix, then the stream is appropriately decompressed."
 	  (setf usage-line line))
 	 ;; lines of documentation before main arguments
 	 ((and (not args) (not (ppcre:scan "^\\s*-" line)))
-	  (when (not (zerop (length line)))
-	    (push line doc)))
+	  (if (zerop (length line))
+	      (when (stringp (car doc))
+		(rplaca doc (s+ (car doc) #\newline)))
+	      (push line doc)))
 	 ;; -e --example       Blah blah blah.
 	 ((match "^\\s*-([A-Za-z0-9?])[,]?\\s*--([-A-Za-z0-9_/:]+)(\\s+(.*)|\\s*)$")
 	  (slarg :name      (subseq line (aref starts 1) (aref ends 1))
@@ -279,11 +311,27 @@ a known compression suffix, then the stream is appropriately decompressed."
        (setf s (cdr s)))
     (when arg
       (push arg args))
+    (when doc
+      (if args
+	  ;; Get rid of up to *newline-fudge* doc strings with no newlines.
+	  (loop :with i = 0
+	     :while (and (< i *newline-fudge*)
+			 (char/= #\newline
+				 (char (car doc) (1- (length (car doc))))))
+	     :do
+	     (setf doc (cdr doc))
+	     (incf i))
+	  ;; If we didn't find any command line args, chances are good
+	  ;; the doc is junk.
+	  (setf doc
+		(if (char= #\newline (char (car doc) (1- (length (car doc)))))
+		    (list (car doc))
+		    nil))))
 
     (when usage-line
       (make-mined-cmd
        :name (path-file-name file)
-       :short-description usage-line
+       :short-description (replace-subseq "%s" (path-file-name file) usage-line)
        :long-description (join (nreverse doc) #\newline)
        :args (nreverse args))))))
 
