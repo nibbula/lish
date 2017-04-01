@@ -366,8 +366,8 @@ literally in shell syntax."
 
 (defun try-command (command)
   (or (get-command command)
-      (and (mine-command command) (get-command command))
-      (and (load-lisp-command command) (get-command command))))
+      (and (load-lisp-command command) (get-command command))
+      (and (mine-command command) (get-command command))))
 
 ;; Remember, a completion functions returns:
 ;;   One completion: completion and replacement starting position
