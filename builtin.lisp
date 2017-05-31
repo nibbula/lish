@@ -454,11 +454,17 @@ NAME is replaced by EXPANSION before any other evaluation."
       (gethash name (lish-global-aliases shell))
       (gethash name (lish-aliases shell))))
 
+(defun edit-alias (name &key global)
+  (tiny-rl :prompt (s+ "alias " name " ")
+	   :string (or (get-alias name :global global
+				  :shell *shell*)
+		       "")))
+
 (defbuiltin alias
-    (("global"    boolean :short-arg #\g
-      :help "True to define a global alias.")
-     ("name"      string :help "Name of the alias.")
-     ("expansion" string :help "Text to expand to."))
+    ((global    boolean :short-arg #\g :help "True to define a global alias.")
+     (edit	boolean :short-arg #\e :help "True to edit the alias's value.")
+     (name      string :help "Name of the alias.")
+     (expansion string :help "Text to expand to."))
   "Define NAME to expand to EXPANSION when starting a line."
   (if (not name)
       (loop :for a :being :the :hash-keys
@@ -467,8 +473,10 @@ NAME is replaced by EXPANSION before any other evaluation."
 	 (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
 		 a (get-alias a :global global :shell *shell*)))
       (if (not expansion)
-	  (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
-		  name (get-alias name :global global :shell *shell*))
+	  (if edit
+	      (set-alias name (edit-alias name) :global global)
+	      (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
+		      name (get-alias name :global global :shell *shell*)))
 	  (set-alias name expansion :global global :shell *shell*))))
 
 (defbuiltin unalias
