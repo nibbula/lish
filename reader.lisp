@@ -105,7 +105,19 @@ The syntax is vaguely like:
 	     (read-lisp-expr ()
 	       (handler-bind
 		   ((end-of-file (_  (declare (ignore _)) (do-continue)))
-		    (reader-error (_ (do-reader-error _))))
+		    ;; The spec is a bit vauge about what type of error should
+		    ;; be signaled if a symbol with a package marker doesn't
+		    ;; exist. In section 2.3.5 it says it should be correctable
+		    ;; and the effect should be the same as reading the symbol
+		    ;; with *package* set to the package prefix, but there's no
+		    ;; symbol existence error that can happen the when it's not
+		    ;; prefixed.
+		    ;;
+		    ;; For example SBCL signals a reader-error, while CCL
+		    ;; signals a simple-error. I guess we should catch either?
+		    ;; This really only matters when partial is set.
+		    (reader-error (_ (do-reader-error _)))
+		    (simple-error (_ (do-reader-error _))))
 		 ;; read a form as a separate word
 		 (multiple-value-bind (obj pos)
 		     (with-package package
