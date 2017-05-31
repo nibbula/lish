@@ -247,7 +247,7 @@ literally in shell syntax."
 			     (substitute #\space #\newline (arg-help a)))
 			(format nil "~s ~(~a~)"
 				(arg-default a) (arg-type a))))))
-       '("Arg" ("desc" :wrap)) :stream str :trailing-spaces nil
+       '(("Arg" :overflow) ("desc" :wrap)) :stream str :trailing-spaces nil
        :print-titles nil :max-width (term-cols)))
     ;; Get rid of the final newline
     (when (and (> (length result) 0)
@@ -365,8 +365,15 @@ literally in shell syntax."
 	(= word-num 1))))
 
 (defun try-command (command)
+  "See if we can dig up the dirt on a command named COMMAND.
+Uses the first available of:
+  - an already loaded command
+  - a command which we load by the normal command path mechanism
+  - a pre-defined external command, from an external command cache
+  - a mined external command"
   (or (get-command command)
       (and (load-lisp-command command) (get-command command))
+      ;;(and (load-external-command command) (get-command command))
       (and (mine-command command) (get-command command))))
 
 ;; Remember, a completion functions returns:
@@ -377,9 +384,11 @@ literally in shell syntax."
   (declare (type string context))
   "Analyze the context and try figure out what kind of thing we want to ~
 complete, and call the appropriate completion function."
+  (dbug "shell-complete~%")
   (let ((exp (ignore-errors (shell-read context :partial t
 					:package *junk-package*)))
 	cmd)
+    (dbug "exp is a ~a~%" (type-of exp))
     (typecase exp
       (cons
        (dbug "Hellow I am janky!~%")

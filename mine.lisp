@@ -6,11 +6,11 @@
 ;;
 ;; One could postulate a world in which it could be eliminated by having every
 ;; developer that makes a command, also making a defexternal or some other
-;; agreed upon format which all shells could read. Either that or I and/or my
-;; minions would submit patches to every debian/ubuntu/macports/bsdports/cygwin
-;; etc. package which provides commands, to include a defexternal or similar.
-;; Oh, and then every maintainer would keep them up to date.
-;; I think it's safe to say, that's not going to happen.
+;; agreed upon format which all shells could read. Either that or we would
+;; submit patches to every debian/ubuntu/macports/bsdports/cygwin etc. package
+;; which provides commands, to include a defexternal or similar.  Oh, and then
+;; every maintainer would keep them up to date.  I think it's safe to say,
+;; that's not going to happen.
 ;;
 ;; Another only slightly more feasible possibility would be that we would
 ;; maintain a massive accurately hand-crafted database of definitions for
@@ -110,14 +110,14 @@ a known compression suffix, then the stream is appropriately decompressed."
        :do
        (cond
 	 ((eq next 'name)
-	  (dbugf :mine-man "blurg ~s~%" line)
+	  (dbugf 'mine-man "blurg ~s~%" line)
 	  (cond
 	    ((begins-with ".Nm" line :test #'equalp)
 	     (setf (mined-cmd-name cmd) (subseq line 4)
 		   next 'short-description))
 	    ((multiple-value-setq (match strings)
 	       (ppcre:scan-to-strings "^\\s*(\\w+)\\s+\\\\-\\s+(.*)$" line))
-	     (dbugf :mine-man "got name~%")
+	     (dbugf 'mine-man "got name~%")
 	     (setf (mined-cmd-name cmd) (aref strings 0)
 		   (mined-cmd-short-description cmd) (aref strings 1))))
 	  (setf next nil))
@@ -138,16 +138,16 @@ a known compression suffix, then the stream is appropriately decompressed."
 	 ((begins-with ".sh" line :test #'equalp)
 	  (cond
 	    ((equalp (subseq line 4) "NAME")
-	     (dbugf :mine-man "Name~%")
+	     (dbugf 'mine-man "Name~%")
 	     (setf next 'name))
 	    ((equalp (subseq line 4) "DESCRIPTION")
-	     (dbugf :mine-man "Description~%")
+	     (dbugf 'mine-man "Description~%")
 	     (setf next 'long-description))
 	    ((equalp (subseq line 4) "OPTIONS")
-	     (dbugf :mine-man "Options~%")
+	     (dbugf 'mine-man "Options~%")
 	     (setf next 'options))
 	    ((equalp (subseq line 4) "SYNOPSIS")
-	     (dbugf :mine-man "Synopsis~%")
+	     (dbugf 'mine-man "Synopsis~%")
 	     (setf next 'long-description))))
 	 ((begins-with ".Nd" line :test #'equalp)
 	  (setf (mined-cmd-short-description cmd) (subseq line 4)))))
@@ -223,7 +223,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 		 (or (and (eql #\newline (aref str (1- (length str))))
 			  (setf no-nl-count 0))
 		     (and (< no-nl-count *newline-fudge*) (incf no-nl-count)))))
-	  (dbugf :mine-bin "got start ~s~%" start)
+	  (dbugf 'mine-bin "got start ~s~%" start)
 	  (when start
 	    (loop :with i = 0
 	       :while (and (setf str (read-null-terminated-string))
@@ -249,11 +249,12 @@ a known compression suffix, then the stream is appropriately decompressed."
 		    (when arg
 		      (push arg args))
 		    (setf arg (list ,@props)))))
+    (dbugf 'mine-bin "not very ~s~%" (length strings))
     (loop :with s = strings :and (line b e starts ends)
        :while s
        :do
        (setf line (car s))
-       ;; (format t "line = ~s~%" line)
+       (dbugf 'mine-bin "line = ~s~%" line)
        (cond
 	 ;; initial usage line
 	 ((and (not usage-line) (ppcre:all-matches "^[Uu]sage:" line))
@@ -312,10 +313,12 @@ a known compression suffix, then the stream is appropriately decompressed."
     (when arg
       (push arg args))
     (when doc
+      (dbugf 'mine-bin "what up doc ~s~%" (car doc))
       (if args
 	  ;; Get rid of up to *newline-fudge* doc strings with no newlines.
 	  (loop :with i = 0
-	     :while (and (< i *newline-fudge*)
+	     :while (and doc
+			 (< i *newline-fudge*)
 			 (char/= #\newline
 				 (char (car doc) (1- (length (car doc))))))
 	     :do

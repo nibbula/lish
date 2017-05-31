@@ -361,6 +361,38 @@ and the name of the external program. ARGLIST is a shell argument list."
   (unset-command name)
   (setf *command-list* (delete name *command-list*)))
 
+(defun in-lisp-path (command)
+  "Return true if a command can be found by ASDF."
+  ;; (loop :with path
+  ;;    :for dir :in *lisp-path* :do
+  ;;    (when (setf path (probe-file (s+ dir command)))
+  ;;      (asdf::resolve-symlinks path))))	; XXX I know, this is cheating.
+  ;; Maybe we should make our own system search function?
+  ;;  i.e. push on asdf:*system-definition-search-functions*
+  (typecase command
+    ((or string keyword symbol)
+     (ignore-errors (asdf:find-component nil command)))
+    (t nil)))
+
+(defun load-lisp-command (command)
+  "Load a command in the lisp path."
+  (let* ((pkg (intern (string-upcase command) :keyword)))
+    (if (ignore-errors (asdf:oos 'asdf:load-op pkg :verbose nil))
+	;; succeeded
+	(progn 
+	  ;; (init-commands sh)
+	  (get-command command))
+	;; failed
+	nil)))
+
+;; (defun load-external-command (command)
+;;   "Try to load an external command definition."
+;;   (let* ((path (command-pathname command))
+;; 	 (path-list (split-path path)))
+;;     (when path
+;;       path-list
+;;       )))
+
 #|
   (defclass arg-list ()
 (arg-list-list)
