@@ -379,7 +379,8 @@ and the name of the external program. ARGLIST is a shell argument list."
   (let* ((pkg (intern (string-upcase command) :keyword)))
     (if (ignore-errors (asdf:oos 'asdf:load-op pkg :verbose nil))
 	;; succeeded
-	(progn 
+	(progn
+	  (dbugf :lish-load "load-lisp-command")
 	  ;; (init-commands sh)
 	  (get-command command))
 	;; failed

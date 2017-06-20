@@ -307,7 +307,7 @@ Symbols will be replaced by their value."
 	 (when (> len 1)
 	   (setf out-char (aref out (1- len))
 		 cols (terminal-window-columns
-		       (tiny-rl::line-editor-terminal
+		       (rl:line-editor-terminal
 			(lish-editor sh))))
 	   (loop :repeat (- cols len)
 	      :do (write-char out-char str))))))
@@ -511,13 +511,13 @@ Symbols will be replaced by their value."
     ("SHLVL"    nil "Shell level"		  	 *lish-level*)
     ("COLUMNS"  nil "Terminal character columns"
      ,#'(lambda () (terminal-window-columns
-	      (tiny-rl::line-editor-terminal (lish-editor *shell*)))))
+	      (rl:line-editor-terminal (lish-editor *shell*)))))
     ("ROWS"     nil "Terminal character rows"
      ,#'(lambda () (terminal-window-rows
-	      (tiny-rl::line-editor-terminal (lish-editor *shell*)))))
+	      (rl:line-editor-terminal (lish-editor *shell*)))))
     ("LINES"    nil "Terminal character rows"
      ,#'(lambda () (terminal-window-rows
-	      (tiny-rl::line-editor-terminal (lish-editor *shell*)))))
+	      (rl:line-editor-terminal (lish-editor *shell*)))))
     ("$"        nil "Current process ID"	  	 ,#'os-unix:getpid)
     ("!"        nil "Process ID of the previous command" nil)	;; @@@
     ("?"        nil "Result of the last command." 	 nil))) ;; @@@
@@ -677,12 +677,12 @@ Remove backquotes."
 (defun shell-expand-line (editor)
   "A command to expand the current line."
   ;;(format t "editor is a ~a = ~s~%" (type-of editor) editor)
-  (let ((buf (tiny-rl::buf editor)))
+  (let ((buf (rl::buf editor)))
     (let ((words (possibly-expand-aliases
 		  *shell*
 		  (lisp-exp-eval
 		   (expr-to-words (do-expansions (shell-read buf)))))))
-      (tiny-rl::replace-buffer
+      (rl::replace-buffer
        editor
        (with-output-to-string (str)
 	 (when (first words)
@@ -1487,7 +1487,7 @@ handling errors."
 		  (format t "~%") (finish-output)
 		  (invoke-restart (find-restart 'abort))))
 	     ;; So we can step through functions
-#|	     #+sbcl (sb-ext::step-condition 'tiny-rl::repple-stepper) |#
+#|	     #+sbcl (sb-ext::step-condition 'rl::repple-stepper) |#
 #|	     (condition #'(lambda (c)
 			    (if (lish-debug sh)
 				(invoke-debugger c)
@@ -1500,7 +1500,7 @@ handling errors."
 			      (signal c))))))
 	  (progn
 	    ;;(break)
-	    (setf str (tiny-rl
+	    (setf str (rl
 		       :eof-value *real-eof-symbol*
 		       :quit-value *quit-symbol*
 		       :context :lish
@@ -1529,7 +1529,7 @@ handling errors."
       (error (c)
 	(if (lish-debug sh)
 	    (invoke-debugger c)
-	    (format t "~&~a" c))
+	    (format t "~&~a~&" c))
 	*error-symbol*))))
 
 (defun lish-print (values)
@@ -1618,8 +1618,9 @@ handling errors."
       (update-user-package))
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
-    (when (or (not init-file-supplied-p) init-file)
-      (load-rc-file sh init-file))
+    (when (or (not init-file-supplied-p) init-file *lishrc*)
+      (load-rc-file sh (or (and (not init-file-supplied-p) *lishrc*)
+			   init-file)))
 
     (when command
       (start-job-control)
@@ -1632,7 +1633,7 @@ handling errors."
 
     ;; Make a customized line editor
     (setf (lish-editor sh)
-	  (make-instance 'tiny-rl:line-editor
+	  (make-instance 'rl:line-editor
 			 :non-word-chars *shell-non-word-chars*
 			 :completion-func #'shell-complete
 			 :context :lish

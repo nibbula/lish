@@ -197,10 +197,10 @@ from stack."
       "FILENAME is only useful with READ, WRITE, APPEND, or READ-NOT-READ.")))
   (cond
     (clear
-     (tiny-rl:history-clear :lish))
-    ;; @@@ TODO: finish this when history saving in tiny-rl is done.
+     (rl:history-clear :lish))
+    ;; @@@ TODO: finish this when history saving in rl is done.
     (t
-     (tiny-rl:show-history :lish))))
+     (rl:show-history :lish))))
 
 ;; This seems stupid and unnecessary. 
 ;; (defbuiltin #:|:| (("args" t :repeating t))
@@ -312,7 +312,7 @@ Commands can be:
   ;;     ;; add spaces in front and clip to screen columns
   ;;     (format t "  ~a~%" (subseq l 0 (min (length l)
   ;; 					  (- (get-cols) 2)))))))
-  (let ((prefix-size (loop :for (a b) :in rows :maximize (length a))))
+  (let ((prefix-size (loop :for a :in rows :maximize (length (car a)))))
     (loop :for (a b) :in rows
        :do
        (format t "  ~v,a : " prefix-size a)
@@ -455,10 +455,10 @@ NAME is replaced by EXPANSION before any other evaluation."
       (gethash name (lish-aliases shell))))
 
 (defun edit-alias (name &key global)
-  (tiny-rl :prompt (s+ "alias " name " ")
-	   :string (or (get-alias name :global global
-				  :shell *shell*)
-		       "")))
+  (rl :prompt (s+ "alias " name " ")
+      :string (or (get-alias name :global global
+			     :shell *shell*)
+		  "")))
 
 (defbuiltin alias
     ((global    boolean :short-arg #\g :help "True to define a global alias.")
@@ -615,10 +615,10 @@ But instead we have to to a kludgey version:
 variables explicitly set in arguments are passed to the commands."
   (if arguments
       ;; Set variables and execute command
-      (let (pos env new-env cmd (a arguments) args)
+      (let (env new-env cmd (a arguments) args)
 	;; Accumulate environment modifications in env
 	(loop
-	   :while (and a (setf pos (position #\= (car a))))
+	   :while (and a (position #\= (car a)))
 	   :do
 	   (let* ((seq (split-sequence #\= (car a)))
 		  (var (first seq))
@@ -656,7 +656,7 @@ variables explicitly set in arguments are passed to the commands."
 	 :do (format t "~a=~a~%" (car e) (cdr e)))))
 
 (defun get-cols ()
-  (let ((tty (tiny-rl::line-editor-terminal (lish::lish-editor *shell*))))
+  (let ((tty (rl:line-editor-terminal (lish-editor *shell*))))
     (terminal-get-size tty)
     (terminal-window-columns tty)))
 
@@ -732,7 +732,7 @@ variables explicitly set in arguments are passed to the commands."
   "Read a line of input."
   ;; @@@ totally faked & not working
   (declare (ignore timeout name))
-  (if editing (tiny-rl:tiny-rl :prompt prompt)
+  (if editing (rl:rl :prompt prompt)
       (read-line nil nil)))
 
 (defbuiltin time (("command" string :repeating t :help "Command to time."))
@@ -883,18 +883,18 @@ drastic thing to do to a running Lisp system."
     (error "Mutually exclusive arguments provided."))
   (cond
     (print-bindings
-     (keymap:dump-keymap tiny-rl:*normal-keymap*))
+     (keymap:dump-keymap rl:*normal-keymap*))
     (print-readable-bindings
      (keymap:map-keymap
       #'(lambda (key val)
-	  (format t "(keymap:define-key tiny-rl:*normal-keymap* ~w '~a)~%"
+	  (format t "(keymap:define-key rl:*normal-keymap* ~w '~a)~%"
 		  key val))
-      tiny-rl:*normal-keymap*))
+      rl:*normal-keymap*))
     ;; @@@ todo: query remove-function-bindings remove-key-binding
     ((and key-sequence (not function-name))
      (format t "~w: ~(~a~)~%" key-sequence
 	     (keymap:key-sequence-binding
-	      key-sequence tiny-rl:*normal-keymap*)))
+	      key-sequence rl:*normal-keymap*)))
     (query
      (if (not function-name)
 	 (error "Missing function name.")
@@ -902,9 +902,9 @@ drastic thing to do to a running Lisp system."
 	  #'(lambda (key val)
 	      (when (equal val function-name)
 		(format t "~w: ~a~%" key val)))
-	  tiny-rl:*normal-keymap*)))
+	  rl:*normal-keymap*)))
     ((and key-sequence function-name)
-     (keymap:set-key key-sequence function-name tiny-rl:*normal-keymap*))))
+     (keymap:set-key key-sequence function-name rl:*normal-keymap*))))
 
 #|
 This is really just for simple things. You should probably use the
@@ -1105,11 +1105,11 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 
 (defun edit-opt (name &optional (value nil value-supplied-p))
   (read-from-string
-   (tiny-rl :prompt (s+ name " := ")
-	    :string (prin1-to-string
-		     (if value-supplied-p
-			 value
-			 (get-option *shell* name))))
+   (rl :prompt (s+ name " := ")
+       :string (prin1-to-string
+		(if value-supplied-p
+		    value
+		    (get-option *shell* name))))
    nil nil))
 
 (defbuiltin opt

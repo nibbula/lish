@@ -59,13 +59,12 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
   (when (and supersede append)
     (error "Can't both supersede and append to a file."))
   (let ((result nil))
-    (multiple-value-bind (vals in-stream show-vals)
+    (multiple-value-bind (vals in-stream)
 	(shell-eval *shell*
 		    (if (shell-expr-p commands)
 			commands
 			(shell-read (lisp-args-to-command commands)))
 		    (modified-context *context* :out-pipe t))
-      (declare (ignore show-vals))
       (unwind-protect
 	   (when (and vals (> (length vals) 0))
 	     (with-open-file-or-stream
@@ -100,13 +99,12 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 or a list to be converted by LISP-ARGS-TO-COMMAND."
   (let ((result nil))
     (with-open-file-or-stream (in-stream file-or-stream)
-      (multiple-value-bind (vals stream show-vals)
+      (multiple-value-bind (vals)
 	  (shell-eval *shell*
 		      (if (shell-expr-p commands)
 			  commands
 			  (shell-read (lisp-args-to-command commands)))
 		      (modified-context *context* :in-pipe in-stream))
-	(declare (ignore stream show-vals))
 	(setf result vals)))
     result))
 
@@ -131,10 +129,10 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
   "Return a list of the results of calling the function FUNC with each output
 line of COMMAND. COMMAND should probably be a string, and FUNC should take one
 string as an argument."
-  (let (vals stream show-vals)
+  (let (vals stream)
     (unwind-protect
       (progn
-	(multiple-value-setq (vals stream show-vals)
+	(multiple-value-setq (vals stream)
 	  (shell-eval *shell* (shell-read command)
 		      (modified-context *context* :out-pipe t)))
 	(when (and vals (> (length vals) 0))
@@ -162,10 +160,10 @@ string as an argument."
 ;	     (args (cdr seq))
 	     )
 	;; (nos:with-process-output (proc cmd args)
-	(let (vals stream show-vals)
+	(let (vals stream)
 	  (unwind-protect
 	     (progn
-	       (multiple-value-setq (vals stream show-vals)
+	       (multiple-value-setq (vals stream)
 		 (shell-eval *shell* expr
 			     (modified-context *context* :out-pipe t)))
 	       (when (and vals (> (length vals) 0))
@@ -180,10 +178,10 @@ string as an argument."
 (defun pipe (&rest commands)
   "Send output from commands to subsequent commands."
   (labels ((sub (cmds &optional in-stream)
-	     (let (vals stream show-vals)
+	     (let (vals stream)
 	       (unwind-protect
 	         (progn
-		   (multiple-value-setq (vals stream show-vals)
+		   (multiple-value-setq (vals stream)
 		     (shell-eval *shell* (shell-read (car cmds))
 				 (modified-context
 				  *context*
@@ -207,10 +205,9 @@ string as an argument."
 ;; ;; This has a lot of potential problems / security issues.
 ;; (defun != (&rest commands)
 ;;   "Temporary file name output substitution."
-;;   (multiple-value-bind (vals stream show-vals)
+;;   (multiple-value-bind (vals stream)
 ;;       (shell-eval *shell* (shell-read (lisp-args-to-command commands))
 ;;                   (modified-context *context* :out-pipe t))
-;;     (declare (ignore show-vals))
 ;;     (if (and vals (> (length vals) 0))
 ;; 	(let ((fn (nos:mktemp "lish")))
 ;; 	  (push fn *files-to-delete*)
@@ -271,10 +268,9 @@ like $(command) in bash."
 
 (defun !! (&rest commands)
   "Pipe output of commands. Return a stream of the output."
-  (multiple-value-bind (vals stream show-vals)
+  (multiple-value-bind (vals stream)
       (shell-eval *shell* (shell-read (lisp-args-to-command commands))
 		  (modified-context *context* :out-pipe t))
-    (declare (ignore show-vals))
     (if (and vals (> (length vals) 0))
 	stream
 	(progn
@@ -307,20 +303,18 @@ like $(command) in bash."
 (defun !< (file-or-stream &rest commands)
   "Run commands with input from a file or stream."
   ;; (with-open-file-or-stream (in-stream file-or-stream)
-  ;;   (multiple-value-bind (vals stream show-vals)
+  ;;   (multiple-value-bind (vals)
   ;; 	(shell-eval *shell* (shell-read (lisp-args-to-command commands))
   ;; 		    :in-pipe in-stream)
-  ;;     (declare (ignore stream show-vals))
   ;;     (values-list vals))))
   (run-with-input-from file-or-stream commands))
 
 (defun !!< (file-or-stream &rest commands)
   "Run commands with input from a file or stream and return a stream of output."
   (with-open-file-or-stream (in-stream file-or-stream)
-    (multiple-value-bind (vals stream show-vals)
+    (multiple-value-bind (vals stream)
 	(shell-eval *shell* (shell-read (lisp-args-to-command commands))
 		    (modified-context *context* :out-pipe t :in-pipe in-stream))
-      (declare (ignore show-vals))
       (if (and vals (> (length vals) 0))
 	  stream
 	  (progn

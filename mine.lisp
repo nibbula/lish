@@ -105,6 +105,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 
 (defun mine-page (stream)
   (let ((cmd (make-mined-cmd)) line next match strings)
+    (declare (ignorable match))
     (loop
        :while (setf line (read-line stream nil nil))
        :do
@@ -240,7 +241,8 @@ a known compression suffix, then the stream is appropriately decompressed."
 (defun get-binary-usage (file)
   (let ((strings (flatten (mapcar (_ (split-sequence #\newline _))
 				  (get-binary-usage-strings file))))
-	usage-line doc args arg)
+	usage-line doc args arg b e)
+    (declare (ignorable b e))
     (macrolet ((match (string)
 		 `(multiple-value-setq (b e starts ends)
 		    (ppcre:scan ,string line)))
@@ -250,7 +252,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 		      (push arg args))
 		    (setf arg (list ,@props)))))
     (dbugf 'mine-bin "not very ~s~%" (length strings))
-    (loop :with s = strings :and (line b e starts ends)
+    (loop :with s = strings :and (line starts ends)
        :while s
        :do
        (setf line (car s))

@@ -111,7 +111,6 @@
   (when (not (slot-boundp o 'old-long-arg))
     (setf (slot-value o 'old-long-arg) nil)))
 
-
 (defvar *arg-normal-flag-char* #\-
   "Normal argument flag character.")
 

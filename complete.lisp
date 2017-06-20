@@ -163,7 +163,7 @@ literally in shell syntax."
 (defun term-cols ()
   "Return the terminal columns."
   (terminal-window-columns
-   (tiny-rl::line-editor-terminal (lish-editor *shell*))))
+   (rl:line-editor-terminal (lish-editor *shell*))))
 
 (defun list-arg-choices (command doc choices)
   (let* ((cols (term-cols))
