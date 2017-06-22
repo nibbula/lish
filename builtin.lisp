@@ -347,6 +347,8 @@ Commands can be:
 			     doc))))))
     (print-columnar-help rows)))
 
+;; This has to make sure to be able to operate without a current shell or even,
+;; current terminal, since it's called by the documentation method.
 (defun print-command-help (cmd &optional (stream *standard-output*))
   "Print documentation for a command."
   (format stream "~a~%" (documentation cmd 'function))
@@ -372,7 +374,6 @@ Commands can be:
     (format stream "Accepts: ~a~%" (command-accepts cmd)))
   (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
     (format stream "Loaded from: ~a~%" (command-loaded-from cmd))))
-  
 
 ;; For use by other things. Like my "doc" command.
 (defmethod documentation ((symbol symbol) (type (eql :command)))
@@ -656,9 +657,10 @@ variables explicitly set in arguments are passed to the commands."
 	 :do (format t "~a=~a~%" (car e) (cdr e)))))
 
 (defun get-cols ()
-  (let ((tty (rl:line-editor-terminal (lish-editor *shell*))))
-    (terminal-get-size tty)
-    (terminal-window-columns tty)))
+  ;; (let ((tty (rl:line-editor-terminal (lish-editor *shell*))))
+  ;;   (terminal-get-size tty)
+  ;;   (terminal-window-columns tty))
+  (or (and *terminal* (tt-width)) 80))
 
 ;; We do a simple fake out for signals on OS's that don't really support them.
 
