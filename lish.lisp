@@ -820,8 +820,11 @@ them as a list."
   ;;; @@@ I think I want to change this to do a shell-read
   ;;(format t "p-l line = ~s~%" string)
   (loop :with start = 0 :and expr
-     :while (setf (values expr start)
-		  (read-from-string string nil nil :start start))
+     :while (progn
+	      (setf (values expr start)
+		    (read-from-string string nil *real-eof-symbol*
+				      :start start))
+	      (not (eq expr *real-eof-symbol*)))
      ;;:do
      ;;(format t "p-l before eval arg ~s of type ~a~%" expr (type-of expr))
      :collect (eval expr)))
@@ -1179,11 +1182,17 @@ probably fail, but perhaps in similar way to other shells."
 		 (read-from-string (shell-expr-line expr) nil nil)
 	       (declare (ignore pos))
 	       (if (and (symbolp symb) (fboundp symb))
-		   (progn
-		     (run-fun (symbol-function symb)
-			      ;;(subseq (shell-expr-line expr) pos)
-			      (rest-of-the-line expr)
-			      ))
+		   (if (macro-function symb)
+		       (progn
+			 (dbugf :lish-eval "re-wrap macro~%")
+			 (shell-eval sh (cons symb
+					      (read-parenless-args
+					       (rest-of-the-line expr)))
+				     context))
+		       (run-fun (symbol-function symb)
+				;;(subseq (shell-expr-line expr) pos)
+				(rest-of-the-line expr)
+				))
 		   ;; Just try a system command anyway, which will likely fail.
 		   (sys-cmd)))))
 	(t ;; Some other type, just return it, like it's self evaluating.
