@@ -32,6 +32,11 @@ spaces between every argument."
 	 (t
 	  (princ a str))))))
 
+(defun possibly-read (expr)
+  (if (shell-expr-p expr)
+      expr
+      (shell-read expr)))
+
 #|
 ;; This needs so much work.
 (defun copy-stream (source destination)
@@ -55,16 +60,13 @@ an EOF on SOURCE."
 
 (defun run-with-output-to (file-or-stream commands &key supersede append)
   "Run commands with output to a file or stream. COMMANDS can be a SHELL-EXPR,
-or a list to be converted by LISP-ARGS-TO-COMMAND."
+or a list of arguments."
   (when (and supersede append)
     (error "Can't both supersede and append to a file."))
   (let ((result nil))
     (multiple-value-bind (vals in-stream)
-	(shell-eval *shell*
-		    (if (shell-expr-p commands)
-			commands
-			(shell-read (lisp-args-to-command commands)))
-		    (modified-context *context* :out-pipe t))
+	(shell-eval (possibly-read commands)
+		    :context (modified-context *context* :out-pipe t))
       (unwind-protect
 	   (when (and vals (> (length vals) 0))
 	     (with-open-file-or-stream
@@ -100,11 +102,8 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
   (let ((result nil))
     (with-open-file-or-stream (in-stream file-or-stream)
       (multiple-value-bind (vals)
-	  (shell-eval *shell*
-		      (if (shell-expr-p commands)
-			  commands
-			  (shell-read (lisp-args-to-command commands)))
-		      (modified-context *context* :in-pipe in-stream))
+	  (shell-eval (possibly-read commands)
+		      :context (modified-context *context* :in-pipe in-stream))
 	(setf result vals)))
     result))
 
@@ -133,8 +132,8 @@ string as an argument."
     (unwind-protect
       (progn
 	(multiple-value-setq (vals stream)
-	  (shell-eval *shell* (shell-read command)
-		      (modified-context *context* :out-pipe t)))
+	  (shell-eval (possibly-read command)
+		      :context (modified-context *context* :out-pipe t)))
 	(when (and vals (> (length vals) 0))
 	  (loop :with l = nil
 	     :while (setf l (read-line stream nil nil))
@@ -154,22 +153,16 @@ string as an argument."
 			(not first-time) l)
 		(setf first-time nil))))
     (with-output-to-string (s)
-      (let* ((expr (shell-read command))
-;	     (seq (shell-expr-words expr))
-;	     (cmd (first seq))
-;	     (args (cdr seq))
-	     )
-	;; (nos:with-process-output (proc cmd args)
-	(let (vals stream)
-	  (unwind-protect
-	     (progn
-	       (multiple-value-setq (vals stream)
-		 (shell-eval *shell* expr
-			     (modified-context *context* :out-pipe t)))
-	       (when (and vals (> (length vals) 0))
-		 (convert-to-words stream s)))
-	    (when stream
-	      (close stream))))))))
+      (let (vals stream)
+	(unwind-protect
+	   (progn
+	     (multiple-value-setq (vals stream)
+	       (shell-eval (possibly-read command)
+			   :context (modified-context *context* :out-pipe t)))
+	     (when (and vals (> (length vals) 0))
+	       (convert-to-words stream s)))
+	  (when stream
+	    (close stream)))))))
 
 (defun command-output-list (command)
   "Return lines output from command as a list."
@@ -182,11 +175,11 @@ string as an argument."
 	       (unwind-protect
 	         (progn
 		   (multiple-value-setq (vals stream)
-		     (shell-eval *shell* (shell-read (car cmds))
-				 (modified-context
-				  *context*
-				  :in-pipe in-stream
-				  :out-pipe (and (cadr cmds) t))))
+		     (shell-eval (possibly-read (car cmds))
+				 :context (modified-context
+					   *context*
+					   :in-pipe in-stream
+					   :out-pipe (and (cadr cmds) t))))
 		   (if (and vals (listp vals) (> (length vals) 0))
 		       (if (cdr cmds)
 			   (apply #'pipe stream (cdr cmds))
@@ -206,8 +199,8 @@ string as an argument."
 ;; (defun != (&rest commands)
 ;;   "Temporary file name output substitution."
 ;;   (multiple-value-bind (vals stream)
-;;       (shell-eval *shell* (shell-read (lisp-args-to-command commands))
-;;                   (modified-context *context* :out-pipe t))
+;;       (shell-eval (possibly-read commands)
+;;                   :context (modified-context *context* :out-pipe t))
 ;;     (if (and vals (> (length vals) 0))
 ;; 	(let ((fn (nos:mktemp "lish")))
 ;; 	  (push fn *files-to-delete*)
@@ -223,14 +216,13 @@ string as an argument."
 
 (defun ! (&rest args)
   "Evaluate the shell command."
-  (shell-eval *shell* (shell-read (lisp-args-to-command args)) *context*))
+  (shell-eval (shell-read (lisp-args-to-command args))))
 
 (defun !? (&rest args)
   "Evaluate the shell command, converting Unix shell result code into boolean.
 This means the 0 is T and anything else is NIL."
   (let ((result
-	 (shell-eval *shell* (shell-read (lisp-args-to-command args))
-		     *context*)))
+	 (shell-eval (shell-read (lisp-args-to-command args)))))
     (and (numberp result) (zerop result))))
 
 (defun !$ (&rest command)
@@ -249,16 +241,18 @@ like $(command) in bash."
 (defun !- (&rest command)
   "Return a string containing the output from the command."
   (with-output-to-string (str)
-    (run-with-output-to str command)))
+    (run-with-output-to str (lisp-args-to-command command))))
 
 (defun !and (&rest commands)
   "Run commands until one fails."
   (declare (ignore commands))
+  ;; @@@
   )
 
 (defun !or (&rest commands)
   "Run commands if previous command succeeded."
   (declare (ignore commands))
+  ;; @@@
   )
 
 ;; (defun !bg (&rest commands)
@@ -269,8 +263,8 @@ like $(command) in bash."
 (defun !! (&rest commands)
   "Pipe output of commands. Return a stream of the output."
   (multiple-value-bind (vals stream)
-      (shell-eval *shell* (shell-read (lisp-args-to-command commands))
-		  (modified-context *context* :out-pipe t))
+      (shell-eval (shell-read (lisp-args-to-command commands))
+		  :context (modified-context *context* :out-pipe t))
     (if (and vals (> (length vals) 0))
 	stream
 	(progn
@@ -279,7 +273,7 @@ like $(command) in bash."
 
 (defun !> (file-or-stream &rest commands)
   "Run commands with output to a file or stream."
-  (run-with-output-to file-or-stream commands))
+  (run-with-output-to file-or-stream (lisp-args-to-command commands)))
 
 (defun !>> (file-or-stream &rest commands)
   "Run commands with output appending to a file or stream."
@@ -302,24 +296,66 @@ like $(command) in bash."
 
 (defun !< (file-or-stream &rest commands)
   "Run commands with input from a file or stream."
-  ;; (with-open-file-or-stream (in-stream file-or-stream)
-  ;;   (multiple-value-bind (vals)
-  ;; 	(shell-eval *shell* (shell-read (lisp-args-to-command commands))
-  ;; 		    :in-pipe in-stream)
-  ;;     (values-list vals))))
-  (run-with-input-from file-or-stream commands))
+  (run-with-input-from file-or-stream (lisp-args-to-command commands)))
 
 (defun !!< (file-or-stream &rest commands)
   "Run commands with input from a file or stream and return a stream of output."
   (with-open-file-or-stream (in-stream file-or-stream)
     (multiple-value-bind (vals stream)
-	(shell-eval *shell* (shell-read (lisp-args-to-command commands))
+	(shell-eval (shell-read (lisp-args-to-command commands))
+		    :context
 		    (modified-context *context* :out-pipe t :in-pipe in-stream))
       (if (and vals (> (length vals) 0))
 	  stream
 	  (progn
 	    (close stream)
 	    nil)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; literal arg comands (= suffix)
+
+(defun != (&rest args)
+  "Run a command with the separate verbatim arguments, without shell syntax."
+  (shell-eval (expr-from-args args)))
+
+(defun !?= (&rest args)
+  "Evaluate the shell command, converting Unix shell result code into boolean.
+This means the 0 is T and anything else is NIL."
+  (let ((result
+	 (shell-eval (expr-from-args args))))
+    (and (numberp result) (zerop result))))
+
+(defun !$= (&rest command)
+  "Return lines output from command as a string of words. This is basically
+like $(command) in bash."
+  (command-output-words (expr-from-args command)))
+
+(defun !$$= (&rest command)
+  "Return lines of output from command as a string of quoted words."
+  (command-output-words (expr-from-args command) t))
+
+(defun !_= (&rest args)
+  "Run a command with the separate verbatim arguments, without shell syntax."
+  (command-output-list (expr-from-args args)))
+
+(defun !-= (&rest command)
+  "Return a string containing the output from the command."
+  (with-output-to-string (str)
+    (run-with-output-to str (expr-from-args command))))
+
+(defun !!= (&rest commands)
+  "Pipe output of commands. Return a stream of the output."
+  (multiple-value-bind (vals stream)
+      (shell-eval (expr-from-args commands)
+		  :context (modified-context *context* :out-pipe t))
+    (if (and vals (> (length vals) 0))
+	stream
+	(progn
+	  (close stream)
+	  nil))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 ;; Perhaps just use CL-INTERPOL?
 ;;

@@ -731,6 +731,28 @@ Remove backquotes."
 	 (incf (shell-word-end w) max)))
     (append w1 w2)))
 
+(defun expr-from-args (args)
+  "Return a shell expression made up of ARGS as the words."
+  (let* ((expr (make-shell-expr))
+	 (line (with-output-to-string (str)
+		 (loop :with pos = 0
+		    :for a :in args :do
+		    (when (not (zerop pos))
+		      (princ #\space str)
+		      (incf pos))
+		    (push a (shell-expr-words expr))
+		    (push pos (shell-expr-word-start expr))
+		    (push (+ pos (length a)) (shell-expr-word-end expr))
+		    (incf pos (length a))
+		    (princ a str)))))
+    (setf (shell-expr-line expr) line
+	  (shell-expr-words       expr) (nreverse (shell-expr-words expr))
+	  (shell-expr-word-start  expr) (nreverse (shell-expr-word-start expr))
+	  (shell-expr-word-end    expr) (nreverse (shell-expr-word-end expr))
+	  (shell-expr-word-quoted expr) (make-list (length args))
+	  (shell-expr-word-eval   expr) (make-list (length args)))
+    expr))
+
 (defun lisp-exp-eval (words)
   "Evaluate Lisp expressions in the array of shell-words, return a possibly
 expanded array of shell-words."
@@ -1137,7 +1159,7 @@ probably fail, but perhaps in similar way to other shells."
 	((and alias (not no-alias))
 	 (dbugf :lish-eval "Expanding alias~%")
 	 ;; re-read and re-eval the line with the alias expanded
-	 (shell-eval sh (expand-alias alias expanded-words) context
+	 (shell-eval (expand-alias alias expanded-words) :context context
 		     :no-expansions t))
 	;; Lish command
 	((typep command 'internal-command)
@@ -1185,10 +1207,10 @@ probably fail, but perhaps in similar way to other shells."
 		   (if (macro-function symb)
 		       (progn
 			 (dbugf :lish-eval "re-wrap macro~%")
-			 (shell-eval sh (cons symb
-					      (read-parenless-args
-					       (rest-of-the-line expr)))
-				     context))
+			 (shell-eval (cons symb
+					   (read-parenless-args
+					    (rest-of-the-line expr)))
+				     :context context))
 		       (run-fun (symbol-function symb)
 				;;(subseq (shell-expr-line expr) pos)
 				(rest-of-the-line expr)
@@ -1208,7 +1230,7 @@ probably fail, but perhaps in similar way to other shells."
 ;; This does normal expansions, sets up piping and redirections and
 ;; eventually calls shell-eval-command.
 
-(defun shell-eval (sh expr context &key no-expansions)
+(defun shell-eval (expr &key no-expansions (shell *shell*) (context *context*))
   "Evaluate the shell expression EXPR. If NO-EXPANSIONS is true, don't expand
 aliases. Return a list of the result values, a stream or NIL, and a boolean
 which is true to show the values.
@@ -1235,17 +1257,16 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	     `(multiple-value-bind (vals out-stream show-vals)
 		  (let ((*accepts*
 			 (get-accepts (elt (shell-expr-words expr) 1))))
-		    (shell-eval sh (second first-word)
-				(make-context
-				 :in-pipe in-pipe
-				 :out-pipe ,new-pipe
-				 :environment environment
-				 :flipped-io flipped-io)))
+		    (shell-eval (second first-word)
+				:context (make-context
+					  :in-pipe in-pipe
+					  :out-pipe ,new-pipe
+					  :environment environment
+					  :flipped-io flipped-io)))
 		(declare (ignore show-vals) (ignorable vals))
 		(when ,test
 		  (with-package *lish-user-package*
 		    (shell-eval
-		     sh
 		     (make-shell-expr
 		      :words       (cdr (shell-expr-words expr))
 		      :word-start  (cdr (shell-expr-word-start expr))
@@ -1257,6 +1278,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		      :line (format nil "~{~a ~}"
 				    (cdr (shell-expr-words expr))))
 		     ;; @@@ is this right with out-stream?
+		     :context
 		     (if out-stream
 			 (modified-context *context* :in-pipe out-stream)
 			 *context*)
@@ -1273,30 +1295,30 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	      (with-package *lish-user-package*
 		(values (multiple-value-list (eval expr)) nil t)))
 	     ((consp expr)
-	      (case (command-type sh (string-downcase (car expr)))
+	      (case (command-type shell (string-downcase (car expr)))
 		((:command :file)
 		 ;; Try to do a system command in s-exp syntax
 		 (dbugf :lish-eval "command or file expr = ~s.~%" expr)
 		 (shell-eval
-		  sh (shell-read
-		      (join (cons
-			     (string-downcase (car expr))
-			     (with-package *lish-user-package*
-			       (let ((*print-case* :downcase)
-				     (*print-escape* nil))
-				 (mapcar (_ (if (consp _)
-						(s+ #\" (prin1-to-string _) #\")
-						(prin1-to-string _)))
-					 (cdr expr)))))
-		       #\space))
-		  context))
+		  (shell-read
+		   (join (cons
+			  (string-downcase (car expr))
+			  (with-package *lish-user-package*
+			    (let ((*print-case* :downcase)
+				  (*print-escape* nil))
+			      (mapcar (_ (if (consp _)
+					     (s+ #\" (prin1-to-string _) #\")
+					     (prin1-to-string _)))
+				      (cdr expr)))))
+			 #\space))
+		  :context context))
 		(t
 		 (dbugf :lish-eval "non command list expr = ~s.~%" expr)
 		 (with-package *lish-user-package*
 		   (values (multiple-value-list (eval expr)) nil t)))))
 	     ((stringp expr)
 	      (dbugf :lish-eval "string expr = ~s.~%" expr)
-	      (shell-eval sh (shell-read expr) context))
+	      (shell-eval (shell-read expr) :context context))
 	     (t
 	      (dbugf :lish-eval "other expr = ~s.~%" expr)
 	      (with-package *lish-user-package*
@@ -1351,12 +1373,12 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		     flipped-io t))
 	     (dbugf 'pipe "*input* = ~s~%" *input*)
 	     (setf (values vals out-stream show-vals)
-		   (shell-eval-command sh expr *context*
+		   (shell-eval-command shell expr *context*
 				       :no-alias no-expansions))
 	     (dbugf 'pipe "*output* = ~s~%" *output*)
 	     (values vals out-stream show-vals))))))))
 
-(defun load-file (sh file)
+(defun load-file (file)
   "Load a lish syntax file."
   (let ((*load-pathname* (pathname file))
 	(line-number 1)
@@ -1383,18 +1405,18 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		(setf line (s+ line #\newline new-line)))
 	     (when (and expr (not (eql expr *continue-symbol*)))
 	       (setf expression-start-line nil))
-	     (shell-eval sh expr *context*))
+	     (shell-eval expr))
 	  (when (eql expr *continue-symbol*)
 	    (error "End of file in expression. Probably starting at line ~a."
 		   expression-start-line)))))))
 
-(defun load-rc-file (sh init-file)
+(defun load-rc-file (init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
   ;; I don't like this special case, but ...
   (let ((file (expand-variables init-file))
 	(*lish-user-package* (find-package :lish-user)))
     (if (probe-file file)
-	(load-file sh file)
+	(load-file file)
 	(format t "Couldn't find RC file: ~s~%" file))))
 
 (defun find-id (shell)
@@ -1590,7 +1612,7 @@ handling errors."
 			 (invoke-debugger c)))))
 	     (force-output)
 	     (multiple-value-bind (vals stream show-vals)
-		 (shell-eval sh expr nil)
+		 (shell-eval expr :context nil)
 	       (declare (ignore stream))
 	       (when show-vals
 		 (lish-print vals))))
@@ -1628,8 +1650,8 @@ handling errors."
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
     (when (or (not init-file-supplied-p) init-file *lishrc*)
-      (load-rc-file sh (or (and (not init-file-supplied-p) *lishrc*)
-			   init-file)))
+      (load-rc-file (or (and (not init-file-supplied-p) *lishrc*)
+			init-file)))
 
     (when command
       (start-job-control)

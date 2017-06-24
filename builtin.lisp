@@ -495,7 +495,7 @@ NAME is replaced by EXPANSION before any other evaluation."
 (defbuiltin source (("filename" pathname :optional nil
  		     :help "Filename to read."))
   "Evalute lish commands in the given file."
-  (without-warning (load-file *shell* filename)))
+  (without-warning (load-file filename)))
 
 ;; XXX I wish this would work without using the :use-supplied-flag, just using
 ;; the default value of :toggle in boolean-toggle, but there is some kind of
@@ -739,7 +739,7 @@ variables explicitly set in arguments are passed to the commands."
 
 (defbuiltin time (("command" string :repeating t :help "Command to time."))
   "Shows some time statistics resulting from the execution of COMMNAD."
-  (time (shell-eval *shell* (make-shell-expr :words command) *context*)))
+  (time (shell-eval (make-shell-expr :words command))))
 
 #|
 (defun print-timeval (tv &optional (stream t))
