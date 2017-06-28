@@ -1547,10 +1547,11 @@ handling errors."
 	    (t
 	     (setf ! last-command
 		   last-command (copy-seq this-command))
+	     ;; This is THE read of the REPL.
 	     (shell-read (setf this-command
-				 (if pre-str
-				     (s+ pre-str #\newline str)
-				     str))))))
+			       (if pre-str
+				   (s+ pre-str #\newline str)
+				   str))))))
       #+sbcl
       (sb-sys:interactive-interrupt ()
 	(format t "~%") (finish-output)

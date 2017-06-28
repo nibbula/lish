@@ -341,6 +341,8 @@ The syntax is vaguely like:
 	  ;; just a lisp expression to be evaluated
 	  (first words)
 	  ;; a normal shell expression
-	  (make-the-expr)))))
+	  (if (and in-compound (< (length words) 2))
+	      (return-from shell-read *continue-symbol*)
+	      (make-the-expr))))))
 
 ;; EOF
