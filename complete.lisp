@@ -289,7 +289,7 @@ literally in shell syntax."
 			      (eq (arg-type a) 'boolean))))
 	   (return-from first-mandatory-or-non-flag-arg a))
 	 (incf i))
-      (nth (1- past) arglist)))
+      (nth (max 0 (1- past)) arglist)))
 
 ;; Note that this takes different args than a normal completion function.
 (defun complete-command-arg (context command expr pos all
