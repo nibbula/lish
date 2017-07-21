@@ -677,12 +677,12 @@ Remove backquotes."
 (defun shell-expand-line (editor)
   "A command to expand the current line."
   ;;(format t "editor is a ~a = ~s~%" (type-of editor) editor)
-  (let ((buf (rl::buf editor)))
+  (let ((buf (rl:get-buffer-string editor)))
     (let ((words (possibly-expand-aliases
 		  *shell*
 		  (lisp-exp-eval
 		   (expr-to-words (do-expansions (shell-read buf)))))))
-      (rl::replace-buffer
+      (rl:replace-buffer
        editor
        (with-output-to-string (str)
 	 (when (first words)
