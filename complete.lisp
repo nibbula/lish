@@ -4,7 +4,8 @@
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
+(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+		   (compilation-speed 0)))
 
 ;; (defun quoted-start (str pos)
 ;;   "Check if we are inside a shell quoted string and return it's starting
@@ -118,8 +119,11 @@ facility. Usually it's a universal-time, or an alist of (<thing> . <time>).")
     (if all
 	(completion::symbol-completion-list
 	 word :package pack :external external)
-	(values (completion::symbol-completion
-		 word :package pack :external external) word-start))))
+	(let ((result
+	       (completion::symbol-completion
+		word :package pack :external external)))
+	  (setf (completion-result-insert-position result)
+		word-start)))))
 
 (defun shell-complete-symbol (context pos all &optional bang-p)
   "Complete symbols in the *lish-user-package*, optionally with a
@@ -137,7 +141,7 @@ literally in shell syntax."
 	     (when (position c result)
 	       (setf result (join (split-sequence c result) (s+ #\\ c))))))
       (loop :for c :across " !$|;[]*?()" :do ;
-  (possibly-quote c))
+	 (possibly-quote c))
       result)))
 
 (defun words-past (expr pos)
@@ -166,20 +170,24 @@ literally in shell syntax."
    (rl:line-editor-terminal (lish-editor *shell*))))
 
 (defun list-arg-choices (command doc choices)
-  (let* ((cols (term-cols))
-	 (out-str (s+ (if (>= *completion-count* 1)
-			  (s+ (documentation command 'function) #\newline)
-			  (s+ (posix-synopsis command) #\newline))
-		      (or doc "") #\newline
-		      (or (and choices
-			       (with-output-to-string (str)
-				 (print-columns choices
-						:stream str
-						:columns cols)))
-			  ""))))
-    (when (eql (char out-str (1- (length out-str))) #\newline)
-      (setf out-str (subseq out-str 0 (1- (length out-str)))))
-    (list out-str)))
+  (let* (;; (cols (term-cols))
+	 (prefix-str (s+ (if (>= *completion-count* 1)
+			     (s+ (documentation command 'function) #\newline)
+			     (s+ (posix-synopsis command) #\newline))
+			 (or doc "") #\newline))
+	 (comp-list (or choices (list ""))))
+			  ;;      (with-output-to-string (str)
+			  ;; 	 (print-columns choices
+			  ;; 			:stream str
+			  ;; 			:columns cols)))
+			  ;; ""))))
+    ;; Trim possible trailing newline?
+    ;; (when (eql (char out-str (1- (length out-str))) #\newline)
+    ;;   (setf out-str (subseq out-str 0 (1- (length out-str)))))
+    ;;(make-completion-result :completion (list out-str) :count 1)))
+    (make-completion-result :completion comp-list
+			    :count (length comp-list)
+			    :prefix prefix-str)))
 
 ;; (defun show-dash-arglist (arglist)
 ;;   (list
@@ -223,7 +231,7 @@ literally in shell syntax."
     (when (and (> (length result) 0)
 	       (char= #\newline (aref result (- (length result) 1))))
       (setf (fill-pointer result) (- (length result) 2)))
-    (list result)))
+    (make-completion-result :completion (list result) :count 1)))
 
 (defvar *long-double-dash-help* nil
   "True to show longer help for double dash arguments.")
@@ -253,7 +261,7 @@ literally in shell syntax."
     (when (and (> (length result) 0)
 	       (char= #\newline (aref result (- (length result) 1))))
       (setf (fill-pointer result) (- (length result) 2)))
-    (list result)))
+    (make-completion-result :completion (list result) :count 1)))
 
 (defun complete-double-dash-arglist (word pos arglist)
   (dbug "word = ~s pos = ~s~%" word pos)
@@ -322,7 +330,17 @@ literally in shell syntax."
        (show-dash-arglist (command-arglist command)))
       (func
        (dbug "---> (~a ~s ~s ~s )~%" func fake-word (length fake-word) all)
-       (funcall func fake-word (length fake-word) all :parsed-exp expr))
+       ;; I don't want to make all the arg completion functions have to use
+       ;; completion-result, but will this suffice? Or will it lose something?
+       ;; @@@
+       (let ((result
+	      (funcall func fake-word (length fake-word) all :parsed-exp expr)))
+	 (if (completion-result-p result)
+	     result
+	     (make-completion-result
+	      :completion result
+	      :count (length result) ;; @@@ redundant?
+	      ))))
       (t
        (let ((doc (and arg (documentation (type-of arg) 'type)))
 	     (choices (and arg (argument-choices arg))))
@@ -406,10 +424,13 @@ complete, and call the appropriate completion function."
 	 (dbug "~%word-num = ~w word = ~w word-pos = ~w~%exp ~w~%"
 	       word-num word word-pos exp)
 	 (flet ((simple-complete (func word wpos)
-		  (if all
-		      (let ((list (funcall func word all)))
-			(values list (length list)))
-		      (values (funcall func word all) wpos))))
+		  (let ((result (funcall func word all)))
+		    (if all
+			(setf (completion-result-count result)
+			      (length (completion-result-completion result)))
+			(setf (completion-result-insert-position result)
+			      wpos))
+		    result)))
 	   (cond
 	     ((or (and (not word-num) (= pos 0))
 		  (start-of-a-compound-p exp pos))
@@ -425,19 +446,23 @@ complete, and call the appropriate completion function."
 		  ;; a blank spot somewhere in the line
 		  (let ((from-end (- (length context) pos)))
 		    (dbug "heyba~%")
-		    (multiple-value-bind (result new-pos)
-			(if (setf cmd (try-command first-word))
-			    (progn
-			      (dbug "Baaa~%")
-			      (complete-command-arg context cmd exp pos all))
-			    (complete-filename word
-					       (- (length word) from-end) all))
-		      (declare (ignore new-pos))
-		      (values (if (not all) (quotify result) result)
-			      (or (and word-num
-				       (elt (shell-expr-word-start exp)
-					    word-num))
-				  pos))))))
+		    (let ((result
+			   (if (setf cmd (try-command first-word))
+			       (progn
+				 (dbug "Baaa~%")
+				 (complete-command-arg context cmd exp pos all))
+			       (complete-filename word
+						  (- (length word) from-end)
+						  all))))
+		      (when (not all)
+			(setf (completion-result-completion result)
+			      (quotify (completion-result-completion result))))
+		      (setf (completion-result-insert-position result)
+			    (or (and word-num
+				     (elt (shell-expr-word-start exp)
+					  word-num))
+				pos))
+		      result))))
 	     ((symbolp word)
 	      (dbug "janky~%")
 	      (shell-complete-symbol context pos all t))
@@ -466,43 +491,46 @@ complete, and call the appropriate completion function."
 	       (not (position (aref word 0) "/.~")))
 	      (dbug "jinky~%")
 	      ;; try commands
-	      (multiple-value-bind (v1 v2)
-		  (simple-complete #'complete-command
-				   first-word ;; was: context
-				   (elt (shell-expr-word-start exp) word-num))
+	      (let ((result 
+		     (simple-complete #'complete-command
+				      first-word ;; was: context
+				      (elt (shell-expr-word-start exp)
+					   word-num))))
 		;; then symbols
 		;; XXX Symbols won't come up in the list.
-		(when (not v1)
-		  (setf (values v1 v2)
-			(shell-complete-symbol context pos all))
-		  )
-		(values v1 v2)))
+		(when (not (completion-result-completion result))
+		  (setf result
+			(shell-complete-symbol context pos all)))
+		result))
 	     (t
-	      (let ((from-end (- (length context) pos)))
-		(dbug "hello ~a~%" word)
-		(multiple-value-bind (result new-pos)
-		    (if (setf cmd (try-command first-word))
-			(progn
-			  (dbug "blurgg~%")
-			  (complete-command-arg
-			   context cmd exp pos #| (- (length word) from-end) |#
-			   all word-num word word-pos))
-			(progn
-			  (dbug "jorky~%")
-			  ;; But it could be a command which isn't loaded yet.
-			  (if (load-lisp-command first-word)
-			      (complete-command-arg
-			       context (get-command first-word) exp pos
-			       all word-num word word-pos)
-			      (complete-filename word
-						 (- (length word) from-end)
-						 all))))
-		  (declare (ignore new-pos))
-		  (dbug "result = ~s~%" result)
-		  (if all
-		      (values result (length result))
-		      (values
-		       (quotify result)
-		       (elt (shell-expr-word-start exp) word-num)))))))))))))
+	      (dbug "hello ~a~%" word)
+	      (let* ((from-end (- (length context) pos))
+		     (result
+		      (if (setf cmd (try-command first-word))
+			  (progn
+			    (dbug "blurgg~%")
+			    (complete-command-arg
+			     context cmd exp pos
+			     #| (- (length word) from-end) |#
+			     all word-num word word-pos))
+			  (progn
+			    (dbug "jorky~%")
+			    ;; But it could be a command which isn't loaded yet.
+			    (if (load-lisp-command first-word)
+				(complete-command-arg
+				 context (get-command first-word) exp pos
+				 all word-num word word-pos)
+				(complete-filename word
+						   (- (length word) from-end)
+						   all))))))
+		(dbug "result = ~s~%" result)
+		(if all
+		    (setf (completion-result-count result)
+			  (length (completion-result-completion result)))
+		    (setf (completion-result-completion result)
+			  (quotify (completion-result-completion result))
+			  (completion-result-insert-position result)
+			  (elt (shell-expr-word-start exp) word-num)))
+		result)))))))))
 
 ;; EOF
