@@ -183,7 +183,8 @@ text effects to the enclosed objects. The keywords recognized are:
 and the colors
   :BLACK :RED :GREEN :YELLOW :BLUE :CYAN :WHITE and :DEFAULT.
 The colors can be prefixed by :FG- or :BG- for the foreground or background.
-Symbols will be replaced by their value."
+Symbols will be replaced by their value. Functions will be evaluated with
+the primary result printed as a string."
   (with-output-to-string (str)
     (if (not (consp symbolic-prompt))
 	(princ symbolic-prompt str)
@@ -1029,8 +1030,10 @@ read from."
 	 (path    (get-command-path program))
 	 result result-stream pid status job)
     (when (not path)
-      (error 'unknown-command-error
-	     :command-string program :format "not found."))
+      (signal ;; cerror "Fixypoo: "
+       'unknown-command-error
+       :name 'path
+       :command-string program :format "not found."))
 
     ;; This actually should be in the child process:
     ;;(set-default-job-sigs)

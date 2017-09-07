@@ -68,6 +68,7 @@ it's shell features.
    #:arg-lenient-choice
    ;; argument generics
    #:convert-arg #:argument-choices
+   #:defargtype
    ;; commands
    #:command #:command-name #:command-function #:command-arglist
    #:command-built-in-p #:command-loaded-from #:command-accepts
@@ -79,7 +80,6 @@ it's shell features.
    #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash #:!opt
    ;; convenience / scripting
    #:set-alias #:unset-alias #:get-alias
-   #:command-pathname
    #:command-paths
    #:input-line-words
    #:input-line-list

@@ -34,7 +34,7 @@
 		       (shell-error-arguments c)))))
   (:documentation "An error ocurring in the shell."))
 
-(define-condition unknown-command-error (shell-error)
+(define-condition unknown-command-error (shell-error cell-error)
   ((command-string
     :accessor unknown-command-error-command-string
     :initarg :command-string

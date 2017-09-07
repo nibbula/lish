@@ -499,6 +499,7 @@ objects, like in the command object."
 		   (declare (ignorable arg value quoted))
 		   ,@conv-body)
 		conversions)))
+	    ;; @@@ What about :default-initargs or :metaclass ?
 	    (otherwise
 	     (error "Unknown keyword in defargtype: ~s." (car form)))))
 	 (t

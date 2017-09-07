@@ -110,7 +110,7 @@ The syntax is vaguely like:
 		    ;; exist. In section 2.3.5 it says it should be correctable
 		    ;; and the effect should be the same as reading the symbol
 		    ;; with *package* set to the package prefix, but there's no
-		    ;; symbol existence error that can happen the when it's not
+		    ;; symbol existence error that can happen when it's not
 		    ;; prefixed.
 		    ;;
 		    ;; For example SBCL signals a reader-error, while CCL
@@ -131,7 +131,8 @@ The syntax is vaguely like:
 		   (push obj args)
 		   (push i word-end)
 		   (push nil word-quoted)
-		   (push nil word-eval))))
+		   (push t word-eval)
+		   )))
 	     (return-partial ()
 	       (push i word-start)
 	       (push (subseq line i) args)
