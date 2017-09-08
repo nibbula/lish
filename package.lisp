@@ -65,7 +65,9 @@ it's shell features.
    #:arg-boolean #:arg-number #:arg-integer #:arg-float #:arg-string
    #:arg-keyword #:arg-object #:arg-date #:arg-pathname
    #:arg-choice #:arg-choices #:arg-choice-labels
-   #:arg-lenient-choice
+   #:arg-choice-test
+   #:arg-choice-compare-ignore-case #:arg-choice-compare
+   #:arg-lenient-choice 
    ;; argument generics
    #:convert-arg #:argument-choices
    #:defargtype

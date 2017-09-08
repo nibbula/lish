@@ -309,19 +309,35 @@
 (defclass arg-io-stream-or-file (arg-stream-or-filename)
   () (:documentation "An I/O stream or a filename."))
 
+(defun arg-choice-compare-ignore-case (choice value)
+  "Return true if VALUE as a string is equalp to CHOICE."
+  (equalp choice (princ-to-string value)))
+
+(defun arg-choice-compare (choice value)
+  "Return true if VALUE as a string is equal to CHOICE."
+  (equal choice (princ-to-string value)))
+
 (defclass arg-choice (argument)
-  ((choices	:type list
-		:documentation "A list of choices for value."
-		:initarg :choices
-		:accessor arg-choices)
-   (choice-labels :type list
-		:documentation "A list of string names for choices."
-		:initarg :choice-labels
-		:accessor arg-choice-labels)
-   (choice-func :type function
-		:documentation "A function to call to get the list of choices."
-		:initarg :choice-func
-		:accessor arg-choice-func))
+  ((choices
+    :type list
+    :documentation "A list of choices for value."
+    :initarg :choices
+    :accessor arg-choices)
+   (choice-labels
+    :type list
+    :documentation "A list of string names for choices."
+    :initarg :choice-labels
+    :accessor arg-choice-labels)
+   (choice-func
+    :type function
+    :documentation "A function to call to get the list of choices."
+    :initarg :choice-func
+    :accessor arg-choice-func)
+   (test
+    :initarg :test :accessor arg-choice-test :type function
+    :documentation "Function to compare values to choices."))
+  (:default-initargs
+   :test #'arg-choice-compare-ignore-case)
   (:documentation "An argument whose value must be one of a list of choices."))
 
 (defmethod convert-arg ((arg arg-choice) (value string) &optional quoted)
@@ -330,9 +346,7 @@
 	(choices (argument-choices arg)))
     (unless choices
       (error "Choice argument has no choices ~a." (arg-name arg)))
-    (if (setf choice (find value choices
-			   :test #'(lambda (a b)
-				     (equalp a (princ-to-string b)))))
+    (if (setf choice (find value choices :test (arg-choice-test arg)))
 	choice
 	(error "~s is not one of the choices for the argument ~:@(~a~)."
 	       value (arg-name arg)))))
@@ -358,9 +372,7 @@
 	(choices (argument-choices arg)))
     (if (not choices)
 	(warn "Choice argument has no choices ~a." (arg-name arg))
-	(if (setf choice (find value choices
-			       :test #'(lambda (a b)
-					 (equalp a (princ-to-string b)))))
+	(if (setf choice (find value choices :test (arg-choice-test arg)))
 	    choice
 	    (progn
 	      (warn "~s is not one of the choices for the argument ~:@(~a~)."
