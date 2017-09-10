@@ -250,6 +250,19 @@
 	    obj
 	    value))))
 
+(defclass arg-case-preserving-object (argument) ()
+  (:documentation "A Lisp object, read with case preserved."))
+(defmethod convert-arg ((arg arg-case-preserving-object) (value string)
+			&optional quoted)
+  (if quoted
+      value
+      (multiple-value-bind (obj end)
+	  (fancy-read-from-string value :safe t :case :preserve)
+	;; If the whole string wasn't an object, just treat as a string.
+	(if (= end (length value))
+	    obj
+	    value))))
+
 (defclass arg-sequence (arg-object) () (:documentation "A sequence."))
 (defmethod convert-arg ((arg arg-sequence) (value sequence) &optional quoted)
   (declare (ignore arg quoted))
