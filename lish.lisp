@@ -518,10 +518,21 @@ the primary result printed as a string."
 	      (rl:line-editor-terminal (lish-editor *shell*)))))
     ("LINES"    nil "Terminal character rows"
      ,#'(lambda () (terminal-window-rows
-	      (rl:line-editor-terminal (lish-editor *shell*)))))
+		    (rl:line-editor-terminal (lish-editor *shell*)))))
+    ;; These are readonly unlike the POSIX ones. But you can:
+    ;; (setf (lish-start-time *shell*) (get-universal-time))
+    ;; and of course:
+    ;; (setf *random-state* (make-random-state))
+    ;; to get similar (or better) functionality.
+    ("SECONDS"	nil "Seconds elapsed since some time"
+		,#'(lambda () (- (get-universal-time)
+				 (lish-start-time *shell*))))
+    ("RANDOM"	nil "A random 16 bit number."
+		,#'(lambda () (random (1- (ash 1 15)))))
     ("$"        nil "Current process ID"	  	 ,#'os-unix:getpid)
     ("!"        nil "Process ID of the previous command" nil)	;; @@@
-    ("?"        nil "Result of the last command." 	 nil))) ;; @@@
+    ("?"        nil "Result of the last command." 	 nil)) ;; @@@
+  "List of: Name Cacheable-p Description Value")
 
 (defparameter *fake-var-table* nil
   "The fake var table.")

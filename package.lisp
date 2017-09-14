@@ -55,6 +55,7 @@ it's shell features.
    #:lish-old-pwd
    #:lish-dir-list
    #:lish-suspended-jobs
+   #:lish-start-time
    #:lish-options
    ;; arguments
    #:argument

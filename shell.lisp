@@ -49,12 +49,17 @@
    (jobs
     :accessor lish-jobs :initarg :jobs :initform nil
     :documentation "List of jobs.")
+   (start-time
+    :initarg :start-time :accessor lish-start-time :type integer
+    :documentation
+    "Seconds elapsed since some time. Defaults to since shell was started.")
    (options
     :initarg :options :accessor lish-options :initform nil
     :documentation "Operator configurable options."))
   (:default-initargs
    :exit-flag nil
    :exit-values '()
+   :start-time (get-universal-time)
    :keymap (copy-keymap *lish-default-keymap*))
   (:documentation "A lispy system command shell."))
 
