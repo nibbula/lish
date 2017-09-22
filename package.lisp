@@ -89,6 +89,7 @@ it's shell features.
    #:command-output-words
    #:command-output-list
    #:pipe
+   #:append-file #:append-files
    ;; magic punctuation
    #:! #:!? #:!! #:!$ #:!$$ #:!_ #:!-
    #:!= #:!?= #:!!= #:!$= #:!$$= #:!_= #:!-=

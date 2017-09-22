@@ -58,6 +58,26 @@ an EOF on SOURCE."
      :while (setf b (read-byte source nil nil))
      :do (write-byte b destination)))
 
+(defun append-files (input-files output-file &key callback)
+  "Copy the data from INPUT-FILES appending it to OUTPUT-FILE. Create
+OUTPUT-FILE if it doesn't exist."
+  (with-open-file (out (quote-filename output-file) :direction :output
+		       :if-exists :append
+		       :if-does-not-exist :create
+		       :element-type '(unsigned-byte 8))
+    (loop :for file :in input-files :do
+       (with-open-file (in (quote-filename file) :direction :input
+			   :element-type '(unsigned-byte 8))
+	 (when callback
+	   (funcall callback file))
+	 (copy-stream in out)))))
+
+;; This is mostly for convenience from the command line
+(defun append-file (input-file output-file)
+  "Copy the data from INPUT-FILE appending it to OUTPUT-FILE. Create
+OUTPUT-FILE if it doesn't exist."
+  (append-files (list input-file) output-file))
+
 (defun run-with-output-to (file-or-stream commands &key supersede append)
   "Run commands with output to a file or stream. COMMANDS can be a SHELL-EXPR,
 or a list of arguments."
