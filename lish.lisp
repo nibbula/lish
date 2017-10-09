@@ -454,11 +454,13 @@ the primary result printed as a string."
 ;       (setpgid 0 our-pid)
 ;       (set-terminal-group our-pid))))
 
-(defun handle-job-change (job result status)
+(defun handle-job-change (job result status &key foreground)
   "Take appropriate action when JOB changes status."
   (case status
     (:exited
-     ;;(format t ";; Exited ~a~%" result)
+     ;; Only announce normal exits when not running in the foreground.
+     (when (not foreground)
+       (format t ";; Exited ~a ~a~%" (job-name job) result))
      (finish-output)
      (delete-job job)
      result)
@@ -466,7 +468,7 @@ the primary result printed as a string."
      (format t ";; Killed ~a ~a" (job-name job) (job-pid job))
      #+unix (progn
 	      (when (and result (integerp result))
-		(format t "~a" (os-unix:signal-description result)))
+		(format t " ~a" (os-unix:signal-description result)))
 	      (when (eq status :coredump)
 		(format t " Core dump")))
      (terpri)
@@ -1090,7 +1092,7 @@ read from."
 		(progn
 		  (multiple-value-setq (result status)
 		    (uos::wait-and-chill pid))
-		  (handle-job-change job result status))))))
+		  (handle-job-change job result status :foreground t))))))
     (values (or result '(0)) result-stream)))
 
 ;; This ends up calling one of the following to do the actual work:
@@ -1474,13 +1476,14 @@ suspend itself."
 		  (lish-jobs *shell*) :test #'= :key #'job-id))))
 
 (defun check-job-status (sh)
-  (let (job)
-    (multiple-value-bind (pid result status)
-	(uos::check-jobs)
-      (when pid
+  (let (job pid result status)
+    (loop :do
+       (multiple-value-setq (pid result status) (uos::check-jobs))
+       :while pid
+       :do
 	(if (setf job (find pid (lish-jobs sh) :test #'eql :key #'job-pid))
 	    (handle-job-change job result status)
-	    (format t "Unknown job changed ~a~%" pid))))))
+	    (format t "Unknown job changed ~a~%" pid)))))
 
 (defvar *shell-non-word-chars*
   #(#\space #\tab #\newline #\linefeed #\page #\return
