@@ -150,18 +150,18 @@ from stack."
        (cond
 	 (resume-function
 	  (format t "~3d ~10a ~20a ~:[~;~a ~]~a~%"
-		  id "LISP" name long resume-function command-line))
+		  id "Lisp" name long resume-function command-line))
 	 (pid
-	  (format t "~3d ~10a ~20a ~a ~:[~;~a ~]~a~%"
-		  id "SYSTEM" name status long pid command-line))
+	  (format t "~3d ~10a ~20a ~:(~a~) ~:[~;~a ~]~a~%"
+		  id "System" name status long pid command-line))
 	 (t
-	  (format t "~3d ~10a ~20a ~a ~a ~a~%"
+	  (format t "~3d ~10a ~20a ~:(~a~) ~a ~a~%"
 		  id "????" name status pid command-line)))))
   (when (find-package :bt)
     (loop :for j :in (ignore-errors (funcall (find-symbol "ALL-THREADS" :bt)))
        :do
        (format t "~3d ~10a ~20a ~:[~;~a ~]~a~%"
-	       0 "THREAD"
+	       0 "Thread"
 	       (funcall (find-symbol "THREAD-NAME" :bt) j)
 	       long j ""))))
 
@@ -316,10 +316,11 @@ Commands can be:
     (loop :for (a b) :in rows
        :do
        (format t "  ~v,a : " prefix-size a)
-       (justify-text (substitute #\space #\newline b)
-		     :prefix (make-string (+ prefix-size 5)
-					  :initial-element #\space)
-		     :omit-first-prefix t :cols (get-cols))
+       (when b
+	 (justify-text (substitute #\space #\newline b)
+		       :prefix (make-string (+ prefix-size 5)
+					    :initial-element #\space)
+		       :omit-first-prefix t :cols (get-cols)))
        (terpri))))
   
 (defun command-list (type)
