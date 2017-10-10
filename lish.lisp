@@ -1653,10 +1653,17 @@ handling errors."
 (defun lish (&key debug terminal-name
 	       (init-file *default-lishrc* init-file-supplied-p)
 	       command)
-  "Unix Shell & Lisp somehow smushed together."
+  "Unix Shell & Lisp somehow smushed together.
+Type the “help” command for more documentation.
+Arguments:
+  DEBUG         - True to turn on entering the debugger on errors.
+  TERMINAL-NAME - Device name of the terminal.
+  INIT-FILE     - File to load on startup or *default-lishrc* if not given.
+  COMMAND       - A command to evaluate and exit."
   (let* ((*shell* (make-instance 'shell :debug debug))
 	 (sh *shell*)		; shorthand
 	 (state (make-read-state))
+	 (*history-context* :lish)
 	 (*lish-level* (if *lish-level*
 			   (funcall #'1+ (symbol-value '*lish-level*))
 			   0))
@@ -1685,7 +1692,7 @@ handling errors."
 	  (make-instance 'rl:line-editor
 			 :non-word-chars *shell-non-word-chars*
 			 :completion-func #'shell-complete
-			 :context :lish
+			 :context *history-context*
 			 :terminal-device-name terminal-name
 			 :local-keymap (lish-keymap sh)
 			 :prompt-func nil))
