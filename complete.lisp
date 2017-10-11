@@ -24,13 +24,12 @@
   (complete-list str (length str) all
 		 (mapcar (_ (nos:user-info-name _)) (nos:user-list))))
 
-;; @@@ Consider caching this.
-;; @@@ In fact we should probably require a "rehash", like other shells.
 (defvar *verb-list* nil
   "List of current lish commands. Includes aliases, built-in commands, and ~
 exectuables in the path. Use the \"rehash\" command to update after new ~
 commands are added.")
 
+#+nil (progn ;; Unused code for better verb list caching
 (defun probe-file-or-dir (p)
   (or (probe-directory p) (probe-file p)))
 
@@ -61,6 +60,7 @@ facility. Usually it's a universal-time, or an alist of (<thing> . <time>).")
     (:commands)
     (:path))
   )
+)
 
 (defun verb-list (shell)
   "Return the command list for the current shell: *shell*."
@@ -394,62 +394,92 @@ Uses the first available of:
       ;;(and (load-external-command command) (get-command command))
       (and (mine-command command) (get-command command))))
 
-;; Remember, a completion functions returns:
-;;   One completion: completion and replacement starting position
-;;   List:           sequence and sequence length
-
 (defun shell-complete (context pos all)
   (declare (type string context))
   "Analyze the context and try figure out what kind of thing we want to ~
 complete, and call the appropriate completion function."
-  (dbug "shell-complete~%")
-  (let ((exp (ignore-errors (shell-read context :partial t
-					:package *junk-package*)))
-	cmd)
-    (dbug "exp is a ~a~%" (type-of exp))
-    (typecase exp
-      (cons
-       (dbug "Hellow I am janky!~%")
-       (shell-complete-symbol context pos all))
-      (shell-expr
-       (let* ((word-num (shell-word-number exp pos))
-	      (first-word (first-word-in-expr pos exp))
-	      word word-pos)
-	 ;; word-num is the index of the word in the shell expr
-	 ;; word is the text of the word
-	 ;; word-pos is the relative position in the word
-	 (when word-num
-	   (setf word (elt (shell-expr-words exp) word-num)
-		 word-pos (- pos (elt (shell-expr-word-start exp) word-num))))
-	 (dbug "~%word-num = ~w word = ~w word-pos = ~w~%exp ~w~%"
-	       word-num word word-pos exp)
-	 (flet ((simple-complete (func word wpos)
-		  (let ((result (funcall func word all)))
-		    (if all
-			(setf (completion-result-count result)
-			      (length (completion-result-completion result)))
-			(setf (completion-result-insert-position result)
-			      wpos))
-		    result)))
+  (dbugf 'completion "shell-complete ~s ~s ~s~%" context pos all)
+  (let (exp explanation cmd)
+    (multiple-value-setq (exp explanation)
+      (ignore-errors (shell-read context :partial t
+				 :package *junk-package*)))
+    (dbugf 'completion "exp ~s is a ~a~%" exp (type-of exp))
+    (flet ((simple-complete (func word wpos)
+	     (let ((result (funcall func word all)))
+	       (if all
+		   (setf (completion-result-count result)
+			 (length (completion-result-completion result)))
+		   (setf (completion-result-insert-position result)
+			 wpos))
+	       result)))
+      (typecase exp
+	(keyword
+	 (cond
+	   ;; Couldn't read a whole expression.
+	   ((eq exp *continue-symbol*)
+	    ;; If it's not something we know about, it's probably a bug.
+	    (ecase (car explanation) 
+	      (lisp-expr	      ; an incomplete lisp expression
+	       ;; (cdr explanation) should be the expr?
+	       (dbugf 'completion "partial lisp-expr ~s ~s~%" context pos)
+	       (shell-complete-symbol context pos all))
+	      (bang-expr	      ; an incomplete !lisp expression
+	       ;; (cdr explanation) should be the expr?
+	       (dbugf 'completion "partial bang-expr ~s ~s~%" context pos)
+	       (shell-complete-symbol context pos all))
+	      (string	       ; an unclosed string
+	       ;; This is lame. Anything could be in a string.
+	       (dbugf 'completion "partial string ~s ~s~%" (second explanation)
+		      (third explanation))
+	       ;; (complete-filename (cdr explanation)
+	       ;; 			  (length (cdr explanation)) all))
+	       (simple-complete #'complete-filename (second explanation)
+				(third explanation)))
+	      (compound		  ; a compound connector with nothing after it
+	       (dbugf 'completion "partial compound ~s~%" (cdr explanation))
+	       (case (cadr explanation)
+		 ((:pipe :and :or :sequence)
+		  (dbugf 'completion "whut?~%")
+		  (prog1 (simple-complete #'complete-command "" pos)
+		    (dbugf 'completion "why?~%")))
+		 ((:redirect-to :redirect-from :append-to)
+		  (complete-filename "" 0 all))))))
+	   (t ;; This is probably a bug.
+	    (error "Unknown keyword returned from shell-read."))))
+	(cons
+	 (dbugf 'completion "Hellow I am janky!~%")
+	 (shell-complete-symbol context pos all))
+	(shell-expr
+	 (let* ((word-num (shell-word-number exp pos))
+		(first-word (first-word-in-expr pos exp))
+		word word-pos)
+	   ;; word-num is the index of the word in the shell expr
+	   ;; word is the text of the word
+	   ;; word-pos is the relative position in the word
+	   (when word-num
+	     (setf word (elt (shell-expr-words exp) word-num)
+		   word-pos (- pos (elt (shell-expr-word-start exp) word-num))))
+	   (dbugf 'completion "~%word-num = ~w word = ~w word-pos = ~w~%"
+		  word-num word word-pos)
 	   (cond
 	     ((or (and (not word-num) (= pos 0))
 		  (start-of-a-compound-p exp pos))
 	      ;; no words
-	      (dbug "none~%")
+	      (dbugf 'completion "none~%")
 	      (simple-complete #'complete-command "" 0))
 	     ((not word)
 	      (if (= 0 (length (shell-expr-words exp)))
 		  ;; probably ()
 		  (progn
-		    (dbug "bogo~%")
+		    (dbugf 'completion "bogo~%")
 		    (shell-complete-symbol context pos all))
 		  ;; a blank spot somewhere in the line
 		  (let ((from-end (- (length context) pos)))
-		    (dbug "heyba~%")
+		    (dbugf 'completion "heyba~%")
 		    (let ((result
 			   (if (setf cmd (try-command first-word))
 			       (progn
-				 (dbug "Baaa~%")
+				 (dbugf 'completion "Baaa~%")
 				 (complete-command-arg context cmd exp pos all))
 			       (complete-filename word
 						  (- (length word) from-end)
@@ -464,13 +494,13 @@ complete, and call the appropriate completion function."
 				pos))
 		      result))))
 	     ((symbolp word)
-	      (dbug "janky~%")
+	      (dbugf 'completion "janky~%")
 	      (shell-complete-symbol context pos all t))
 	     ((consp word)		; (foo)
-	      (dbug "junky~%")
+	      (dbugf 'completion "junky~%")
 	      (shell-complete-symbol context pos all))
 	     ((eql (aref word 0) #\()	; (foo
-	      (dbug "half baka~%")
+	      (dbugf 'completion "half baka~%")
 	      (shell-complete-symbol context pos all))
 	     ((eql (aref word 0) #\!)	; !foo
 	      (shell-complete-symbol context pos all t))
@@ -489,7 +519,7 @@ complete, and call the appropriate completion function."
 	     ((and
 	       (in-command-position-p exp word-num)
 	       (not (position (aref word 0) "/.~")))
-	      (dbug "jinky~%")
+	      (dbugf 'completion "jinky~%")
 	      ;; try commands
 	      (let ((result 
 		     (simple-complete #'complete-command
@@ -503,34 +533,37 @@ complete, and call the appropriate completion function."
 			(shell-complete-symbol context pos all)))
 		result))
 	     (t
-	      (dbug "hello ~a~%" word)
+	      (dbugf 'completion "hello ~a~%" word)
 	      (let* ((from-end (- (length context) pos))
 		     (result
 		      (if (setf cmd (try-command first-word))
 			  (progn
-			    (dbug "blurgg~%")
+			    (dbugf 'completion "blurgg~%")
 			    (complete-command-arg
 			     context cmd exp pos
 			     #| (- (length word) from-end) |#
 			     all word-num word word-pos))
 			  (progn
-			    (dbug "jorky~%")
+			    (dbugf 'completion "jorky~%")
 			    ;; But it could be a command which isn't loaded yet.
 			    (if (load-lisp-command first-word)
 				(complete-command-arg
 				 context (get-command first-word) exp pos
 				 all word-num word word-pos)
 				(complete-filename word
-						   (- (length word) from-end)
-						   all))))))
-		(dbug "result = ~s~%" result)
+				 		   (- (length word) from-end)
+				 		   all)
+				)))))
+		(dbugf 'completion "result = ~s~%" result)
 		(if all
 		    (setf (completion-result-count result)
 			  (length (completion-result-completion result)))
 		    (setf (completion-result-completion result)
 			  (quotify (completion-result-completion result))
 			  (completion-result-insert-position result)
-			  (elt (shell-expr-word-start exp) word-num)))
+			  (let ((ss (elt (shell-expr-word-start exp) word-num)))
+			    (if (elt (shell-expr-word-quoted exp) word-num)
+				(1+ ss) ss))))
 		result)))))))))
 
 ;; EOF

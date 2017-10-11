@@ -44,8 +44,7 @@ the end and didn't get a close quote, the third value is true.~
   "Characters which the reader interprets specially if not quoted.")
 
 (defun shell-read (line &key partial (package *lish-user-package*))
-  "Read objects in shell syntax and return them. If PARTIAL is true, don't 
-signal an error if we can't read a full expression. It returns a SHELL-EXPR or
+  "Read objects in shell syntax and return them. It returns a SHELL-EXPR or
 a normal lisp object.
 The syntax is vaguely like:
   ; comment
@@ -55,7 +54,11 @@ The syntax is vaguely like:
   command | command | ...
   command < file-name
   command > file-name
-  ([lisp expressions...])"
+  ([lisp expressions...])
+
+If PARTIAL is true, don't signal an error if we can't read a full expression.
+Instead we return *CONTINUE-SYMBOL* as the first value, and as the second
+value, an explaination which consists of (tag-symbol datum...)."
 ;  (setf line (expand-global-aliases line))
   (let (word-start word-end word-quoted word-eval words
 	(c nil)				; current char
@@ -104,7 +107,9 @@ The syntax is vaguely like:
 	       (incf i))
 	     (read-lisp-expr ()
 	       (handler-bind
-		   ((end-of-file (_  (declare (ignore _)) (do-continue)))
+		   ((end-of-file
+		     (_ (declare (ignore _))
+			(do-continue 'lisp-expr (copy-seq w))))
 		    ;; The spec is a bit vauge about what type of error should
 		    ;; be signaled if a symbol with a package marker doesn't
 		    ;; exist. In section 2.3.5 it says it should be correctable
@@ -148,11 +153,12 @@ The syntax is vaguely like:
 		  :word-quoted (nreverse word-quoted)
 		  :word-eval (nreverse word-eval)
 		  )))
-	     (do-continue ()
+	     (do-continue (reason &optional data)
 	       "Handle when the expression is incomplete."
 	       (if partial
 		   (return-partial)
-		   (return-from shell-read *continue-symbol*)))
+		   (return-from shell-read
+		     (values *continue-symbol* `(,reason ,@data)))))
 	     (do-reader-error (c)
 	       "Handle when the expression has an error."
 	       ;; (format t "lish-read error ~a~%" c)
@@ -202,7 +208,7 @@ The syntax is vaguely like:
 		     word-end	 (list 0)
 	       	     word-quoted (list nil)
 	       	     word-eval	 (list nil)
-	       	     in-compound t)))
+		     in-compound key)))
       (loop
 	 :named tralfaz
 	 :while (< i len)
@@ -231,7 +237,8 @@ The syntax is vaguely like:
 	    (multiple-value-bind (str ink cont)
 		(read-string (subseq line (1+ i)))
 	      (when (and cont (not partial))
-		(return-from shell-read *continue-symbol*))
+		(return-from shell-read
+		  (values *continue-symbol* `(string ,str ,i))))
 	      (push i word-start)
 	      (push str args)
 	      (incf i (+ 2 ink))
@@ -271,7 +278,9 @@ The syntax is vaguely like:
 	      (setf (fill-pointer w) 0))
 	    ;; read a form as a separate word
 	    (handler-bind
-		((end-of-file (_  (declare (ignore _)) (do-continue)))
+		((end-of-file
+		  (_ (declare (ignore _))
+		     (do-continue 'bang-expr (copy-seq w))))
 		 (reader-error (_ (do-reader-error _))))
 	      (multiple-value-bind (obj pos)
 		  (with-package package
@@ -343,7 +352,8 @@ The syntax is vaguely like:
 	  (first words)
 	  ;; a normal shell expression
 	  (if (and in-compound (< (length words) 2))
-	      (return-from shell-read *continue-symbol*)
+	      (return-from shell-read
+		(values *continue-symbol* `(compound ,in-compound)))
 	      (make-the-expr))))))
 
 ;; EOF
