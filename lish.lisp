@@ -361,25 +361,37 @@ the primary result printed as a string."
 ;;   "Nothing fancy. Just a wrapper for a lisp value for now."
 ;;   object)
 
-(defun in-shell-word-p (exp word-num position)
-  (declare (type shell-expr exp)
-	   (type number word-num position))
-  "Return true if the POSITION is in the shell word numbered WORD-NUM."
-  (and (>= position (elt (shell-expr-word-start exp) word-num))
-       (<= position (elt (shell-expr-word-end   exp) word-num))))
+(defun in-shell-word-p (word position)
+  "Return true if the POSITION is in the WORD. If WORD isn't a shell-word, then
+return NIL."
+  (typecase word
+    (shell-word
+     (and (>= position (shell-word-start word))
+	  (<= position (shell-word-end word))))))
 
-(defun shell-word-number (exp pos
-			  &key (exp-len (length (shell-expr-words exp))))
-  (declare (type shell-expr exp))
-  "Return the shell expression's word number that position POS is in."
-;  (with-slots (word-start word-end) exp
-  (loop :for w :from 0 :below exp-len
-#|
-  :when (and (>= pos (elt (shell-expr-word-start exp) w))
-     (<= pos (elt (shell-expr-word-end exp) w))) 
-  |#
-     :when (in-shell-word-p exp w pos)
+(defun shell-word-num (exp pos)
+  "Return the shell expression's word that position POS is in."
+  (loop :for i = 0 :then (1+ i)
+     :for w :in (shell-expr-words exp)
+     :when (in-shell-word-p w pos)
+     :return i))
+
+(defun shell-word-at (exp pos)
+  "Return the shell expression's word that position POS is in."
+  (loop :for w :in (shell-expr-words exp)
+     :when (in-shell-word-p w pos)
      :return w))
+
+(defun word-word (word)
+  "Word is bond."
+  (typecase word
+    (shell-word (shell-word-word word))
+    (t word)))
+
+(defun word-quoted (word)
+  (typecase word
+    (shell-word (shell-word-quoted word))
+    (t nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Job control
@@ -490,19 +502,30 @@ the primary result printed as a string."
      nil)))
 
 
-(defun unquoted-string-p (w expr i)
+;; (defun unquoted-string-p (w expr i)
+;;   "True if W in EXPR with index I is _not_ quoted."
+;;   (and (stringp w) (> (length w) 0)
+;;        (and (shell-expr-word-quoted expr)
+;; 	    (not (elt (shell-expr-word-quoted expr) i)))))
+
+(defun unquoted-string-p (word)
   "True if W in EXPR with index I is _not_ quoted."
-  (and (stringp w) (> (length w) 0)
-       (and (shell-expr-word-quoted expr)
-	    (not (elt (shell-expr-word-quoted expr) i)))))
+  (or (and (stringp word) (> (length word) 0))
+      (and (shell-word-p word)
+	   (stringp (shell-word-word word))
+	   (> (length (shell-word-word word)) 0)
+	   (not (shell-word-quoted word)))))
 
 (defstruct fake-var
+  "A compatibility variable."
   name
   value
   cacheable
   cached-value
   description)
 
+;; Please don't add to these. These are just for superficial compatibility with
+;; POSIX shells.
 (defparameter *fake-vars*
   `(("HOSTNAME" nil "Name of the host."		  	 *host*)
     ("HOSTTYPE" t   "Type of the host."		  	 ,#'machine-type)
@@ -521,7 +544,7 @@ the primary result printed as a string."
     ("LINES"    nil "Terminal character rows"
      ,#'(lambda () (terminal-window-rows
 		    (rl:line-editor-terminal (lish-editor *shell*)))))
-    ;; These are readonly unlike the POSIX ones. But you can:
+    ;; These are readonly unlike the POSIX ones. But you can, as you may know:
     ;; (setf (lish-start-time *shell*) (get-universal-time))
     ;; and of course:
     ;; (setf *random-state* (make-random-state))
@@ -583,15 +606,15 @@ the primary result printed as a string."
 	    (evaluate (fake-var-value var)))))))
 
 ;; @@@ This is overly consy.
-(defun remove-backquotes (s)
-  "Remove backquotes from the string S, except don't remove double backquotes."
-  ;;(join (substitute "\\" "" (split-sequence #\\ s) :test #'equal) ""))
+(defun remove-backslashes (s)
+  "Remove quoting backslashes from the string S, except don't remove doubled
+backslashes."
   (with-output-to-string (str)
     (let ((start 0) (last-start 0) (len (length s)))
       (loop
 	 :while (and (< start len) (setf start (position #\\ s :start start)))
 	 :do
-	 (format t "start = ~s last-start = ~s~%" start last-start)
+	 ;;(format t "start = ~s last-start = ~s~%" start last-start)
 	 (when (> (- start last-start) 0)
 	   (princ (subseq s last-start start) str))
 	 (when (and (< (1+ start) len) (char= #\\ (char s (1+ start))))
@@ -656,56 +679,116 @@ the primary result printed as a string."
       (when (not (zerop (- (or start len) last-start)))
 	(princ (subseq s last-start (or start len)) str)))))
 
+;; @@@ Perhaps we could actually do the evaluation in here?
+(defun expand-bang (word)
+  "Expand a shell word starting with !. If the history-expansion shell option
+is set, and the expression is an integer, do history expansion.
+Otherwise, return words which will evaluate a lisp expression."
+  (let (results expansion)
+    (handler-case
+	(multiple-value-bind (obj pos)
+	    (read-from-string (subseq word 1) nil)
+	  (declare (ignore pos)) ;; @@@ wrong, should complain
+	  (if (and obj (integerp obj)
+		   *shell* (get-option *shell* 'history-expansion))
+	      (setf expansion (shell-read (rl:history-nth obj))
+		    results
+		    (typecase expansion
+		      (shell-expr (shell-expr-words expansion))
+		      (t (list expansion))))
+	      ;;(push (make-shell-word :word obj :eval t) results)))
+	      (push obj results)))
+      (end-of-file ())
+      (reader-error ()))
+    results))
+
 (defun do-expansions (expr)
   "Perform shell syntax expansions / subsitutions on the expression.
-Remove backquotes."
+Remove backslash quotes."
   (let ((new-words '()))
-    (loop
-       :for w :in (shell-expr-words expr)
-       :for i = 0 :then (1+ i)
+    (loop :with w
+       :for word :in (shell-expr-words expr)
        :do
-       (if (unquoted-string-p w expr i)
-	 (cond
-	   ;; $ environment variable expansion
-	   ((position #\$ w)
-	    (push (expand-variables w) new-words))
-	   ;; filename globbing, with ~ expansion on
-	   ((glob:pattern-p w nil t)
-	    (let ((g (glob:glob w :tilde t)))
-	      (if g
-		(dolist (x g) (push x new-words))
-		;; There's no existing file expansions, but try just twiddle,
-		;; and also keep the literal glob expression if no matches.
+       (setf w (word-word word))
+       (cond
+	 ((not (unquoted-string-p word))
+	  ;; Quoted, so just push it verbatim
+	  (push word new-words))
+	 ((position #\$ w)
+	  ;; $ environment variable expansion
+	  (let ((expansion (expand-variables w)))
+	    (push (if (shell-word-p word)
+		      (make-shell-word
+		       :word expansion
+		       :start (shell-word-start word)
+		       ;; @@@ this could overlap a following word
+		       :end (+ (shell-word-start word) (length expansion))
+		       :quoted t
+		       :eval (shell-word-eval word))
+		      (make-shell-word :word expansion :quoted t))
+		new-words)))
+	 ((glob:pattern-p w nil t)
+	  ;; filename globbing, with ~ expansion on
+	  (let ((g (glob:glob w :tilde t)))
+	    (if g
+		(dolist (x g) (push x new-words)) ;; @@@ fix to not dup
+		;; There's no existing file expansions, but try just
+		;; twiddle, and also keep the literal glob expression
+		;; if no matches.
 		(push (glob:expand-tilde w) new-words))))
-	   ;; global aliases
-	   #|((setf v (get-alias w :global t :shell sh))
-	    (loop :for a :in (shell-expr-words
-			      (shell-read v #| :package *junk-package* |#))
-	       :do (push (or v "") new-words))) |#
-	   (t (push (remove-backquotes w) new-words)))
-	 ;; Quoted, so just push it verbatim
-	 (push w new-words)))
+	 ;; global aliases
+	 #|((setf v (get-alias w :global t :shell sh))
+	 (loop :for a :in (shell-expr-words
+	 (shell-read v #| :package *junk-package* |#))
+	 :do (push (or v "") new-words))) |#
+	 ((eql (char w 0) #\!)
+	  ;; !bang expansion
+	  (loop :for e :in (expand-bang w) :do
+	     ;; (format t "--> ~s~%" e)
+	     (push e new-words)))
+	 ((shell-word-p word)
+	  ;; quoted word without anything special to expand
+	  (setf (shell-word-word word) (remove-backslashes w))
+	  (push word new-words))
+	 ((stringp word)
+	  (push (remove-backslashes word) new-words))
+	 (t
+	  (push word new-words))))
     (setf (shell-expr-words expr) (nreverse new-words)))
   expr)
 
 (defun shell-expand-line (editor)
   "A command to expand the current line."
   ;;(format t "editor is a ~a = ~s~%" (type-of editor) editor)
-  (let ((buf (rl:get-buffer-string editor)))
-    (let ((words (possibly-expand-aliases
+  (let* ((buf (rl:get-buffer-string editor))
+	 (words (shell-expr-words
+		 (possibly-expand-aliases
 		  *shell*
-		  (lisp-exp-eval
-		   (expr-to-words (do-expansions (shell-read buf)))))))
-      (rl:replace-buffer
-       editor
-       (with-output-to-string (str)
+		  (do-expansions
+		      (lisp-exp-eval (shell-read buf)))))))
+    (rl:replace-buffer
+     editor
+     (with-output-to-string (str)
+       (labels ((write-thing (w)
+		  (typecase w
+		     (string (princ (quotify w) str))
+		     (cons (write w :stream str :readably t :case :downcase))))
+		;;(write w :stream str :readably t :case :downcase))
+		(write-it (w)
+		  (cond
+		    ((and (shell-word-p w) (word-quoted w))
+		     (write-char #\" str)
+		     (write-thing (word-word w))
+		     (write-char #\" str))
+		    (t
+		     (write-thing (word-word w))))))
 	 (when (first words)
-	   (princ (shell-word-word (first words)) str))
+	   (write-it (first words)))
 	 (loop :for w :in (rest words)
 	    :do (write-char #\space str)
-	    (if (shell-word-quoted w)
-		(format str "\"~a\"" (shell-word-word w))
-		(princ (shell-word-word w) str))))))))
+	    (write-it w)))))))
+
+#|
 
 (defun expr-to-words (expr)
   (loop
@@ -766,23 +849,47 @@ Remove backquotes."
 	  (shell-expr-word-quoted expr) (make-list (length args))
 	  (shell-expr-word-eval   expr) (make-list (length args)))
     expr))
+|#
 
-(defun lisp-exp-eval (words)
-  "Evaluate Lisp expressions in the array of shell-words, return a possibly
-expanded array of shell-words."
-  (loop :with results
-     :for w :in words
-     :if (and (or (consp (shell-word-word w)) (symbolp (shell-word-word w)))
-	      (shell-word-eval w))
-     :do (setf results (eval (shell-word-word w)))
-     :and :if (listp results)
+(defun expr-from-args (args)
+  "Return a shell expression made up of ARGS as the words."
+  (let* (words
+	 (line (with-output-to-string (str)
+		(loop :with pos = 0
+		   :for a :in args :do
+		   (when (not (zerop pos))
+		     (princ #\space str)
+		     (incf pos))
+		   (push (make-shell-word
+			  :word a
+			  :start pos
+			  :end (+ pos (length a)))
+			 words)
+		   (incf pos (length a))
+		   (princ a str)))))
+    (make-shell-expr :line line :words (reverse words))))
+
+(defun lisp-exp-eval (expr)
+  "Return a shell-expr with Lisp expressions expanded."
+  (make-shell-expr
+   :words
+   (loop :with results :and first-word = t
+      :for w :in (shell-expr-words expr)
+      :if (and (not first-word) (shell-word-p w)
+	       (or (consp (shell-word-word w)) (symbolp (shell-word-word w)))
+	       (shell-word-eval w))
+      :do (setf results (eval (shell-word-word w)))
+      :and :if (listp results)
 	;; Spread list results into separate args
         :append (mapcar #'(lambda (x) (make-shell-word :word x))
 			results)
-     :else
+      :else
         :collect (make-shell-word :word results)
-    :else
-      :collect w))
+      :else
+        :collect w
+      :do (setf first-word nil))
+   ;; @@@ doesn't fix the line
+   :line (shell-expr-line expr)))
 
 (defvar *input* nil
   "The output of the previous command in pipeline.")
@@ -793,13 +900,21 @@ expanded array of shell-words."
 (defvar *accepts* nil
   "What the next command in the pipeline accepts.")
 
+(defun nth-expr-word (n expr)
+  "Return the Nth, potentially unwrapped, word of the shell-expr."
+  (let ((w (nth n (shell-expr-words expr))))
+    (typecase w
+      (shell-word
+       (shell-word-word w))
+      (t w))))
+
 (defun resolve-command (command &optional seen)
   "Figure some crap out, okay."
   (let ((alias (gethash command (lish-aliases *shell*)))
 	word)
     (if alias
 	(progn
-	  (setf word (elt (shell-expr-words (shell-read alias)) 0))
+	  (setf word (nth-expr-word 0 (shell-read alias)))
 	  (if (not (position command seen :test #'equal)) ; don't circle
 	      (progn
 		(pushnew command seen :test #'equal)
@@ -811,7 +926,7 @@ expanded array of shell-words."
   (typecase expr
     (shell-expr
      (dbugf :accepts "get-accepts: shell-expr ~s~%" expr)
-     (get-accepts (elt (shell-expr-words expr) 0)))
+     (get-accepts (nth-expr-word 0 expr)))
     (list
      (dbugf :accepts "get-accepts: list ~s~%" expr)
      (get-accepts (if (keywordp (car expr))
@@ -873,32 +988,38 @@ them as a list."
 	(setf *output* (first ,vals))
 	,vals))))
 
-(defun expand-alias-words (alias words)
-  "Take an alias and a shell-words array and return a shell-words array
-with the alias expanded."
-  (let* ((alias-words (expr-to-words (shell-read alias)))
-	 (new-words (append alias-words (subseq words 1))))
-    new-words))
+;; (defun expand-alias-words (alias words)
+;;   "Take an alias and a shell-words array and return a shell-words array
+;; with the alias expanded."
+;; ;;  (let* ((alias-words (expr-to-words (shell-read alias)))
+;;   (let* ((alias-words (shell-expr-words (shell-read alias)))
+;; 	 (new-words (append alias-words (subseq words 1))))
+;;     new-words))
 
-(defun possibly-expand-aliases (sh words)
-  (if (zerop (length words))
-      words
-      (let* ((cmd (shell-word-word (elt words 0)))
+(defun possibly-expand-aliases (sh expr)
+  "Return a shell-expr with aliases expanded. This does lisp expression
+expansion in the alias expansion."
+  (if (zerop (length (shell-expr-words expr)))
+      expr
+      (let* ((cmd (nth-expr-word 0 expr))
 	     (alias (gethash cmd (lish-aliases sh))))
 	(if alias
-	    (lisp-exp-eval (expand-alias-words alias words))
-	    words))))
+	    (lisp-exp-eval (expand-alias alias expr))
+	    expr))))
 
 ;; XXX This can be problematic because in the back and forth to words things
 ;; in expr can get trashed or are not set, or faked like the shell-expr-line
 ;; below.
-(defun expand-alias (alias words)
-  "Take an alias and a shell words array and return a shell-expr with the alias
+(defun expand-alias (alias expr)
+  "Take an alias and a shell-expr and return a shell-expr with the alias
 expanded."
-  (let ((new-expr (words-to-expr (expand-alias-words alias words))))
-    (setf (shell-expr-line new-expr)
-	  (format nil "~{~a ~}" (shell-expr-words new-expr)))
-    new-expr))
+  (let ((new-words (append (shell-expr-words (shell-read alias))
+			   (cdr (shell-expr-words expr)))))
+    (make-shell-expr
+     :words new-words
+     :line (format nil "~{~a ~}"
+		   (mapcar (_ (or (and (stringp _) _)
+				  (shell-word-word _))) new-words)))))
 
 (defun command-type (sh command)
   "Return a keyword representing the command type of COMMAND, or NIL."
@@ -1011,7 +1132,7 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
     (if (and (< (length parenless-args) (length function-args))
 	     *input*)
 	(progn
-	  ;;(format t "WOO HOO! parenless input!~%")
+	  ;;(format t "parenless input!~%")
 	  (if parenless-args
 	      (progn
 		;;(format t "parenless-args = ~s~%" parenless-args)
@@ -1023,25 +1144,24 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	;; no *input* stuffing
 	(with-first-value-to-output (apply func parenless-args)))))
 
-(defun do-system-command (words context)
-  #| &key in-pipe out-pipe (environment nil env-p) |#
+(defun do-system-command (expr context)
   "Run a system command.
-WORDS is a list of shell-words or strings.
+EXPR is a shell-expr.
 IN-PIPE is an input stream to read from, if non-nil.
 OUT-PIPE is T to return a input stream which the output of the command can be
 read from."
-  ;; Since run-program can't throw an error when the program is not found, we
-  ;; try to do it here.
-  (dbugf :lish-eval "system command ~w ~w~%" words context)
+  (dbugf :lish-eval "system command ~w ~w~%" expr context)
   (let* ((command-line
 	  ;; System command arguments must be strings
 	  (mapcar (_ (or (and (stringp _) _)
 			 (princ-to-string (shell-word-word _))))
-		     words))
+		     (shell-expr-words expr)))
 	 (program (car command-line))
 	 (args    (cdr command-line))
 	 (path    (get-command-path program))
 	 result result-stream pid status job)
+    ;; Since run-program can't throw an error when the program is not found,
+    ;; we try to do it here.
     (when (not path)
       (signal ;; cerror "Fixypoo: "
        'unknown-command-error
@@ -1113,28 +1233,21 @@ If the first word is a symbol bound to a function, call it with the arguments,
 which are read like lisp code. This is like a ‘parenless’ function call.
 Otherwise just try to execute it with the system command executor, which will
 probably fail, but perhaps in similar way to other shells."
-  (let* ((words (expr-to-words expr))
-	 (cmd (shell-word-word (elt words 0)))
-	 #| (args (subseq (shell-expr-words expr) 1)) |#
-	 ;; (command (gethash cmd (lish-commands)))
+  (let* (;(words (shell-expr-words expr))
+	 (cmd (word-word (nth-expr-word 0 expr)))
 	 (command (get-command cmd))
 	 (alias (gethash cmd (lish-aliases sh)))
-	 (expanded-words (lisp-exp-eval words))
+	 (expanded-expr (lisp-exp-eval expr))
 	 result result-stream)
     (dbugf :lish-eval "words = ~w~%" (shell-expr-words expr))
-    (dbugf :lish-eval "expanded words = ~w~%" expanded-words)
+    (dbugf :lish-eval "expanded expr = ~w~%" expanded-expr)
     ;; These are in order of precedence, so:
     ;;  aliases, lisp path, commands, system path
     (flet ((sys-cmd ()
 	     "Do a system command."
 	     (run-hooks *pre-command-hook* cmd :system-command)
 	     (setf (values result result-stream)
-		   ;; (apply #'do-system-command 
-		   ;; 	  `(,expanded-words
-		   ;; 	    :in-pipe ,in-pipe
-		   ;; 	    :out-pipe ,out-pipe
-		   ;; 	    ,@(when evp-p `(:environment ,environment)))))
-		   (do-system-command expanded-words context))
+		   (do-system-command expanded-expr context))
 	     (run-hooks *post-command-hook* cmd :system-command)
 	     (dbugf :lish-eval "result = ~w~%" result)
 	     (when (not result)
@@ -1143,20 +1256,19 @@ probably fail, but perhaps in similar way to other shells."
 	     (values result result-stream nil))
 	   (rest-of-the-line (expr)
 	     "Return the rest of the line after the first word."
-	     (if (> (length (shell-expr-word-start expr)) 1)
+	     (if (> (length (shell-expr-words expr)) 1)
 		 ;; (subseq (shell-expr-line expr)
 		 ;; 	 (elt (shell-expr-word-start expr) 1))
 		 ;; (join (subseq (shell-expr-words expr) 1) " ")
 		 (with-output-to-string (str)
 		   (loop :with first = t
 		      :for w :in (rest (shell-expr-words expr))
-		      :for q :in (rest (shell-expr-word-quoted expr))
 		      :if first
 		        :do (setf first nil)
 		      :else
 		        :do (princ " " str)
 		      :end
-		      :if q
+		      :if (shell-word-quoted w)
 		        :do (print w str) ; make strings be strings
 		      :else
 		        :do (princ w str)))
@@ -1175,14 +1287,15 @@ probably fail, but perhaps in similar way to other shells."
 	((and alias (not no-alias))
 	 (dbugf :lish-eval "Expanding alias~%")
 	 ;; re-read and re-eval the line with the alias expanded
-	 (shell-eval (expand-alias alias expanded-words) :context context
+	 (shell-eval (expand-alias alias expanded-expr) :context context
 		     :no-expansions t))
 	;; Lish command
 	((typep command 'internal-command)
 	 (dbugf :lish-eval "Calling command ~s ~s~%" command context)
 	 (run-hooks *pre-command-hook* cmd :command)
 	 (multiple-value-prog1
-	     (call-thing command (subseq expanded-words 1) context)
+	     (call-thing command (subseq (shell-expr-words expanded-expr) 1)
+			 context)
 	   (run-hooks *post-command-hook* cmd :command)))
 	;; external command
 	((typep command 'external-command)
@@ -1200,7 +1313,8 @@ probably fail, but perhaps in similar way to other shells."
 	 ;; now try it as a command
 	 (run-hooks *pre-command-hook* cmd :command)
 	 (multiple-value-prog1
-	     (call-thing command (subseq expanded-words 1) context)
+	     (call-thing command (subseq (shell-expr-words expanded-expr) 1)
+			 context)
 	   (run-hooks *post-command-hook* cmd :command)))
 	((functionp cmd)
 	 (dbugf :lish-eval "Function eval~%")
@@ -1272,7 +1386,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	      new pipe."
 	     `(multiple-value-bind (vals out-stream show-vals)
 		  (let ((*accepts*
-			 (get-accepts (elt (shell-expr-words expr) 1))))
+			 (get-accepts (nth-expr-word 1 expr))))
 		    (shell-eval (second first-word)
 				:context (make-context
 					  :in-pipe in-pipe
@@ -1285,10 +1399,6 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		    (shell-eval
 		     (make-shell-expr
 		      :words       (cdr (shell-expr-words expr))
-		      :word-start  (cdr (shell-expr-word-start expr))
-		      :word-end    (cdr (shell-expr-word-end expr))
-		      :word-quoted (cdr (shell-expr-word-quoted expr))
-		      :word-eval   (cdr (shell-expr-word-eval expr))
 		      ;; @@@ perhaps we should retain original,
 		      ;; since indexes not adjusted?
 		      :line (format nil "~{~a ~}"
@@ -1299,6 +1409,11 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			 (modified-context *context* :in-pipe out-stream)
 			 *context*)
 		     :no-expansions no-expansions))))))
+	;; unpack an eval-able lisp expr
+	(when (and (= (length (shell-expr-words expr)) 1)
+		   (shell-word-eval (first (shell-expr-words expr))))
+	  (setf expr (shell-word-word (first (shell-expr-words expr)))))
+	;; @@@ But what if there's multiple eval-able lisp exprs?
 	(cond
 	  ((not (shell-expr-p expr))
 	   (dbugf :lish-eval "Evaluating a Lisp expression.~%")
@@ -1339,10 +1454,10 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	      (dbugf :lish-eval "other expr = ~s.~%" expr)
 	      (with-package *lish-user-package*
 		(values (multiple-value-list (eval expr)) nil t)))))
-	  ((= (length (shell-expr-words expr)) 0)
+	  ((zerop (length (shell-expr-words expr)))
 	   ;; Quick return when no words
 	   (return-from shell-eval (values nil nil nil)))
-	  ((and (listp (setf first-word (elt (shell-expr-words expr) 0)))
+	  ((and (listp (setf first-word (nth-expr-word 0 expr)))
 		(keywordp (first first-word)))
 	   ;; First word is a list with a keyword, so it's a compound command.
 	   (dbugf :lish-eval "Evaluating a compound expression ~a.~%" first-word)
@@ -1441,7 +1556,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
      :if (not (position i (lish-jobs shell)
 			:key #'job-id))
      :return i
-     :if (> i 10000)
+     :if (> i 100000)
      :do (error "Something probably went wrong with finding a job ID.")))
 
 (defun add-job (name command-line thing &key (status :running))
@@ -1491,6 +1606,7 @@ suspend itself."
     #\- #\$ #\~ #\! #\&)
   "Characters that are not considered to be part of a word in the shell.")
 
+;; This isn't even "safe".
 (defun safety-prompt (sh)
   "Return a prompt, in a manner unlikely to fail."
   (or (and (lish-prompt-function sh)
@@ -1651,7 +1767,7 @@ handling errors."
       t))
 
 (defun lish (&key debug terminal-name
-	       (init-file *default-lishrc* init-file-supplied-p)
+	       (init-file (or *lishrc* *default-lishrc*))
 	       command)
   "Unix Shell & Lisp somehow smushed together.
 Type the “help” command for more documentation.
@@ -1667,6 +1783,7 @@ Arguments:
 	 (*lish-level* (if *lish-level*
 			   (funcall #'1+ (symbol-value '*lish-level*))
 			   0))
+	 (*lishrc* init-file) ;; So it's inherited by sub-shells.
 	 ! ;-) !
 	 (saved-sigs (job-control-signals)))
     ;; Don't do the wacky package updating in other packages.
@@ -1674,9 +1791,9 @@ Arguments:
       (update-user-package))
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
-    (when (or (not init-file-supplied-p) init-file *lishrc*)
-      (load-rc-file (or (and (not init-file-supplied-p) *lishrc*)
-			init-file)))
+    ;;(when (or (not init-file-supplied-p) init-file *lishrc*)
+    (when init-file
+      (load-rc-file init-file))
 
     (when command
       (start-job-control)
@@ -1777,7 +1894,7 @@ Arguments:
   (when (and greeting (not command))
     (format t "Welcome to ~a ~a~%" *shell-name* *version*))
   (when (not init-file-supplied-p)
-    (setf init-file *default-lishrc*))
+    (setf init-file (or *lishrc* *default-lishrc*)))
   ;;(format t "init-file = ~s~%" init-file)
   ;;(format t "command = ~s~%" command) (finish-output)
   (lish :command command :init-file init-file :debug debug))

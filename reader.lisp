@@ -60,7 +60,7 @@ If PARTIAL is true, don't signal an error if we can't read a full expression.
 Instead we return *CONTINUE-SYMBOL* as the first value, and as the second
 value, an explaination which consists of (tag-symbol datum...)."
 ;  (setf line (expand-global-aliases line))
-  (let (word-start word-end word-quoted word-eval words
+  (let (words word-start
 	(c nil)				; current char
 	(i 0)				; index in line
 	(len (length line))
@@ -72,36 +72,32 @@ value, an explaination which consists of (tag-symbol datum...)."
 	(do-quote nil)
 	(in-compound nil)
 	(did-quote nil))		;
-    (labels ((finish-word ()
+    (labels ((reset-word ()
+	       "Reset the word to be empty."
+	       (setf (fill-pointer w) 0
+		     in-word nil
+		     in-first-word nil
+		     did-quote nil))
+	     (finish-word ()
 	       "Finish the current word."
 	       (dbugf 'reader "finish-word ~s~%" w)
 	       (when in-word
-		 (if sub-expr
-		     (progn
-		       (push (copy-seq w) sub-expr)
-		       (setf sub-expr (nreverse sub-expr))
-		       (push t word-eval)
-		       (push sub-expr args))
-		     (progn
-		       (push (copy-seq w) args)
-		       (push nil word-eval)))
-		 (push i word-end)
-		 (push did-quote word-quoted)
-		 (setf (fill-pointer w) 0
-		       in-word nil
-		       in-first-word nil
-		       did-quote nil)))
+		 (push (make-shell-word
+			:word (if sub-expr sub-expr (copy-seq w))
+			:eval (and sub-expr t)
+			:start word-start
+			:end i
+			:quoted did-quote)
+		       args))
+	       (reset-word))
 	     (ignore-word ()
 	       "Ignore the current word."
 	       (when in-word
-		 (setf (fill-pointer w) 0
-		       in-word nil
-		       in-first-word nil
-		       did-quote nil)))
+		 (reset-word)))
 	     (add-to-word ()
 	       "Add the character to the current word or start a new one."
 	       (when (not in-word)
-		 (push i word-start))
+		 (setf word-start i))
 	       (setf in-word t)
 	       (vector-push-extend c w)
 	       (incf i))
@@ -131,28 +127,26 @@ value, an explaination which consists of (tag-symbol datum...)."
 						   *continue-symbol* :start i)
 			   (read-from-string line nil
 					     *continue-symbol* :start i)))
-		   (push i word-start)
-		   (setf i pos)
-		   (push obj args)
-		   (push i word-end)
-		   (push nil word-quoted)
-		   (push t word-eval)
+		   (setf word-start i
+		        i pos)
+		   (push (make-shell-word :word obj
+					  :eval t
+					  :quoted nil
+					  :start word-start
+					  :end i)
+			 args)
 		   )))
 	     (return-partial ()
-	       (push i word-start)
-	       (push (subseq line i) args)
-	       (push (length line) word-end)
-	       (push nil word-quoted)
-	       (push nil word-eval)
+	       (setf word-start i)
+	       (push (make-shell-word
+		      :word (subseq line i)
+		      :start word-start
+		      :end (length line)
+		      :quoted nil
+		      :eval nil)
+		     args)
 	       (return-from shell-read
-		 (make-shell-expr
-		  :line line
-		  :words (nreverse args)
-		  :word-start (reverse word-start)
-		  :word-end (nreverse word-end) 
-		  :word-quoted (nreverse word-quoted)
-		  :word-eval (nreverse word-eval)
-		  )))
+		 (make-shell-expr :line line :words (nreverse args))))
 	     (do-continue (reason &optional data)
 	       "Handle when the expression is incomplete."
 	       (if partial
@@ -170,22 +164,14 @@ value, an explaination which consists of (tag-symbol datum...)."
 	       (when (< (+ i 1) len) (aref line (1+ i))))
 	     (reverse-things ()
 	       "Reverse the things we've been consing, so they're in order."
-	       (setf word-start  (reverse word-start)
-		     word-end    (nreverse word-end)
-		     word-quoted (nreverse word-quoted)
-		     word-eval   (nreverse word-eval)
-		     words       (nreverse args)))
+	       (setf words (nreverse args)))
 	     (make-the-expr ()
 	       "Make an expression, with it's own copy of the lists."
 	       (dbugf 'reader "make-the-expr ~s~%" words)
 	       (setf in-compound nil)
 	       (make-shell-expr
 		:line line
-		:words (copy-seq words)
-		:word-start (copy-seq word-start)
-		:word-end (copy-seq word-end)
-		:word-quoted (copy-seq word-quoted)
-		:word-eval (copy-seq word-eval)))
+		:words (copy-seq words)))
 	     (make-compound (key &optional (inc 2))
 	       "Make a compound expression with type KEY."
 	       ;; (finish-word)
@@ -204,10 +190,10 @@ value, an explaination which consists of (tag-symbol datum...)."
 	       (let ((e (list key (make-the-expr))))
 	       	 (setf args (list e)))
 	       (incf i inc)
-	       (setf word-start	 (list 0)
-		     word-end	 (list 0)
-	       	     word-quoted (list nil)
-	       	     word-eval	 (list nil)
+	       (setf word-start	 0
+		     ;; word-end	 (list 0)
+	       	     ;; word-quoted (list nil)
+	       	     ;; word-eval	 (list nil)
 		     in-compound key)))
       (loop
 	 :named tralfaz
@@ -239,12 +225,14 @@ value, an explaination which consists of (tag-symbol datum...)."
 	      (when (and cont (not partial))
 		(return-from shell-read
 		  (values *continue-symbol* `(string ,str ,i))))
-	      (push i word-start)
-	      (push str args)
+	      (setf word-start i)
 	      (incf i (+ 2 ink))
-	      (push i word-end)
-	      (push t word-quoted)
-	      (push nil word-eval)))
+	      (push (make-shell-word :word str
+				     :start word-start
+				     :end i
+				     :quoted t
+				     :eval nil)
+		    args)))
 	   ;; a lisp function application
 	   ((eql c #\()
 	    (finish-word)
@@ -268,14 +256,10 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ;; a lisp expr
 	   ((eql c #\!)
 	    (dbugf 'reader "sub-expr")
+	    (setf sub-expr nil)
+	    (finish-word)
 	    (when (not in-word)
-	      (push i word-start))
-	    (when (not sub-expr)
-	      (push 's+ sub-expr))	; !!!
-	    (when (length w)
-	      (dbugf 'reader " ~s" w)
-	      (push (copy-seq w) sub-expr)
-	      (setf (fill-pointer w) 0))
+	      (setf word-start i))
 	    ;; read a form as a separate word
 	    (handler-bind
 		((end-of-file
@@ -293,7 +277,11 @@ value, an explaination which consists of (tag-symbol datum...)."
 		(setf i pos)
 		(setf in-word t) ; so it gets output
 		(dbugf 'reader " ~s~%" obj)
-		(push obj sub-expr))))
+		(if (and obj (integerp obj)
+			 *shell* (get-option *shell* 'history-expansion))
+		    (map-into w #'identity (subseq line word-start i))
+		    (setf sub-expr obj))
+		)))
 	   ;; quote char
 	   ((eql c #\\)
 	    (setf do-quote t)
@@ -305,9 +293,10 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ;; comment
 	   ((eql c #\;)
 	    (finish-word)
-	    (loop :for j :from i :below len
-	       :while (not (eql (aref line j) #\newline))
-	       :do (incf i)))
+	    ;; (loop :for j :from i :below len
+	    ;;    :while (not (eql (aref line j) #\newline))
+	    ;;    :do (incf i))
+	    (setf i (or (position #\newline line :start i) len)))
 	   ;; pipe
 	   ((and (eql c #\|) (not (eql (next-char) #\|)))
 	    (make-compound :pipe 1))
@@ -323,12 +312,13 @@ value, an explaination which consists of (tag-symbol datum...)."
 			      :redirect-to)
 			  :redirect-from)
 		      (make-the-expr))))
-	      (setf args (list e)))
-	    (setf word-start (list i))
-	    (incf i)
-	    (setf word-end (list i)
-		  word-quoted (list nil)
-		  word-eval (list t)))
+	      (setf word-start i)
+	      (setf args (make-shell-word :start word-start
+					  :word (list e) ;; ???
+					  :end i
+					  :quoted nil
+					  :eval t)))
+	    (incf i))
 	   ;; and
 	   ((and (eql c #\&) (eql (next-char) #\&))
 	    (make-compound :and))

@@ -91,8 +91,9 @@
 
 (defun find-option (sh name)
   "Find the option of the shell SH, named NAME. Error if there is none."
-  (or (find name (lish-options sh) :key #'arg-name :test #'equalp)
-      (error 'shell-error :format "No such option ~w" :arguments name)))
+  (or (find (string name) (lish-options sh) :key #'arg-name :test #'equalp)
+      (error 'shell-error :format "No such option ~w"
+	     :arguments (list name))))
 
 (defun set-option (sh name value)
   "Set the option named NAME, for shell SH, to VALUE."
@@ -148,6 +149,9 @@ number ignore it that many times before exiting."
   :help
   "True to try to load unknown commands from an ASDF system of the same name."
   :default t)
+(defoption history-expansion boolean
+  :help "True if !<integer> should expand to a history item."
+  :default nil)
 
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.

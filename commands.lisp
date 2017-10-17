@@ -536,8 +536,8 @@ and the name of the external program. ARGLIST is a shell argument list."
   "Move the I'th item from the OLD to the NEW list, and return both."
   `(progn
      (setf ,new (push (convert-arg ,arg
-				   (shell-word-word (nth ,i ,old))
-				   (shell-word-quoted (nth ,i ,old)))
+				   (word-word (nth ,i ,old))
+				   (word-quoted (nth ,i ,old)))
 		      ,new)
 	   ,old (delete-nth ,i ,old))))
 
@@ -550,8 +550,8 @@ and the name of the external program. ARGLIST is a shell argument list."
      (when ,keyworded
        (setf ,new (push (arg-key ,arg) ,new)))
      (setf ,new (push (convert-arg ,arg
-				   (shell-word-word (nth ,i ,old))
-				   (shell-word-quoted (nth ,i ,old)))
+				   (word-word (nth ,i ,old))
+				   (word-quoted (nth ,i ,old)))
 		      ,new))
      (setf ,old (delete-nth ,i ,old))))
 
@@ -561,8 +561,8 @@ and the name of the external program. ARGLIST is a shell argument list."
      (when ,keyworded
        (setf ,new (push (arg-key ,arg) ,new)))
      (setf ,new (push (convert-arg ,arg
-				   (shell-word-word ,value)
-				   (shell-word-quoted ,value)))
+				   (word-word ,value)
+				   (word-quoted ,value)))
 	   ,new)))
 
 (defmacro move-flag (old new i arg)
@@ -576,8 +576,8 @@ and the name of the external program. ARGLIST is a shell argument list."
      (dbugf :lish-arg "~s -> ~s~%" (nth (1+ ,i) ,old)
 	   (convert-arg ,arg (nth (1+ ,i) ,old)))
      (setf ,new (push (convert-arg ,arg
-				   (shell-word-word (nth (1+ ,i) ,old))
-				   (shell-word-quoted (nth (1+ ,i) ,old)))
+				   (word-word (nth (1+ ,i) ,old))
+				   (word-quoted (nth (1+ ,i) ,old)))
 		      ,new))
      (setf ,old (delete-nth ,i ,old)) ; flag
      (setf ,old (delete-nth ,i ,old)) ; arg
@@ -612,8 +612,8 @@ and the name of the external program. ARGLIST is a shell argument list."
 				       #'(lambda (x)
 					   (convert-arg
 					    ,arg
-					    (shell-word-word x)
-					    (shell-word-quoted x)))
+					    (word-word x)
+					    (word-quoted x)))
 					      (nthcdr ,start ,old)) ,new))
 		     (when (length (nthcdr ,start ,old))
 		       (setf ,did-one t)))
@@ -621,8 +621,8 @@ and the name of the external program. ARGLIST is a shell argument list."
 		      (setf ,new
 			    (push (convert-arg
 				   ,arg
-				   (shell-word-word ,e)
-				   (shell-word-quoted ,e)) ,new)
+				   (word-word ,e)
+				   (word-quoted ,e)) ,new)
 			    ,did-one t)))
 	       (setf ,old (subseq ,old 0 ,start))
 	       ;; Push default if we have one and didn't get any values.
@@ -734,6 +734,7 @@ value, a list of the converted arguments."
 	      ))))))
 |#
 
+#|
 (defun NEW-posix-to-lisp-args (command p-args)
   "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
 become keyword arguments, in a way specified in the command's arglist."
@@ -745,7 +746,7 @@ become keyword arguments, in a way specified in the command's arglist."
 	                 ; a count of how many posix args we've skipped.
 ;;;	(new-list        '())
 	(old-list        (copy-list p-args)) ; so we don't modify it
-;;;	(old-list        (mapcar #'shell-word-word p-args))
+;;;	(old-list        (mapcar #'word-word p-args))
 	(new-flags       '())
 	(new-mandatories '())
 	(new-optionals   '())
@@ -764,7 +765,7 @@ become keyword arguments, in a way specified in the command's arglist."
     (loop :with a
        :while (< i (length old-list)) :do
        #| (setf a (car old-list)) |#
-       (setf a (shell-word-word (nth i old-list)))
+       (setf a (word-word (nth i old-list)))
        (if (and (stringp a) (> (length a) 0)
 		(is-flag-char (char a 0)))
 	   (if (and (> (length a) 1)
@@ -878,6 +879,7 @@ become keyword arguments, in a way specified in the command's arglist."
       (warn "Extra arguments: ~w" old-list))
     (concatenate
      'list new-mandatories new-optionals new-repeating new-flags)))
+|#
 
 (defun posix-to-lisp-args (command p-args)
   "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
@@ -890,7 +892,7 @@ become keyword arguments, in a way specified in the command's arglist."
 	                 ; a count of how many posix args we've skipped.
 ;;;	(new-list        '())
 	(old-list        (copy-list p-args)) ; so we don't modify it
-;;;	(old-list        (mapcar #'shell-word-word p-args))
+;;;	(old-list        (mapcar #'word-word p-args))
 	(new-flags       '())
 	(new-mandatories '())
 	(new-optionals   '())
@@ -909,7 +911,7 @@ become keyword arguments, in a way specified in the command's arglist."
     (loop :with a
        :while (< i (length old-list)) :do
        #| (setf a (car old-list)) |#
-       (setf a (shell-word-word (nth i old-list)))
+       (setf a (word-word (nth i old-list)))
        (if (and (stringp a) (> (length a) 0)
 		(is-flag-char (char a 0)))
 	   (if (and (> (length a) 1)
@@ -1038,7 +1040,7 @@ become keyword arguments, in a way specified in the command's arglist."
 	                 ; a count of how many posix args we've skipped.
 ;;;	(new-list        '())
 ;;;	(old-list        (copy-list p-args)) ; so we don't modify it
-	(old-list        (mapcar #'shell-word-word p-args))
+	(old-list        (mapcar #'word-word p-args))
 	(new-flags       '())
 	(new-mandatories '())
 	(new-optionals   '())

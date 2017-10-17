@@ -147,22 +147,31 @@ literally in shell syntax."
 (defun words-past (expr pos)
   "Return how many words the position POS is past in EXPR."
   (let ((past 0))
-    (loop :for i :from 0 :below (length (shell-expr-words expr))
-       :do (when (> pos (elt (shell-expr-word-end expr) i))
-	     (setf past (1+ i))))
+    ;; (loop :for i :from 0 :below (length (shell-expr-words expr))
+    ;;    :do (when (> pos (elt (shell-expr-word-end expr) i))
+    ;; 	     (setf past (1+ i))))
+    (loop
+       :for i = 0 :then (1+ i)
+       :for w :in (shell-expr-words expr)
+       :do (when (> pos (shell-word-end w))
+    	     (setf past (1+ i))))
     past))
 
-(defun first-word-in-expr (pos expr)
+(defun first-word-in-expr (expr pos)
   "Find the first word of pipeline where POS is in a shell expr."
-  (let ((w (first (shell-expr-words expr))))
+  (let ((w (first (shell-expr-words expr)))
+	(w2 (second (shell-expr-words expr))))
     (cond
       ((stringp w) w)
+      ((shell-word-p w)
+       (if (>= pos (shell-word-start w))
+	   w
+	   nil)) ; We couldn't find it?
       ((and (consp w) (eq (car w) :pipe))
-       (if (<= pos (elt (shell-expr-word-start expr) 0))
-	   (first-word-in-expr pos (cadr w))
-	   (if (>= pos (elt (shell-expr-word-start expr) 0))
-	       (second (shell-expr-words expr))
-	       nil))))))		; We couldn't find it?
+       (if (and w2 (shell-word-p w2)
+		(>= pos (shell-word-start w2)))
+	   w2
+	   (first-word-in-expr (second w) pos))))))
 
 (defun term-cols ()
   "Return the terminal columns."
@@ -301,17 +310,18 @@ literally in shell syntax."
 
 ;; Note that this takes different args than a normal completion function.
 (defun complete-command-arg (context command expr pos all
-			     &optional word-num word word-pos)
+			     &optional word-num shell-word word-pos)
   "Complete a command argument."
   (let* ((past (words-past expr pos))
+	 (word (word-word shell-word))
 	 (fake-word (or word ""))
 ;;;	 (arg (nth (1- past) (command-arglist command)))
 	 (arg (first-mandatory-or-non-flag-arg past (command-arglist command)))
 	 (func (and arg (arg-completion-function arg))))
-    (dbug "cmd arg ~s ~s ~s ~s ~s ~s~%"
-	  context pos fake-word word-pos arg func)
+    (dbug "cmd arg ~s ~s ~s ~s ~s ~s ~s~%"
+	  context pos fake-word shell-word word-num arg func)
     (cond
-      ((and word-pos (> word-pos 1)
+      ((and shell-word (> word-pos 1)
 ;;;	    (char= (char word (1- word-pos)) #\-)
 ;;;	    (char= (char word (- word-pos 2)) #\-))
 	    (is-flag-char (char word 0))
@@ -450,19 +460,19 @@ complete, and call the appropriate completion function."
 	 (dbugf 'completion "Hellow I am janky!~%")
 	 (shell-complete-symbol context pos all))
 	(shell-expr
-	 (let* ((word-num (shell-word-number exp pos))
-		(first-word (first-word-in-expr pos exp))
-		word word-pos)
-	   ;; word-num is the index of the word in the shell expr
+	 (let* ((shell-word (shell-word-at exp pos))
+		(word (and shell-word (word-word shell-word)))
+		(word-num (shell-word-num exp pos))
+		(first-word (word-word (first-word-in-expr exp pos)))
+		 word-pos)
 	   ;; word is the text of the word
 	   ;; word-pos is the relative position in the word
-	   (when word-num
-	     (setf word (elt (shell-expr-words exp) word-num)
-		   word-pos (- pos (elt (shell-expr-word-start exp) word-num))))
-	   (dbugf 'completion "~%word-num = ~w word = ~w word-pos = ~w~%"
-		  word-num word word-pos)
+	   (when shell-word
+	     (setf word-pos (- pos (shell-word-start shell-word))))
+	   (dbugf 'completion "~%word = ~w word-pos = ~w shell-word ~w~%"
+		  word word-pos shell-word)
 	   (cond
-	     ((or (and (not word-num) (= pos 0))
+	     ((or (and (not word) (= pos 0))
 		  (start-of-a-compound-p exp pos))
 	      ;; no words
 	      (dbugf 'completion "none~%")
@@ -488,9 +498,8 @@ complete, and call the appropriate completion function."
 			(setf (completion-result-completion result)
 			      (quotify (completion-result-completion result))))
 		      (setf (completion-result-insert-position result)
-			    (or (and word-num
-				     (elt (shell-expr-word-start exp)
-					  word-num))
+			    (or (and shell-word
+				     (shell-word-start shell-word))
 				pos))
 		      result))))
 	     ((symbolp word)
@@ -507,14 +516,12 @@ complete, and call the appropriate completion function."
 	     ((eql (aref word 0) #\$)	; $foo
 	      (simple-complete #'complete-env-var
 			       (subseq word 1)
-			       (1+ (elt (shell-expr-word-start exp)
-					word-num))))
+			       (1+ (shell-word-start shell-word))))
 	     ((and (eql (aref word 0) #\~) ; ~foo
 		   (valid-user-name (subseq word 1)))
 	      (simple-complete #'complete-user-name
 			       (subseq word 1)
-			       (1+ (elt (shell-expr-word-start exp)
-					word-num))))
+			       (1+ (shell-word-start shell-word))))
 	     ;; first word, when not starting with directory chars
 	     ((and
 	       (in-command-position-p exp word-num)
@@ -524,8 +531,7 @@ complete, and call the appropriate completion function."
 	      (let ((result 
 		     (simple-complete #'complete-command
 				      first-word ;; was: context
-				      (elt (shell-expr-word-start exp)
-					   word-num))))
+				      (shell-word-start shell-word))))
 		;; then symbols
 		;; XXX Symbols won't come up in the list.
 		(when (not (completion-result-completion result))
@@ -561,8 +567,8 @@ complete, and call the appropriate completion function."
 		    (setf (completion-result-completion result)
 			  (quotify (completion-result-completion result))
 			  (completion-result-insert-position result)
-			  (let ((ss (elt (shell-expr-word-start exp) word-num)))
-			    (if (elt (shell-expr-word-quoted exp) word-num)
+			  (let ((ss (shell-word-start shell-word)))
+			    (if (shell-word-quoted shell-word)
 				(1+ ss) ss))))
 		result)))))))))
 

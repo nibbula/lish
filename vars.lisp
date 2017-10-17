@@ -128,14 +128,16 @@ means every dumped executable.")
   "The result of the shell lexer. A sequence of words and their start and ~
 end points in the original string."
   words					; sequence of objects
+ #|
   word-start				; sequence of word start positions
   word-end				; sequence of word end positions
   word-quoted				; sequence of booleans
   word-eval				; sequence of booleans
+|#
   line)					; the original string
 
 (defstruct shell-word
-  "Used for temporarily splicing a shell-expr."
+  "A word in a shell-expr."
   word					; an object
   start					; integer start position
   end					; integer end position
@@ -143,6 +145,7 @@ end points in the original string."
   eval)					; boolean, true to evaluate word
 
 (defstruct job
+  "A job in the shell, which can be a process, thread, or closure."
   id					; unique integer
   name					; string
   command-line				; string
