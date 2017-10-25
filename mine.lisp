@@ -202,47 +202,93 @@ a known compression suffix, then the stream is appropriately decompressed."
 (defun get-binary-usage-strings (file)
   "Slyly try to extract the usage from strings in a binary executable."
   (let ((type (magic:guess-file-type file))
-	contents start end usage str (no-nl-count 0))
+	contents start end usage str (no-nl-count 0) c cc len style
+	arg-count)
     (when (and (or (equal "x-executable" (magic:content-type-name type))
 		   (equal "x-sharedlib" (magic:content-type-name type)))
 	       (equal "application" (magic:content-type-category type)))
       (with-open-file (stream file :element-type '(unsigned-byte 8))
 	(setf contents (slurp stream)
-	      start (search "usage" contents
-			    :test (lambda (a b)
-				    (char-equal a (code-char b)))))
-	(flet ((read-null-terminated-string ()
+	      len (length contents)))
+      (labels ((string-it (s) (map 'string #'code-char s))
+	       (read-null-terminated-string ()
 		 (setf end (position 0 contents :start start))
 		 (when end
-		   (prog1 (map 'string #'code-char (subseq contents start end))
+		   (prog1 (string-it (subseq contents start end))
 		     (setf start end))))
 	       (skip-zeros ()
-		 (loop :with len = (length contents)
-   		    :while (and (< start len) (zerop (aref contents start)))
+		 (loop :while (and (< start len)
+				   (zerop (aref contents start)))
 		    :do (incf start)))
 	       (check-newline ()
 		 (or (and (eql #\newline (aref str (1- (length str))))
 			  (setf no-nl-count 0))
-		     (and (< no-nl-count *newline-fudge*) (incf no-nl-count)))))
-	  (dbugf 'mine-bin "got start ~s~%" start)
-	  (when start
-	    (loop :with i = 0
-	       :while (and (setf str (read-null-terminated-string))
-			   (< i 200) ;; @@@ some limit?
-			   ;;(eql #\newline (aref str (1- (length str))))
-			   (check-newline)
-			   )
-	       :do
-	       (push str usage)
-	       (skip-zeros)
-	       (incf i)))
-	  (nreverse usage))))))
+		     (and (< no-nl-count *newline-fudge*)
+			  (incf no-nl-count))))
+	       (valid-byte (c)
+		 (and (not (zerop c))
+		      (eq (type-of (setf cc (code-char c))) 'standard-char)
+		      (or (alpha-char-p cc) (other-char cc))))
+	       (other-char (cc)
+		 (or (digit-char-p cc) (position cc "-+_"))))
+	;; usage tagged
+	(when (setf start (search "usage" contents
+				  :test (lambda (a b)
+					  (char-equal a (code-char b)))))
+	  (dbugf 'mine-bin "got usage start ~s~%" start)
+	  (loop :with i = 0
+	     :while (and (setf str (read-null-terminated-string))
+			 (< i 200) ;; @@@ some limit?
+			 ;;(eql #\newline (aref str (1- (length str))))
+			 (check-newline)
+			 )
+	     :do
+	     (push str usage)
+	     (skip-zeros)
+	     (incf i))
+	  (setf style :gnu))
+	(setf arg-count (loop :for u :in usage
+			   :if (ppcre:scan "^\\s*-" u) :count u))
+	;;(format t "arg-count = ~s~%" arg-count)
+	(when (or (not usage)
+		  (< arg-count 2))
+	  ;; Any strings starting with -
+	  (setf start 0 usage nil)
+	  (loop :with i = 1 :and digit-count :and arg-count = 0
+	     :while (and (setf start (position (char-code #\-) contents
+					       :start start))
+			 (< arg-count 150))
+	     :do
+	     ;;(format t "start ~a~%" start)
+	     (when (and start (not (zerop start))
+			(not (valid-byte (aref contents (1- start)))))
+	       (setf i 1 digit-count 0)
+	       (loop
+		  :while (and (setf c (aref contents (+ start i)))
+			      (valid-byte c))
+		  :do (incf i)
+		  ;; don't do too many digits
+		  (when (other-char cc)
+		    (incf digit-count))
+		  :while (and (< i 50)	; Arbitrary length limits
+			      (< digit-count 5)))
+	       (when (and (not (zerop i)) (>= i 5)
+			  (< digit-count 5)
+			  (> (- i 2) digit-count))
+		 (setf str (string-it (subseq contents start (+ start i))))
+		 (pushnew str usage :test #'string-equal)
+		 (incf arg-count)
+		 ;;(format t "~a~%" str)
+		 ))
+	     (incf start i)
+	     (skip-zeros))
+	   (setf style :whatever))
+	(values (nreverse usage) style)))))
 
-(defun get-binary-usage (file)
-  (let ((strings (flatten (mapcar (_ (split-sequence #\newline _))
-				  (get-binary-usage-strings file))))
-	usage-line doc args arg b e)
+(defun get-binary-usage-gnu (file strings)
+  (let (usage-line doc args arg b e)
     (declare (ignorable b e))
+    (setf strings (flatten (mapcar (_ (split-sequence #\newline _)) strings)))
     (macrolet ((match (string)
 		 `(multiple-value-setq (b e starts ends)
 		    (ppcre:scan ,string line)))
@@ -339,6 +385,25 @@ a known compression suffix, then the stream is appropriately decompressed."
        :short-description (replace-subseq "%s" (path-file-name file) usage-line)
        :long-description (join (nreverse doc) #\newline)
        :args (nreverse args))))))
+
+(defun get-binary-usage-whatever (file strings)
+  (make-mined-cmd
+   :name (path-file-name file)
+   :short-description (princ-to-string (path-file-name file))
+   :long-description ""
+   :args (loop :for s :in strings
+	    :collect `(:name ,(subseq s 1)
+		       :type arg-boolean
+		       ,@(if (char= (aref s 1) #\-)
+			     (list :long-arg (subseq s 2))
+			     (list :old-long-arg (subseq s 1)))))))
+
+(defun get-binary-usage (file)
+  (multiple-value-bind (strings style)
+      (get-binary-usage-strings file)
+    (case style
+      (:gnu (get-binary-usage-gnu file strings))
+      (otherwise (get-binary-usage-whatever file strings)))))
 
 (defun convert-arglist (arglist)
   (loop :with type
