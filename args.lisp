@@ -342,7 +342,7 @@
     :initarg :choice-labels
     :accessor arg-choice-labels)
    (choice-func
-    :type function
+    :type (or function symbol)
     :documentation "A function to call to get the list of choices."
     :initarg :choice-func
     :accessor arg-choice-func)
