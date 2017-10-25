@@ -147,9 +147,6 @@ literally in shell syntax."
 (defun words-past (expr pos)
   "Return how many words the position POS is past in EXPR."
   (let ((past 0))
-    ;; (loop :for i :from 0 :below (length (shell-expr-words expr))
-    ;;    :do (when (> pos (elt (shell-expr-word-end expr) i))
-    ;; 	     (setf past (1+ i))))
     (loop
        :for i = 0 :then (1+ i)
        :for w :in (shell-expr-words expr)
@@ -233,6 +230,16 @@ literally in shell syntax."
 			(arg-name a))
 		    (if (arg-default a)
 			(s+ " [" (arg-default a) "]")
+			"")))
+	  :when (and (arg-old-long-arg a)
+		     (not (arg-hidden a)))
+	  :collect
+	  (list (s+ " -" (arg-old-long-arg a))
+		(s+ (or (and (slot-boundp a 'help)
+			     (substitute #\space #\newline (arg-help a)))
+			(arg-name a))
+		    (if (arg-default a)
+			(s+ " [" (arg-default a) "]")
 			""))))
        '("Arg" ("desc" :wrap)) :stream str :trailing-spaces nil
        :print-titles nil :max-width (term-cols)))
@@ -281,6 +288,15 @@ literally in shell syntax."
       :if (arg-long-arg a)
       :collect (s+ "--" (arg-long-arg a)))))
 
+(defun complete-dash-arglist (word pos arglist)
+  (dbug "word = ~s pos = ~s~%" word pos)
+  (complete-list
+   ;; (subseq word 2) (- pos 2) nil
+   word pos nil
+   (loop :for a :in arglist
+      :if (arg-old-long-arg a)
+      :collect (s+ "-" (arg-old-long-arg a)))))
+
 (defun first-mandatory-or-non-flag-arg (past arglist)
   (or (loop :with i = 0
 	 :for a :in arglist :do
@@ -312,14 +328,18 @@ literally in shell syntax."
 (defun complete-command-arg (context command expr pos all
 			     &optional word-num shell-word word-pos)
   "Complete a command argument."
-  (let* ((past (words-past expr pos))
+  (let* (; (past (words-past expr pos))
+	 (past (or (shell-word-num expr
+				   ;; (min pos
+				   ;; 	(length (shell-expr-line expr)))
+				   pos) 0))
 	 (word (word-word shell-word))
 	 (fake-word (or word ""))
 ;;;	 (arg (nth (1- past) (command-arglist command)))
 	 (arg (first-mandatory-or-non-flag-arg past (command-arglist command)))
 	 (func (and arg (arg-completion-function arg))))
-    (dbug "cmd arg ~s ~s ~s ~s ~s ~s ~s~%"
-	  context pos fake-word shell-word word-num arg func)
+    (dbug "cmd arg ~s ~s ~s ~s ~s ~s ~s ~s~%"
+	  context pos fake-word shell-word word-num word-pos arg func)
     (cond
       ((and shell-word (> word-pos 1)
 ;;;	    (char= (char word (1- word-pos)) #\-)
@@ -334,10 +354,14 @@ literally in shell syntax."
 					   (command-arglist command)))))
       ((and all word-pos
 	    (> word-pos 0)
-	    (is-flag-char (char word (1- (min word-pos (length word)))))
+	    ;;(is-flag-char (char word (1- (min word-pos (length word)))))
 	    (is-flag-char (char word 0)))
        ;; dash arg enumeration
        (show-dash-arglist (command-arglist command)))
+      ((and (not all) word-pos
+	    (> word-pos 0)
+	    (is-flag-char (char word 0)))
+       (complete-dash-arglist word word-pos (command-arglist command)))
       (func
        (dbug "---> (~a ~s ~s ~s )~%" func fake-word (length fake-word) all)
        ;; I don't want to make all the arg completion functions have to use
@@ -462,7 +486,7 @@ complete, and call the appropriate completion function."
 	(shell-expr
 	 (let* ((shell-word (shell-word-at exp pos))
 		(word (and shell-word (word-word shell-word)))
-		(word-num (shell-word-num exp pos))
+		(word-num (word-word (shell-word-num exp pos)))
 		(first-word (word-word (first-word-in-expr exp pos)))
 		 word-pos)
 	   ;; word is the text of the word
