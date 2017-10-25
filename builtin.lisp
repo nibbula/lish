@@ -953,16 +953,26 @@ better just to use Lisp syntax.
   (get-command value))
 |#
 
-(defbuiltin undefcommand (("command" command :help "The command to forget."))
+(defbuiltin undefcommand
+  ((command command :optional t :help "The command to forget.")
+   (all-external boolean :short-arg #\e
+    :help "True to undefine all external commands."))
   "Undefine a command."
-  (typecase command
-    ((or string symbol)
-     (undefine-command (string-downcase command)))
+  (cond
+    (all-external
+     (loop :with cmd
+	:for c :in *command-list* :do
+	(when (typep (setf cmd (get-command c)) 'external-command)
+	  (undefine-command c))))
     (command
-     (undefine-command (command-name command)))
-    (t
-     (error "I don't know how to undefine a command of type ~a."
-	    (type-of command)))))
+     (typecase command
+       ((or string symbol)
+	(undefine-command (string-downcase command)))
+       (command
+	(undefine-command (command-name command)))
+       (t
+	(error "I don't know how to undefine a command of type ~a."
+	       (type-of command)))))))
 
 (defun command-paths (cmd)
   "Return all possible command paths. Don't cache the results."
