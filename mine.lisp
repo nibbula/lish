@@ -383,7 +383,7 @@ a known compression suffix, then the stream is appropriately decompressed."
       (make-mined-cmd
        :name (path-file-name file)
        :short-description (replace-subseq "%s" (path-file-name file) usage-line)
-       :long-description (join (nreverse doc) #\newline)
+       :long-description (join-by-string (nreverse doc) #\newline)
        :args (nreverse args))))))
 
 (defun get-binary-usage-whatever (file strings)
@@ -426,13 +426,14 @@ a known compression suffix, then the stream is appropriately decompressed."
 	 (make-external-command command-name
 				path
 				(convert-arglist (mined-cmd-args mined))
-				(join (flatten
-				       (append
-					(list
-					 (mined-cmd-short-description mined))
-					(list
-					 (mined-cmd-long-description mined))))
-				      #\newline)))
+				(join-by-string
+				 (flatten
+				  (append
+				   (list
+				    (mined-cmd-short-description mined))
+				   (list
+				    (mined-cmd-long-description mined))))
+				 #\newline)))
 	((typep cmd 'external-command)
 	 (cond
 	   ((external-command-manual cmd)
@@ -440,11 +441,11 @@ a known compression suffix, then the stream is appropriately decompressed."
 	   (t
 	    (setf (command-arglist cmd) (convert-arglist (mined-cmd-args mined))
 		  (documentation (command-function-name command-name) 'function)
-		  (join (flatten
-			 (append
-			  (list (mined-cmd-short-description mined))
-			  (list (mined-cmd-long-description mined))))
-			#\newline)))))
+		  (join-by-string (flatten
+				   (append
+				    (list (mined-cmd-short-description mined))
+				    (list (mined-cmd-long-description mined))))
+				  #\newline)))))
 	(t
 	 (error "Command must be external or undefined to mine it."))))))
 

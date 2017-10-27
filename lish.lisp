@@ -361,26 +361,40 @@ the primary result printed as a string."
 ;;   "Nothing fancy. Just a wrapper for a lisp value for now."
 ;;   object)
 
-(defun in-shell-word-p (word position)
-  "Return true if the POSITION is in the WORD. If WORD isn't a shell-word, then
-return NIL."
-  (typecase word
-    (shell-word
-     (and (>= position (shell-word-start word))
-	  (<= position (shell-word-end word))))))
+(defun %find-shell-word (expr position)
+  (loop
+     :for i = 0 :then (1+ i)
+     :for word :in (shell-expr-words expr)
+     :do
+     (typecase word
+       (shell-word
+	(when (and (>= position (shell-word-start word))
+		   (<= position (shell-word-end word)))
+	  ;;(format t "yo ~s ~s~%" word i)
+	  (throw 'found (list word i))))
+       (cons
+	(when (and (keywordp (first word))
+		   (shell-expr-p (second word)))
+	  (%find-shell-word (second word) position))))
+     (incf i)))
 
-(defun shell-word-num (exp pos)
-  "Return the shell expression's word that position POS is in."
-  (loop :for i = 0 :then (1+ i)
-     :for w :in (shell-expr-words exp)
-     :when (in-shell-word-p w pos)
-     :return i))
+(defun find-shell-word (expr position)
+  (values-list
+   (catch 'found
+     (%find-shell-word expr
+		       position
+		       ;; (min position
+		       ;; 	    ;; (1- (length (shell-expr-line expr)))
+		       ;; 	    (length (shell-expr-line expr))
+				 ))))
 
-(defun shell-word-at (exp pos)
+(defun shell-word-num (expr pos)
   "Return the shell expression's word that position POS is in."
-  (loop :for w :in (shell-expr-words exp)
-     :when (in-shell-word-p w pos)
-     :return w))
+  (second (multiple-value-list (find-shell-word expr pos))))
+
+(defun shell-word-at (expr pos)
+  "Return the shell expression's word that position POS is in."
+  (first (multiple-value-list (find-shell-word expr pos))))
 
 (defun word-word (word)
   "Word is bond."
@@ -691,7 +705,8 @@ Otherwise, return words which will evaluate a lisp expression."
 	  (declare (ignore pos)) ;; @@@ wrong, should complain
 	  (if (and obj (integerp obj)
 		   *shell* (get-option *shell* 'history-expansion))
-	      (setf expansion (shell-read (rl:history-nth obj))
+	      ;;(setf expansion (shell-read (rl:history-nth obj))
+	      (setf expansion (rl:history-nth obj)
 		    results
 		    (typecase expansion
 		      (shell-expr (shell-expr-words expansion))
@@ -788,69 +803,6 @@ Remove backslash quotes."
 	    :do (write-char #\space str)
 	    (write-it w)))))))
 
-#|
-
-(defun expr-to-words (expr)
-  (loop
-     :for w :in (shell-expr-words expr)
-     :for s = (shell-expr-word-start  expr) :then (cdr s)
-     :for e = (shell-expr-word-end    expr) :then (cdr e)
-     :for q = (shell-expr-word-quoted expr) :then (cdr q)
-     :for v = (shell-expr-word-eval   expr) :then (cdr v)
-     :collect (make-shell-word :word w
-			       :start (car s) :end (car e) :quoted (car q)
-			       :eval (car v))))
-
-(defun words-to-expr (words &optional line)
-  (let ((expr (make-shell-expr)))
-    (loop :for w :in words :do
-       (push (shell-word-word   w) (shell-expr-words       expr))
-       (push (shell-word-start  w) (shell-expr-word-start  expr))
-       (push (shell-word-end    w) (shell-expr-word-end    expr))
-       (push (shell-word-quoted w) (shell-expr-word-quoted expr))
-       (push (shell-word-eval   w) (shell-expr-word-eval   expr)))
-    (setf
-     (shell-expr-words       expr) (nreverse (shell-expr-words       expr))
-     (shell-expr-word-start  expr) (nreverse (shell-expr-word-start  expr))
-     (shell-expr-word-end    expr) (nreverse (shell-expr-word-end    expr))
-     (shell-expr-word-eval   expr) (nreverse (shell-expr-word-eval   expr))
-     (shell-expr-word-quoted expr) (nreverse (shell-expr-word-quoted expr))
-     (shell-expr-line expr)        line)
-    expr))
-
-(defun append-words (w1 w2)
-  (let ((max (+ 2 (loop :for w :in w1 :maximize (shell-word-end w)))))
-    ;; Perhaps unnecessary, but move start and end over.
-    (loop :for w :in w2 :do
-       (when (shell-word-start w)
-	 (incf (shell-word-start w) max))
-       (when (shell-word-end w)
-	 (incf (shell-word-end w) max)))
-    (append w1 w2)))
-
-(defun expr-from-args (args)
-  "Return a shell expression made up of ARGS as the words."
-  (let* ((expr (make-shell-expr))
-	 (line (with-output-to-string (str)
-		 (loop :with pos = 0
-		    :for a :in args :do
-		    (when (not (zerop pos))
-		      (princ #\space str)
-		      (incf pos))
-		    (push a (shell-expr-words expr))
-		    (push pos (shell-expr-word-start expr))
-		    (push (+ pos (length a)) (shell-expr-word-end expr))
-		    (incf pos (length a))
-		    (princ a str)))))
-    (setf (shell-expr-line expr) line
-	  (shell-expr-words       expr) (nreverse (shell-expr-words expr))
-	  (shell-expr-word-start  expr) (nreverse (shell-expr-word-start expr))
-	  (shell-expr-word-end    expr) (nreverse (shell-expr-word-end expr))
-	  (shell-expr-word-quoted expr) (make-list (length args))
-	  (shell-expr-word-eval   expr) (make-list (length args)))
-    expr))
-|#
-
 (defun expr-from-args (args)
   "Return a shell expression made up of ARGS as the words."
   (let* (words
@@ -875,7 +827,8 @@ Remove backslash quotes."
    :words
    (loop :with results :and first-word = t
       :for w :in (shell-expr-words expr)
-      :if (and (not first-word) (shell-word-p w)
+      :if (and (not first-word)
+	       (shell-word-p w)
 	       (or (consp (shell-word-word w)) (symbolp (shell-word-word w)))
 	       (shell-word-eval w))
       :do (setf results (eval (shell-word-word w)))
@@ -1205,7 +1158,8 @@ read from."
 			   ,@(when environment
 				   `(:environment ,environment))
 			   :background ,background))
-		  job (add-job program (join command-line #\space) pid))
+		  job (add-job program
+			       (join-by-string command-line #\space) pid))
 	    (if background
 		(setf (job-status job) :running)
 		;; Wait for it...
@@ -1259,7 +1213,7 @@ probably fail, but perhaps in similar way to other shells."
 	     (if (> (length (shell-expr-words expr)) 1)
 		 ;; (subseq (shell-expr-line expr)
 		 ;; 	 (elt (shell-expr-word-start expr) 1))
-		 ;; (join (subseq (shell-expr-words expr) 1) " ")
+		 ;; (join-by-string (subseq (shell-expr-words expr) 1) " ")
 		 (with-output-to-string (str)
 		   (loop :with first = t
 		      :for w :in (rest (shell-expr-words expr))
@@ -1268,7 +1222,7 @@ probably fail, but perhaps in similar way to other shells."
 		      :else
 		        :do (princ " " str)
 		      :end
-		      :if (shell-word-quoted w)
+		      :if (and (shell-word-p w) (shell-word-quoted w))
 		        :do (print w str) ; make strings be strings
 		      :else
 		        :do (princ w str)))
@@ -1432,16 +1386,17 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		 (dbugf :lish-eval "command or file expr = ~s.~%" expr)
 		 (shell-eval
 		  (shell-read
-		   (join (cons
-			  (string-downcase (car expr))
-			  (with-package *lish-user-package*
-			    (let ((*print-case* :downcase)
-				  (*print-escape* nil))
-			      (mapcar (_ (if (consp _)
-					     (s+ #\" (prin1-to-string _) #\")
-					     (prin1-to-string _)))
-				      (cdr expr)))))
-			 #\space))
+		   (join-by-string
+		    (cons
+		     (string-downcase (car expr))
+		     (with-package *lish-user-package*
+		       (let ((*print-case* :downcase)
+			     (*print-escape* nil))
+			 (mapcar (_ (if (consp _)
+					(s+ #\" (prin1-to-string _) #\")
+					(prin1-to-string _)))
+				 (cdr expr)))))
+		    #\space))
 		  :context context))
 		(t
 		 (dbugf :lish-eval "non command list expr = ~s.~%" expr)
@@ -1916,7 +1871,7 @@ by spaces."
   ;;(trace !lish)
   (let* ((level-string (nos:environment-variable "LISH_LEVEL"))
 	 ;;(args-expr (when (cdr (nos:lisp-args))
-	 ;;  (shell-read (join (cdr (nos:lisp-args)) #\space
+	 ;;  (shell-read (join-by-string (cdr (nos:lisp-args)) #\space
 	 ;;(args-expr (wordify-list (nos:lisp-args)))
 	 )
     (when level-string

@@ -139,20 +139,28 @@ literally in shell syntax."
   (let ((result string))
     (flet ((possibly-quote (c)
 	     (when (position c result)
-	       (setf result (join (split-sequence c result) (s+ #\\ c))))))
+	       (setf result (join-by-string (split-sequence c result)
+					    (s+ #\\ c))))))
       (loop :for c :across " !$|;[]*?()" :do ;
 	 (possibly-quote c))
       result)))
 
+;; (defun words-past (expr pos)
+;;   "Return how many words the position POS is past in EXPR."
+;;   (let ((past 0))
+;;     (loop
+;;        :for i = 0 :then (1+ i)
+;;        :for w :in (shell-expr-words expr)
+;;        :do (when (> pos (shell-word-end w))
+;;     	     (setf past (1+ i))))
+;;     past))
+
 (defun words-past (expr pos)
-  "Return how many words the position POS is past in EXPR."
-  (let ((past 0))
-    (loop
-       :for i = 0 :then (1+ i)
-       :for w :in (shell-expr-words expr)
-       :do (when (> pos (shell-word-end w))
-    	     (setf past (1+ i))))
-    past))
+  (let ((num (shell-word-num expr
+		      ;; (min pos
+		      ;; 	(length (shell-expr-line expr)))
+			     pos)))
+    (or (and num (1- num)) 0)))
 
 (defun first-word-in-expr (expr pos)
   "Find the first word of pipeline where POS is in a shell expr."
@@ -280,7 +288,7 @@ literally in shell syntax."
     (make-completion-result :completion (list result) :count 1)))
 
 (defun complete-double-dash-arglist (word pos arglist)
-  (dbug "word = ~s pos = ~s~%" word pos)
+  (dbugf 'completion "word = ~s pos = ~s~%" word pos)
   (complete-list
    ;; (subseq word 2) (- pos 2) nil
    word pos nil
@@ -289,7 +297,7 @@ literally in shell syntax."
       :collect (s+ "--" (arg-long-arg a)))))
 
 (defun complete-dash-arglist (word pos arglist)
-  (dbug "word = ~s pos = ~s~%" word pos)
+  (dbugf 'completion "word = ~s pos = ~s~%" word pos)
   (complete-list
    ;; (subseq word 2) (- pos 2) nil
    word pos nil
@@ -328,18 +336,20 @@ literally in shell syntax."
 (defun complete-command-arg (context command expr pos all
 			     &optional word-num shell-word word-pos)
   "Complete a command argument."
-  (let* (; (past (words-past expr pos))
-	 (past (or (shell-word-num expr
-				   ;; (min pos
-				   ;; 	(length (shell-expr-line expr)))
-				   pos) 0))
+  (let* ((past (words-past expr pos))
+	 ;; (past (or (shell-word-num expr
+	 ;; 			   ;; (min pos
+	 ;; 			   ;; 	(length (shell-expr-line expr)))
+	 ;; 			   pos) 0))
 	 (word (word-word shell-word))
 	 (fake-word (or word ""))
 ;;;	 (arg (nth (1- past) (command-arglist command)))
 	 (arg (first-mandatory-or-non-flag-arg past (command-arglist command)))
 	 (func (and arg (arg-completion-function arg))))
-    (dbug "cmd arg ~s ~s ~s ~s ~s ~s ~s ~s~%"
-	  context pos fake-word shell-word word-num word-pos arg func)
+    (dbugf 'completion "command arg : context = ~s pos = ~s fake-word = ~s~%~
+                        shell-word = ~s word-num = ~s word-pos = ~s arg = ~s ~
+                        func = ~s~%"
+	   context pos fake-word shell-word word-num word-pos arg func)
     (cond
       ((and shell-word (> word-pos 1)
 ;;;	    (char= (char word (1- word-pos)) #\-)
@@ -363,7 +373,8 @@ literally in shell syntax."
 	    (is-flag-char (char word 0)))
        (complete-dash-arglist word word-pos (command-arglist command)))
       (func
-       (dbug "---> (~a ~s ~s ~s )~%" func fake-word (length fake-word) all)
+       (dbugf 'completion
+	      "---> (~a ~s ~s ~s )~%" func fake-word (length fake-word) all)
        ;; I don't want to make all the arg completion functions have to use
        ;; completion-result, but will this suffice? Or will it lose something?
        ;; @@@
@@ -378,15 +389,17 @@ literally in shell syntax."
       (t
        (let ((doc (and arg (documentation (type-of arg) 'type)))
 	     (choices (and arg (argument-choices arg))))
-	 (let ((*print-lines* 20))
-	   (dbug "wazzup? ~s choices ~w ~%" fake-word choices))
+	 (let ((*print-lines* 10))
+	   (dbugf 'completion "not dash or func : wazzup?~%~
+                               fake-word = ~s choices = ~w ~%"
+		  fake-word choices))
 	 (if all
 	     (progn
 	       #| (print-values* (command expr pos all word-num word)) |#
-	       (dbug "ummm...~a~%" past)
+	       (dbugf 'completion "show all : ummm... past = ~a~%" past)
 	       (if (and (= past 1) (not word-num))
 		   (progn
-		     (dbug "snoo ~a? words-past ~a~%" command past)
+		     (dbugf 'completion "snoo ~a? words-past ~a~%" command past)
 		     (list-arg-choices command doc choices))
 		   (progn
 		     (if (and fake-word choices)
@@ -394,7 +407,7 @@ literally in shell syntax."
 					(length fake-word) all choices)
 			 (complete-filename fake-word pos all)))))
 	     (progn
-	       (dbug "cmd arg fake-word ~s" fake-word)
+	       (dbugf 'completion "not all : fake-word ~s" fake-word)
 	       (if choices
 		   (complete-list fake-word (length fake-word) all choices)
 		   (complete-filename fake-word pos all)))))))))
@@ -481,7 +494,7 @@ complete, and call the appropriate completion function."
 	   (t ;; This is probably a bug.
 	    (error "Unknown keyword returned from shell-read."))))
 	(cons
-	 (dbugf 'completion "Hellow I am janky!~%")
+	 (dbugf 'completion "Hellow I am janky! : symbol completion~%")
 	 (shell-complete-symbol context pos all))
 	(shell-expr
 	 (let* ((shell-word (shell-word-at exp pos))
@@ -493,27 +506,28 @@ complete, and call the appropriate completion function."
 	   ;; word-pos is the relative position in the word
 	   (when shell-word
 	     (setf word-pos (- pos (shell-word-start shell-word))))
-	   (dbugf 'completion "~%word = ~w word-pos = ~w shell-word ~w~%"
+	   (dbugf 'completion
+		  "~%expr completion~%word = ~w word-pos = ~w shell-word ~w~%"
 		  word word-pos shell-word)
 	   (cond
 	     ((or (and (not word) (= pos 0))
 		  (start-of-a-compound-p exp pos))
 	      ;; no words
-	      (dbugf 'completion "none~%")
+	      (dbugf 'completion "no words~%")
 	      (simple-complete #'complete-command "" 0))
 	     ((not word)
 	      (if (= 0 (length (shell-expr-words exp)))
 		  ;; probably ()
 		  (progn
-		    (dbugf 'completion "bogo~%")
+		    (dbugf 'completion "not in a word, empty list : bogo~%")
 		    (shell-complete-symbol context pos all))
 		  ;; a blank spot somewhere in the line
 		  (let ((from-end (- (length context) pos)))
-		    (dbugf 'completion "heyba~%")
+		    (dbugf 'completion "blank spot : heyba~%")
 		    (let ((result
 			   (if (setf cmd (try-command first-word))
 			       (progn
-				 (dbugf 'completion "Baaa~%")
+				 (dbugf 'completion "in a command : Baaa~%")
 				 (complete-command-arg context cmd exp pos all))
 			       (complete-filename word
 						  (- (length word) from-end)
@@ -527,7 +541,7 @@ complete, and call the appropriate completion function."
 				pos))
 		      result))))
 	     ((symbolp word)
-	      (dbugf 'completion "janky~%")
+	      (dbugf 'completion "symbol word : janky~%")
 	      (shell-complete-symbol context pos all t))
 	     ((consp word)		; (foo)
 	      (dbugf 'completion "junky~%")
@@ -550,7 +564,7 @@ complete, and call the appropriate completion function."
 	     ((and
 	       (in-command-position-p exp word-num)
 	       (not (position (aref word 0) "/.~")))
-	      (dbugf 'completion "jinky~%")
+	      (dbugf 'completion "first word, non path : jinky~%")
 	      ;; try commands
 	      (let ((result 
 		     (simple-complete #'complete-command
@@ -563,18 +577,18 @@ complete, and call the appropriate completion function."
 			(shell-complete-symbol context pos all)))
 		result))
 	     (t
-	      (dbugf 'completion "hello ~a~%" word)
+	      (dbugf 'completion "nothing special : hello ~a~%" word)
 	      (let* ((from-end (- (length context) pos))
 		     (result
 		      (if (setf cmd (try-command first-word))
 			  (progn
-			    (dbugf 'completion "blurgg~%")
+			    (dbugf 'completion "command : blurgg~%")
 			    (complete-command-arg
 			     context cmd exp pos
 			     #| (- (length word) from-end) |#
 			     all word-num word word-pos))
 			  (progn
-			    (dbugf 'completion "jorky~%")
+			    (dbugf 'completion "not yet command : jorky~%")
 			    ;; But it could be a command which isn't loaded yet.
 			    (if (load-lisp-command first-word)
 				(complete-command-arg
