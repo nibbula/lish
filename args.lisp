@@ -135,18 +135,20 @@
 
 (defmethod print-object ((o argument) stream)
   "Print a lish command argument in an unreadable way."
-  (print-unreadable-object (o stream :identity nil :type t)
-    (format stream
-	    "~a ~s~:[~; repeating~]~:[~; optional~]~:[~; hidden~]~
-~@[ ~c~a~]~@[ ~c~c~a~]"
-	    (arg-name o) (arg-type o)
-	    (arg-repeating o)
-	    (arg-optional o)
-	    (arg-hidden o)
-	    *arg-normal-flag-char*
-	    (and (slot-boundp o 'short-arg) (arg-short-arg o))
-	    *arg-normal-flag-char* *arg-normal-flag-char*
-	    (and (slot-boundp o 'long-arg) (arg-long-arg o)))))
+  (let ((short-arg (and (slot-boundp o 'short-arg) (arg-short-arg o)))
+	(long-arg (and (slot-boundp o 'long-arg) (arg-long-arg o))))
+    (print-unreadable-object (o stream :identity nil :type t)
+      (format stream
+	      ;;"~a ~s~:[~; repeating~]~:[~; optional~]~:[~; hidden~]~
+	      "~a~:[~; repeating~]~:[~; optional~]~:[~; hidden~]~
+              ~:[~2*~; ~c~a~]~:[~3*~; ~c~c~a~]"
+	      (arg-name o)
+	      ;; (arg-type o)
+	      (arg-repeating o)
+	      (arg-optional o)
+	      (arg-hidden o)
+	      short-arg *arg-normal-flag-char* short-arg
+	      long-arg *arg-normal-flag-char* *arg-normal-flag-char* long-arg))))
 
 (defgeneric convert-arg (arg value &optional quoted)
   (:documentation "Convert an argument value from one type to another.")
