@@ -19,7 +19,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Command definitions
 
-(defbuiltin cd (("directory" directory :help "Directory to change to."))
+(defbuiltin cd ((directory directory :help "Directory to change to."))
   "Change the current directory to DIRECTORY."
   (setf (lish-old-pwd *shell*) (nos:current-directory))
   (nos:change-directory (or directory (nos:environment-variable "HOME")))
@@ -32,7 +32,7 @@
   (format t "~a~%" (nos:current-directory)))
 
 (defbuiltin pushd
-  (("directory" directory :help "Directory to push on the stack."))
+  ((directory directory :help "Directory to push on the stack."))
   "Change the current directory to DIR and push it on the the front of the
 directory stack."
   (when (not directory)
@@ -40,7 +40,7 @@ directory stack."
   (push (nos:current-directory) (lish-dir-list *shell*))
   (!cd directory))
 
-(defbuiltin popd (("number" number :help "Number of item to pop."))
+(defbuiltin popd ((number number :help "Number of item to pop."))
   "Change the current directory to the top of the directory stack and remove it
 from stack."
   (declare (ignore number))
@@ -54,8 +54,6 @@ from stack."
 
 (defbuiltin suspend ()
   "Suspend the shell."
-  ;; ;  (opsys:kill (opsys:getpid) opsys:sigstop))
-  ;;   (opsys:kill (opsys:getpid) 17))	; SIGSTOP
   (opsys:suspend-process))
 
 ;; (define-builtin-arg-type job-descriptor (arg-object)
@@ -91,7 +89,7 @@ from stack."
 	   :key #'job-name))))
 
 (defbuiltin resume
-    (("job-descriptor" job-descriptor :optional t :help "Job to resume."))
+  ((job-descriptor job-descriptor :optional t :help "Job to resume."))
   "Resume a suspended job."
   (let (job)
     (cond
@@ -121,7 +119,7 @@ from stack."
 		   job-descriptor))))))
 
 (defbuiltin bg
-    (("job-descriptor" job-descriptor :optional t :help "Job to backaground."))
+  ((job-descriptor job-descriptor :optional t :help "Job to backaground."))
   "Put a job in the background."
   (let ((job (find-job job-descriptor)))
     ;; (format t "job-descriptor = ~s ~a job = ~s~%"
@@ -140,10 +138,8 @@ from stack."
   (values))
 
 (defbuiltin jobs
-  (("long" boolean :short-arg #\l
-     :help "Show the longer output."))
+  ((long boolean :short-arg #\l :help "Show the longer output."))
   "Lists spawned processes that are active."
-  ;; @@@ not working yet for system commands
   (loop :for j :in (lish-jobs *shell*)
      :do
      (with-slots (id name command-line resume-function pid status) j
@@ -157,6 +153,7 @@ from stack."
 	 (t
 	  (format t "~3d ~10a ~20a ~:(~a~) ~a ~a~%"
 		  id "????" name status pid command-line)))))
+  ;; Threads
   (when (find-package :bt)
     (loop :for j :in (ignore-errors (funcall (find-symbol "ALL-THREADS" :bt)))
        :do
@@ -166,22 +163,22 @@ from stack."
 	       long j ""))))
 
 (defbuiltin history
-    (("clear"	      boolean  :short-arg #\c
-      :help "Clear the history.")
-     ("write"	      boolean  :short-arg #\w
-      :help "Write the history to the history file.")
-     ("read"	      boolean  :short-arg #\r
-      :help "Read the history from the history file.")
-     ("append"	      boolean  :short-arg #\a
-      :help "Append the history to the history file.")
-     ("read-not-read" boolean  :short-arg #\n
-      :help "Read history items not already read from the history file.")
-     ("filename"      pathname :short-arg #\f
-      :help "Use PATHNAME as the history file.")
-     ("show-times"    boolean  :short-arg #\t
-      :help "Show history times.")
-     ("delete"	      integer  :short-arg #\d
-      :help "Delete the numbered history entry."))
+  ((clear boolean :short-arg #\c
+    :help "Clear the history.")
+   (write boolean :short-arg #\w
+    :help "Write the history to the history file.")
+   (read boolean :short-arg #\r
+    :help "Read the history from the history file.")
+   (append boolean :short-arg #\a
+    :help "Append the history to the history file.")
+   (read-not boolean :short-arg #\n
+    :help "Read history items not already read from the history file.")
+   (filename pathname :short-arg #\f
+    :help "Use PATHNAME as the history file.")
+   (show-tim boolean :short-arg #\t
+    :help "Show history times.")
+   (delete integer :short-arg #\d
+    :help "Delete the numbered history entry."))
   "Show a list of the previously entered commands."
   ;; Check argument conflicts
   (cond ;; @@@ Could this kind of thing be done automatically?
@@ -209,12 +206,12 @@ from stack."
 ;;   (values))
 
 (defbuiltin echo
-    (("no-newline" boolean :short-arg #\n :help "Don't output a newline.")
-     ("args" t :repeating t))
+  ((no-newline boolean :short-arg #\n :help "Don't output a newline.")
+   (args t :repeating t))
   "Output the arguments. If -n is given, then don't output a newline a the end."
   (format t "~{~a~#[~:; ~]~}" args)
   (when (not no-newline)
-    (format t "~%")))
+    (terpri)))
 
 (defparameter *help-subjects*
   '("commands" "builtins" "external" "editor" "keys" "options" "syntax")
@@ -383,7 +380,7 @@ Commands can be:
       (with-output-to-string (str)
 	(print-command-help cmd str)))))
 
-(defbuiltin help (("subject" help-subject :help "Subject to get help on."))
+(defbuiltin help ((subject help-subject :help "Subject to get help on."))
   "Show help on the subject. Without a subject show some subjects that are
 available."
   (if (not subject)

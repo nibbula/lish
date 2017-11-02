@@ -17,6 +17,7 @@
   "Keymap for Lish."
   `((,(ctrl #\v)	. shell-expand-line)))
 
+;; @@@ I want to change all the lish-* accessors to shell-*
 (defclass shell ()
   ((exit-flag
     :initarg :exit-flag
