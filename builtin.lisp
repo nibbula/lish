@@ -171,11 +171,11 @@ from stack."
     :help "Read the history from the history file.")
    (append boolean :short-arg #\a
     :help "Append the history to the history file.")
-   (read-not boolean :short-arg #\n
+   (read-not-read boolean :short-arg #\n
     :help "Read history items not already read from the history file.")
    (filename pathname :short-arg #\f
     :help "Use PATHNAME as the history file.")
-   (show-tim boolean :short-arg #\t
+   (show-times boolean :short-arg #\t
     :help "Show history times.")
    (delete integer :short-arg #\d
     :help "Delete the numbered history entry."))
