@@ -369,16 +369,31 @@ and the name of the external program. ARGLIST is a shell argument list."
   ;;      (asdf::resolve-symlinks path))))	; XXX I know, this is cheating.
   ;; Maybe we should make our own system search function?
   ;;  i.e. push on asdf:*system-definition-search-functions*
+  (dbugf :lish-load "in-lisp-path ~s~%" command)
   (typecase command
-    ((or string keyword symbol)
+    ((or keyword symbol)
      (ignore-errors (asdf:find-component nil command)))
+    (string
+     (when (not (position #\/ command))	; looks like a path itself
+       (ignore-errors (asdf:find-component nil command))))
     (t nil)))
 
 (defun load-lisp-command (command)
-  "Load a command in the lisp path."
-  (let* ((pkg (intern (string-upcase command) :keyword)))
-    (if (ignore-errors (asdf:oos 'asdf:load-op pkg :verbose nil))
-	;; succeeded
+  "Try to load a command in the Lisp path. Return the command on success or
+NIL on failure. The Lisp path is most likely the ASDF path."
+  (let* ((pkg (intern (string-upcase command) :keyword))
+	 succeeded)
+    (dbugf :lish-load "load-lisp-command ~s~%" command)
+    (handler-case
+	(let ((asdf:*compile-file-warnings-behaviour* :ignore)
+	      (asdf:*compile-file-failure-behaviour* :ignore))
+	  ;; :error :warn :ignore
+	  (asdf:oos 'asdf:load-op pkg :verbose nil)
+	  ;; Presumable we succeeded if we didn't get an error.
+	  (setf succeeded t))
+      (asdf:system-definition-error (c) (declare (ignore c)))
+      (asdf:operation-error (c) (declare (ignore c))))
+    (if succeeded
 	(progn
 	  (dbugf :lish-load "load-lisp-command")
 	  ;; (init-commands sh)

@@ -437,7 +437,9 @@ Uses the first available of:
   - a pre-defined external command, from an external command cache
   - a mined external command"
   (or (get-command command)
-      (and (load-lisp-command command) (get-command command))
+      (and (in-lisp-path command)
+	   (load-lisp-command command)
+	   (get-command command))
       ;;(and (load-external-command command) (get-command command))
       (and (mine-command command) (get-command command))))
 
@@ -588,16 +590,9 @@ complete, and call the appropriate completion function."
 			     #| (- (length word) from-end) |#
 			     all word-num word word-pos))
 			  (progn
-			    (dbugf 'completion "not yet command : jorky~%")
-			    ;; But it could be a command which isn't loaded yet.
-			    (if (load-lisp-command first-word)
-				(complete-command-arg
-				 context (get-command first-word) exp pos
-				 all word-num word word-pos)
-				(complete-filename word
-				 		   (- (length word) from-end)
-				 		   all)
-				)))))
+			    (dbugf 'completion "default to filename : jorky~%")
+			    (complete-filename
+			     word (- (length word) from-end) all)))))
 		(dbugf 'completion "result = ~s~%" result)
 		(if all
 		    (setf (completion-result-count result)
