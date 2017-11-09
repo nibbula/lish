@@ -1437,13 +1437,16 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	     (:sequence (eval-compound t nil))
 	     (:redirect-to
 	      (run-with-output-to
-	       (elt (shell-expr-words expr) 1) (elt first-word 1)))
+	       (word-word (elt (shell-expr-words expr) 1))
+	       (elt first-word 1)))
 	     (:append-to
 	      (run-with-output-to
-	       (elt (shell-expr-words expr) 1) (elt first-word 1) :append t))
+	       (word-word (elt (shell-expr-words expr) 1))
+	       (elt first-word 1) :append t))
 	     (:redirect-from
 	      (run-with-input-from
-	       (elt (shell-expr-words expr) 1) (elt first-word 1)))
+	       (word-word (elt (shell-expr-words expr) 1))
+	       (elt first-word 1)))
 	     (t
 	      (error "Unknown compound command type."))))
 	  (t

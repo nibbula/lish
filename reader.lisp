@@ -80,7 +80,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 		     did-quote nil))
 	     (finish-word ()
 	       "Finish the current word."
-	       (dbugf 'reader "finish-word ~s~%" w)
+	       (dbugf 'reader "finish-word ~s ~s~%" w in-word)
 	       (when in-word
 		 (push (make-shell-word
 			:word (if sub-expr sub-expr (copy-seq w))
@@ -313,11 +313,13 @@ value, an explaination which consists of (tag-symbol datum...)."
 			  :redirect-from)
 		      (make-the-expr))))
 	      (setf word-start i)
-	      (setf args (make-shell-word :start word-start
-					  :word (list e) ;; ???
-					  :end i
-					  :quoted nil
-					  :eval t)))
+	      (setf args (list (make-shell-word :start word-start
+						;; :word (list e) ;; ???
+						:word e
+						:end i
+						:quoted nil
+						:eval t))))
+	    (dbugf 'reader "args 1 = ~s~%" args)
 	    (incf i))
 	   ;; and
 	   ((and (eql c #\&) (eql (next-char) #\&))
@@ -334,8 +336,11 @@ value, an explaination which consists of (tag-symbol datum...)."
 	 :finally
 	 (progn
 	   (dbugf 'reader "Finally!~%")
+	   (dbugf 'reader "args 2 = ~s~%" args)
 	   (finish-word)
-	   (reverse-things)))
+	   (dbugf 'reader "args 3 = ~s~%" args)
+	   (reverse-things)
+	   ))
       (if (and (= (length words) 1) (consp (first words))
 	       (not in-compound))
 	  ;; just a lisp expression to be evaluated
