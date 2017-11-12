@@ -63,7 +63,10 @@ from stack."
 (defun job-id-list ()
   "Return a list of suspended job ids."
   (loop :for j :in (lish-jobs *shell*)
-     :collect (job-id j)))
+     :collect (job-id j))
+  (when (find-package :bt)
+    (loop :for j :in (symbol-call :bt :all-threads)
+       :collect (symbol-call :bt :thread-name j))))
 
 (defclass arg-job-descriptor (arg-lenient-choice)
   ()
@@ -78,12 +81,31 @@ from stack."
     ((null job-descriptor)
      (first (lish-jobs *shell*)))
     ((stringp job-descriptor)
-     (find job-descriptor (lish-jobs *shell*) :test #'equalp :key #'job-name))
+     ;; strip off a leading percent
+     (when (and (not (zerop (length job-descriptor)))
+		(char= (char job-descriptor 0) #\%))
+       (setf job-descriptor (subseq job-descriptor 1)))
+     (or
+      ;;(format t "jibby ~s~%" job-descriptor)
+      (find job-descriptor (lish-jobs *shell*) :test #'equalp :key #'job-name)
+      (when (find-package :bt)
+	(find job-descriptor (symbol-call :bt :all-threads)
+	      :test #'equalp
+	      :key (symbol-function (find-symbol "THREAD-NAME" :bt))
+	      ))
+      (and (setf job-descriptor (ignore-errors (parse-integer job-descriptor)))
+	   (find job-descriptor (lish-jobs *shell*)
+		 :test #'eql :key #'job-id))))
     ((numberp job-descriptor)
      (find job-descriptor (lish-jobs *shell*) :test #'= :key #'job-id))
     ((symbolp job-descriptor)
-     (find (string job-descriptor) (lish-jobs *shell*) :test #'equalp
-	   :key #'job-name))
+     (or (find (string job-descriptor) (lish-jobs *shell*) :test #'equalp
+	       :key #'job-name)
+	 (when (find-package :bt)
+	   (find job-descriptor (symbol-call :bt :all-threads)
+		 :test #'equalp
+		 :key (symbol-function (find-symbol "THREAD-NAME" :bt))
+		 ))))
     (t
      (find job-descriptor (lish-jobs *shell*) :test #'equalp
 	   :key #'job-name))))
@@ -104,6 +126,8 @@ from stack."
     (if (not job)
 	(format t "Couldn't find a job matching ~a.~%" job-descriptor)
 	(cond
+	  ((symbol-call :bt :threadp job)
+	   (symbol-call :bt :join-thread job))
 	  ((job-resume-function job)
 	   (setf (lish-jobs *shell*)
 		 (delete job (lish-jobs *shell*)))
@@ -132,6 +156,12 @@ from stack."
 	     ;; (format t "job = ~s~%" job)
 	     (uos::background-pid (job-pid job))
 	     (setf (job-status job) :running)))
+	  ((symbol-call :bt :threadp job)
+	   ;; @@@ If we created the the thread, we could have set up
+	   ;; a condition variable that in the interrupt handler we would
+	   ;; ask the thread to wait on, then we could use
+	   ;; condition-notify here to wake it up, effectively backgrounding it.
+	   (format t "Threads can't be backgrounded yet."))
 	  (t
 	   (format t "I don't know how to background a non-system job.")))
 	(format t "Couldn't find a job matching ~a.~%" job-descriptor)))
@@ -157,8 +187,8 @@ from stack."
   (when (find-package :bt)
     (loop :for j :in (ignore-errors (funcall (find-symbol "ALL-THREADS" :bt)))
        :do
-       (format t "~3d ~10a ~20a ~:[~;~a ~]~a~%"
-	       0 "Thread"
+       (format t "~3a ~10a ~20a ~:[~;~a ~]~a~%"
+	       #\- "Thread"
 	       (funcall (find-symbol "THREAD-NAME" :bt) j)
 	       long j ""))))
 
@@ -688,38 +718,89 @@ variables explicitly set in arguments are passed to the commands."
   :convert string
   (or #+unix (position value *signal-names* :test #'equalp)
       #+windows (cadr (assoc value *siggy* :test #'equalp))
-      (parse-integer value)))
+      (ignore-errors (parse-integer value))
+      value))
 
 (defun pseudo-kill (sig pid)
-  #+unix (os-unix:kill sig pid)
-  #+windows (funcall (caddr (find value *siggy* :key #'second)) pid)
-  )
+  (labels ((kill-pid (p)
+	     #+unix (os-unix:kill p (or sig uos:+SIGTERM+))
+	     #+windows (funcall (caddr (find value *siggy* :key #'second)) p))
+	   (kill-job (j)
+	     (cond
+	       ((job-pid j)
+		(kill-pid (job-pid j)))
+	       ((job-resume-function j)
+		(format t "We don't know how to kill a Lisp job yet."))))
+	   (kill-thread (j)
+	     (symbol-call :bt :destroy-thread j)
+	     (format t "Killed thread ~s.~%" j)))
+    (cond
+      ((stringp pid)
+       (let ((job (find-job pid)) pid-int)
+	 (cond
+	   ((symbol-call :bt :threadp job)
+	    (kill-thread job))
+	   ((job-p job)
+	    (kill-job job))
+	   (t
+	    (when (setf pid-int (ignore-errors (parse-integer pid)))
+	      (kill-pid pid-int))))))
+      ((job-p pid)
+       (kill-job pid))
+      ((symbol-call :bt :threadp pid)
+       (kill-thread pid))
+      ((integerp pid)
+       (kill-pid pid)))))
+
+(defun pid-or-job-list ()
+  "Return a list of jobs and process IDs."
+  `(,@(job-id-list) ,@(mapcar #'nos:os-process-id (nos:process-list))))
+
+(defclass arg-pid-or-job (arg-lenient-choice)
+  ()
+  (:default-initargs
+   :choice-func #'pid-or-job-list)
+  (:documentation "A job descriptor or process ID."))
+
+;; (define-builtin-arg-type pid-or-job (arg-lenient-choice)
+;;   "A process ID or a job."
+;;   ()
+;;   (:default-initargs
+;;    :choice-func #'pid-or-job-list))
 
 (defbuiltin kill
-  ((list-signals boolean :short-arg #\l  :help "List available signals.")
-   (signal       signal  :default "TERM" :help "Signal number to send.")
-   (pids         integer :repeating t    :help "Process IDs to signal."))
-  ;; @@@ pid should be job # type to support %job
+  ((list-signals boolean    :short-arg #\l  :help "List available signals.")
+   (signal       signal     :default "TERM" :help "Signal number to send.")
+   (pids         pid-or-job :repeating t    :help "Process IDs to signal."))
   "Sends SIGNAL to PID."
-  ;; @@@ totally faked & not working
   (if list-signals
       (format t (s+ "~{~<~%~1," (get-cols) ":;~a~> ~}~%") ; bogus, but v fails
 	      ;; (loop :for i :from 1 :below nos:*signal-count*
 	      ;;  :collect (format nil "~2d) ~:@(~8a~)" i (nos:signal-name i))))
 	      (loop :for s :in *siggy*
 		 :collect (format nil "~2d) ~:@(~8a~)" (second s) (first s))))
-      (when pids
-	(mapcar #'(lambda (x) (pseudo-kill signal x)) pids))))
+      (let (job)
+	(cond
+	  (pids
+	   (mapcar #'(lambda (x) (pseudo-kill signal x)) pids))
+	  (signal
+	   (typecase signal
+	     (string
+	      (if (setf job (find-job signal))
+		  (pseudo-kill nil job)
+		  (error "No such job ~s" signal)))
+	     (integer
+	      (pseudo-kill nil signal))))))))
 
 ;; Actually I think that "format" and "read" are a bad idea / useless, because
 ;; they're for shell scripting which you should do in Lisp.
 
+#|
 ;;; make printf an alias
 (defbuiltin format
     (("format-string" string :optional nil :help "Format control string.")
      ("args" object :repeating t :help "Format arguments."))
   "Formatted output."
-  ;; @@@ totally faked & not working
   (apply #'format t format-string args))
 
 ;; Since this is for scripting in other shells, I think we don't need to worry
@@ -732,8 +813,10 @@ variables explicitly set in arguments are passed to the commands."
   "Read a line of input."
   ;; @@@ totally faked & not working
   (declare (ignore timeout name))
-  (if editing (rl:rl :prompt prompt)
+  (if editing
+      (rl:rl :prompt prompt)
       (read-line nil nil)))
+|#
 
 (defbuiltin time (("command" string :repeating t :help "Command to time."))
   "Shows some time statistics resulting from the execution of COMMNAD."
@@ -833,6 +916,7 @@ symbolic format, otherwise output in octal."
   "Wait for commands to terminate."
   #+unix
   (let (job)
+    ;; @@@ should we wait for threads or what?
     (multiple-value-bind (pid result status) (uos::wait)
       (when pid
 	(if (setf job (find pid (lish-jobs *shell*)
