@@ -23,8 +23,10 @@
      (:file "commands"  :depends-on ("package" "vars" "args"))
      (:file "shell"     :depends-on ("package" "vars" "args" "commands"))
      (:file "complete"  :depends-on ("package" "vars" "args" "commands"))
+     (:file "prompt"    :depends-on ("package" "vars" "args" "commands"
+				     "shell"))
      (:file "lish"   	:depends-on ("package" "vars" "args" "commands"
-				     "shell" "complete"))
+				     "shell" "prompt" "complete"))
      (:file "builtin"   :depends-on ("package" "vars" "args" "commands"
 				     "shell" "complete" "lish"))
      (:file "piping"	:depends-on ("package" "vars" "args" "commands"
