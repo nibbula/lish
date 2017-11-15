@@ -163,7 +163,10 @@ variables."
   ;; This is NIL for unspecified, :empty, or an alist environement.
   environment
   ;; True if we flipped *input* to *output* for a pipeline.
-  flipped-io)
+  flipped-io
+  ;; True if we should run things in the background.
+  background
+  )
 
 (defvar *context* nil
   "The dynamic command context. If it is NIL it is equivalent to all the
