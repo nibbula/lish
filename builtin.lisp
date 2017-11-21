@@ -678,8 +678,8 @@ variables explicitly set in arguments are passed to the commands."
 	;; @@@ This should respect piping!!!
 	(when cmd
 	  (apply #'do-system-command
-		 `(,`(,cmd ,@args)
-		     ,(modified-context *context* :environment new-env)))))
+		 `(,(make-shell-expr :words `(,cmd ,@args))
+		    ,(modified-context *context* :environment new-env)))))
       ;; Just print the variables
       (loop :for e :in (environment)
 	 :do (format t "~a=~a~%" (car e) (cdr e)))))
