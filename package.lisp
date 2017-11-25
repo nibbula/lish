@@ -76,6 +76,7 @@ it's shell features.
    #:command #:command-name #:command-function #:command-arglist
    #:command-built-in-p #:command-loaded-from #:command-accepts
    #:internal-command #:shell-command #:builtin-command #:external-command
+   #:command-list
    #:defcommand #:defexternal
    #:!cd #:!pwd #:!pushd #:!popd #:!dirs #:!suspend #:!history #:!echo
    #:!help #:!alias #:!unalias #:!type #:!exit #:!source #:!debug #:!bind
