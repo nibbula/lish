@@ -85,22 +85,24 @@
 ;;   "Nothing fancy. Just a wrapper for a lisp value for now."
 ;;   object)
 
-(defun %find-shell-word (expr position)
+(defun %find-shell-word (expr position &optional (word-num 0))
   (loop
-     :for i = 0 :then (1+ i)
      :for word :in (shell-expr-words expr)
      :do
      (typecase word
        (shell-word
-	(when (and (>= position (shell-word-start word))
-		   (<= position (shell-word-end word)))
-	  ;;(format t "yo ~s ~s~%" word i)
-	  (throw 'found (list word i))))
+	(when (<= position (shell-word-end word))
+	  (throw 'found (list
+			 (if (>= position (shell-word-start word))
+			     word
+			     nil)
+			 word-num))))
        (cons
 	(when (and (keywordp (first word))
 		   (shell-expr-p (second word)))
-	  (%find-shell-word (second word) position))))
-     (incf i)))
+	  (%find-shell-word (second word) position word-num))))
+     (incf word-num))
+  (list nil nil))
 
 (defun find-shell-word (expr position)
   (values-list
@@ -114,7 +116,10 @@
 
 (defun shell-word-num (expr pos)
   "Return the shell expression's word that position POS is in."
-  (second (multiple-value-list (find-shell-word expr pos))))
+  (multiple-value-bind (word num) (find-shell-word expr pos)
+    (if word
+	num
+	(and num (max 0 (1- num))))))
 
 (defun shell-word-at (expr pos)
   "Return the shell expression's word that position POS is in."

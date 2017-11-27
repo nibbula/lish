@@ -156,11 +156,14 @@ literally in shell syntax."
 ;;     past))
 
 (defun words-past (expr pos)
-  (let ((num (shell-word-num expr
-		      ;; (min pos
-		      ;; 	(length (shell-expr-line expr)))
-			     pos)))
-    (or (and num (1- num)) 0)))
+  (multiple-value-bind (word num) (find-shell-word expr pos)
+    (declare (ignore word))
+    (or num -1)))
+  ;; (let ((num (shell-word-num expr
+  ;; 		      ;; (min pos
+  ;; 		      ;; 	(length (shell-expr-line expr)))
+  ;; 			     pos)))
+  ;;   (or (and num (1- num)) 0)))
 
 (defun first-word-in-expr (expr pos)
   "Find the first word of pipeline where POS is in a shell expr."
@@ -332,6 +335,9 @@ literally in shell syntax."
 	 (incf i))
       (nth (max 0 (1- past)) arglist)))
 
+;; (defun what-next (command expr pos)
+;;   (loop
+
 ;; Note that this takes different args than a normal completion function.
 (defun complete-command-arg (context command expr pos all
 			     &optional word-num shell-word word-pos)
@@ -467,7 +473,7 @@ complete, and call the appropriate completion function."
 	   ;; Couldn't read a whole expression.
 	   ((eq exp *continue-symbol*)
 	    ;; If it's not something we know about, it's probably a bug.
-	    (ecase (car explanation) 
+	    (ecase (car explanation)
 	      (lisp-expr	      ; an incomplete lisp expression
 	       ;; (cdr explanation) should be the expr?
 	       (dbugf 'completion "partial lisp-expr ~s ~s~%" context pos)
@@ -512,7 +518,7 @@ complete, and call the appropriate completion function."
 		  "~%expr completion~%word = ~w word-pos = ~w shell-word ~w~%"
 		  word word-pos shell-word)
 	   (cond
-	     ((or (and (not word) (= pos 0))
+	     ((or (and (not word) (zerop pos))
 		  (start-of-a-compound-p exp pos))
 	      ;; no words
 	      (dbugf 'completion "no words~%")
