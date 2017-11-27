@@ -339,14 +339,15 @@ Commands can be:
   ;;     ;; add spaces in front and clip to screen columns
   ;;     (format t "  ~a~%" (subseq l 0 (min (length l)
   ;; 					  (- (get-cols) 2)))))))
-  (let ((prefix-size (loop :for a :in rows :maximize (length (car a)))))
+  (let* ((prefix-size (loop :for a :in rows :maximize (length (car a))))
+	 (prefix-len (+ prefix-size 5))
+	 (prefix-string (make-string prefix-len :initial-element #\space)))
     (loop :for (a b) :in rows
        :do
        (format t "  ~v,a : " prefix-size a)
        (when b
 	 (justify-text (substitute #\space #\newline b)
-		       :prefix (make-string (+ prefix-size 5)
-					    :initial-element #\space)
+		       :prefix prefix-string :start-column prefix-len
 		       :omit-first-prefix t :cols (get-cols)))
        (terpri))))
   
