@@ -821,7 +821,7 @@ variables explicitly set in arguments are passed to the commands."
 
 (defbuiltin time (("command" string :repeating t :help "Command to time."))
   "Shows some time statistics resulting from the execution of COMMNAD."
-  (time (shell-eval (make-shell-expr :words command))))
+  (time (shell-eval (expr-from-args command))))
 
 #|
 (defun print-timeval (tv &optional (stream t))
