@@ -375,6 +375,18 @@
      (funcall (arg-choice-func arg)))
     (t nil)))
 
+(defmethod arg-help ((arg arg-choice))
+  (let ((help (if (slot-boundp arg 'help)
+		  (slot-value arg 'help) nil)))
+    (cond
+      ((and (slot-boundp arg 'choices) (slot-value arg 'choices))
+       (format nil "~@[~a ~]Choices: ~{~s~^ ~}" help (arg-choices arg)))
+      ((and (slot-boundp arg 'choice-func) (slot-value arg 'choice-func))
+       (format nil "~@[~a ~]Choice function: ~a" help (arg-choice-func arg)))
+      ((and (slot-boundp arg 'help) (slot-value arg 'help))
+       help)
+      (t ""))))
+
 (defclass arg-lenient-choice (arg-choice)
   ()
   (:documentation
