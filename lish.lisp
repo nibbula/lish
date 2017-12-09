@@ -560,7 +560,9 @@ Remove backslash quotes."
 	       (shell-word-p w)
 	       (or (consp (shell-word-word w)) (symbolp (shell-word-word w)))
 	       (shell-word-eval w))
-      :do (setf results (eval (shell-word-word w)))
+      :do
+      (dbugf :lish-eval "Expanding eval of ~s~%" (shell-word-word w))
+      (setf results (eval (shell-word-word w)))
       :and :if (listp results)
 	;; Spread list results into separate args
         :append (mapcar #'(lambda (x) (make-shell-word :word x))
@@ -756,7 +758,7 @@ bound during command."
 |#
 
 (defun call-thing (thing args context)
-  "Call a command with the given POSIX style arguments.
+  "Call a command or function with the given POSIX style arguments.
 THING is a COMMAND object or a function/callable symbol.
 ARGS is a list of POSIX style arguments, which are converted to Lisp arguments
 by POSIX-TO-LISP-ARGS and given to the COMMAND's function.
@@ -796,8 +798,12 @@ bound during command."
 	     nil))
 	  (if in-pipe
 	      (let ((*standard-input* in-pipe))
-		(runky thing args))
-	      (runky thing args)))))))
+		(if command-p
+		    (runky thing args)
+		    (values (list (runky thing args)) nil t)))
+	      (if command-p
+		  (runky thing args)
+		  (values (list (runky thing args)) nil t))))))))
 
 (defun call-parenless (func line context)
   "Apply the function to the line, and return the proper values. If there are
@@ -1108,8 +1114,10 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		   (and (symbolp (car expr)) (fboundp (car expr))))
 	      ;; Give precedence to functions
 	      (dbugf :lish-eval "fbound expr = ~s.~%" expr)
+	      ;; (with-package *lish-user-package*
+	      ;; 	(values (multiple-value-list (eval expr)) nil t)))
 	      (with-package *lish-user-package*
-		(values (multiple-value-list (eval expr)) nil t)))
+		(call-thing expr nil *context*)))
 	     ((consp expr)
 	      (case (command-type shell (string-downcase (car expr)))
 		((:command :file)
