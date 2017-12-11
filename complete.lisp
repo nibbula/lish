@@ -335,8 +335,28 @@ literally in shell syntax."
 	 (incf i))
       (nth (max 0 (1- past)) arglist)))
 
-;; (defun what-next (command expr pos)
-;;   (loop
+(defun flag-arg-p (arg)
+  (and (or (arg-short-arg arg)
+	   (arg-long-arg arg)
+	   (arg-old-long-arg arg))
+       (not (eq (arg-type arg) 'boolean))))
+
+#|
+(defun what-next (command expr pos)
+  (let ((unused (copy-seq (command-arglist command)))
+	used previous-flaged-arg)
+    (loop :for word :in (cdr (mapcar #'word-word (shell-expr-words expr)))
+       :do
+       (loop :for a :in (command-arglist command)
+	  :do
+	  (cond
+	    ((and (flag-arg-p a)
+		  (or (string-equal word (s+ "-" (arg-short-arg a)))
+		      (string-equal word (s+ "--" (arg-long-arg a)))))
+	     (setf previous-flaged-arg a)
+	     (return))
+	    ((and (arg-optional
+|#
 
 ;; Note that this takes different args than a normal completion function.
 (defun complete-command-arg (context command expr pos all

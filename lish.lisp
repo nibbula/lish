@@ -275,6 +275,7 @@
     ("MACHTYPE" nil "Fully specific platform"	  	 *arch*)
     ("OLDPWD"   nil "Last working directory"
      ,#'(lambda () (lish-old-pwd *shell*)))
+    #+unix
     ("PPID"     t   "Parent process ID"		  	 ,#'os-unix:getppid)
     ("PWD"      nil "Current working directory"	  	 ,#'current-directory)
     ("SHLVL"    nil "Shell level"		  	 *lish-level*)
@@ -297,6 +298,7 @@
 				 (lish-start-time *shell*))))
     ("RANDOM"	nil "A random 16 bit number."
 		,#'(lambda () (random (1- (ash 1 15)))))
+    #+unix
     ("$"        nil "Current process ID"	  	 ,#'os-unix:getpid)
     ("!"        nil "Process ID of the previous command" nil)	;; @@@
     ("?"        nil "Result of the last command." 	 nil)) ;; @@@
@@ -888,7 +890,8 @@ read from."
 		  (apply
 		   ;; #+(or clisp ecl lispworks) #'fork-and-exec
 		   ;; #-(or clisp ecl lispworks) #'nos:run-program
-		   #'uos::forky
+		   #+unix #'uos::forky
+		   #-unix #'nos:run-program
 		   `(,path ,args
 			   ,@(when environment
 				   `(:environment ,environment))
@@ -900,7 +903,7 @@ read from."
 		;; Wait for it...
 		(progn
 		  (multiple-value-setq (result status)
-		    (uos::wait-and-chill pid))
+		    (nos:wait-and-chill pid))
 		  (handle-job-change job result status :foreground t))))))
     (values (or result '(0)) result-stream)))
 
@@ -1290,7 +1293,7 @@ suspend itself."
 (defun check-job-status (sh)
   (let (job pid result status)
     (loop :do
-       (multiple-value-setq (pid result status) (uos::check-jobs))
+       (multiple-value-setq (pid result status) (nos:check-jobs))
        :while pid
        :do
 	(if (setf job (find pid (lish-jobs sh) :test #'eql :key #'job-pid))
