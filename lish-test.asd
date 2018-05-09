@@ -11,7 +11,7 @@
     :source-control	:git
     :long-description
     "Haphazard and surely incomplete tests for the Lish shell."
-    :depends-on (:test :lish)
+    :depends-on (:test :lish :dlib)
     :components
     ((:file "lish-test"))
     :in-order-to ((test-op load-op :list-test))

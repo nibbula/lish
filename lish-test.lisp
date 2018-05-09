@@ -2,9 +2,11 @@
 ;; lish-test.lisp - Tests for Lish
 ;;
 
+;; @@@ These are so woefully incomplete.
+
 (defpackage :lish-test
   (:documentation "Tests for Lish")
-  (:use :cl :test :lish)
+  (:use :cl :test :lish :dlib)
   (:export
    #:run
    ))
@@ -43,19 +45,19 @@
   (vuvu "suspend" '())
   (vuvu "history" '(&key clear write read append read-not-read filename
 		    show-times delete))
-  (vuvu ":"       '(&rest args))
+  ;; (vuvu ":"       '(&rest args))
   (vuvu "echo" 	  '(&key no-newline args))
   (vuvu "help" 	  '(&optional subject))
-  (vuvu "alias"   '(&optional name expansion))
+  (vuvu "alias"   '(&key global edit name expansion))
   (vuvu "unalias" '(name))
   (vuvu "exit" 	  '(&rest values))
   (vuvu "source"  '(filename))
   (vuvu "debug"   '(&optional (state :toggle)))
-  (vuvu "export"  '(&optional name value))
+  (vuvu "export"  '(&key remove name value))
   (vuvu "jobs" 	  '(&key long))
-  (vuvu "kill" 	  '(&key list-signals (signal 15) pids))
-  (vuvu "format"  '(format-string &rest args))
-  (vuvu "read" 	  '(&key name prompt timeout editing))
+  (vuvu "kill" 	  '(&key list-signals (signal "term") pids))
+  ;; (vuvu "format"  '(format-string &rest args))
+  ;; (vuvu "read" 	  '(&key name prompt timeout editing))
   (vuvu "time" 	  '(&rest command))
   (vuvu "times"   '())
   (vuvu "umask"   '(&key print-command symbolic mask))
@@ -65,9 +67,10 @@
   (vuvu "bind" 	  '(&key print-bindings print-readable-bindings query
 		    remove-function-bindings	remove-key-binding key-sequence
 		    function-name))
-  (vuvu "hash" 	  '(&key rehash commands))
+  (vuvu "hash" 	  '(&key rehash packages commands))
   (vuvu "type" 	  '(&key type-only path-only all names))
-  (format t "SUCCEED!~%"))
+  ;; (format t "SUCCEED!~%")
+  )
 
 (defun o-vivi (str &rest args)
   (format t "~w ~{~w ~}~%~w~%~%" str args
@@ -76,8 +79,10 @@
 (defun vivi (str p-args l-args)
   (let ((aa (posix-to-lisp-args
 	     (get-command str)
-	     (lish::expr-to-words (lish:shell-read p-args)))))
-    (format t "~w ~{~w ~}~%~w~%~%" str p-args aa)
+	     ;; (lish::expr-to-words (lish:shell-read p-args)))))
+	     (lish::shell-expr-words (lish:shell-read p-args)))))
+    ;;(format t "~w ~{~w ~}~%~w~%~%" str p-args aa)
+    (format t "~w ~w~%~w~%~%" str p-args aa)
     (equalp aa l-args)))
 
 (defcommand tata
@@ -141,7 +146,8 @@
 ;(with-dbug (lish::posix-to-lisp-args (lish::get-command "find") '("--name" "txt$")))
 
 ;; @@@ This is an internal-ish way to test. Once we finish, we should test it
-;; through a more external interface.
+;; through a more external interface. Or perhaps this suggests that an external
+;; interface to these would be useful.
 (deftests (expand-variables-1 :doc "Test variable expansion")
   :setup
   (progn
@@ -168,9 +174,61 @@
   (equal (lish::expand-variables "$}") "$}")
   )
 
+(deftests (expand-braces-1 :doc "Test brace expansion")
+  (equal (lish::expand-braces "hi") '("hi"))
+  (equal (lish::expand-braces "hi there") '("hi there"))
+  (equal (lish::expand-braces "fooba{r,z}") '("foobar" "foobaz"))
+  (equal (lish::expand-braces "foo{bar,baz}") '("foobar" "foobaz"))
+  (equal (lish::expand-braces "{f,g,l}oobar{1,2,3}")
+	 '("foobar1" "foobar2" "foobar3" "goobar1" "goobar2" "goobar3" "loobar1"
+	   "loobar2" "loobar3"))
+  (equal (lish::expand-braces "foo{b,f}a{r,z}")
+	 '("foobar" "foobaz" "foofar" "foofaz"))
+  (equal (lish::expand-braces "foo{ba{r,t},ga}") '("foobar" "foobat" "fooga"))
+  (equal (lish::expand-braces "{foo,bar}") '("foo" "bar"))
+  (equal (lish::expand-braces "{a,b,c}") '("a" "b" "c"))
+  "Malformed expressions"
+  (equal (lish::expand-braces "}") '("}"))
+  (equal (lish::expand-braces "{") '("{"))
+  (equal (lish::expand-braces "{}") '("{}"))
+  (equal (lish::expand-braces "{ }") '("{ }"))
+  (equal (lish::expand-braces "{foo}") '("{foo}"))
+  (equal (lish::expand-braces "fooba{r,z") '("fooba{r,z"))
+  (equal (lish::expand-braces "foobar,z") '("foobar,z"))
+  "Escaping"
+  (equal (lish::expand-braces "fooba{r\\,z}") '("fooba{r\\,z}"))
+  (equal (lish::expand-braces "_\\{a,b,c}_") '("_\\{a,b,c}_"))
+  (equal (lish::expand-braces "\\_{a,b,c}_") '("\\_a_" "\\_b_" "\\_c_"))
+  (equal (lish::expand-braces "\\{a,b,c,d,e}") '("\\{a,b,c,d,e}"))
+  (equal (lish::expand-braces "{foo,bar,\\{it's,the,blimp}}")
+	 '("foo}" "bar}" "\\{it's}" "the}" "blimp}"))
+  (equal (lish::expand-braces "{foo\\,bar,\\{zerp\\},quux}")
+	 '("foo\\,bar" "\\{zerp\\}" "quux"))
+  )
+
+(deftests (expand-brace-sequences-1 :doc "Test brace sequence expansion")
+  (equal (lish::expand-braces "{1..5}") '("1" "2" "3" "4" "5"))
+  (equal (lish::expand-braces "{1..10}")
+			      '("1" "2" "3" "4" "5" "6" "7" "8" "9" "10"))
+  (equal (lish::expand-braces "{01..10}")
+			      '("01" "02" "03" "04" "05" "06" "07" "08" "09"
+				"10"))
+  (equal (lish::expand-braces "{1..10..2}") '("1" "3" "5" "7" "9"))
+  (equal (lish::expand-braces "{1..010..2}") '("001" "003" "005" "007" "009"))
+  (equal (lish::expand-braces "{01..110..10}")
+	 '("001" "011" "021" "031" "041" "051" "061" "071" "081" "091" "101"))
+  (equal (lish::expand-braces "{-5..5}")
+	 '("-5" "-4" "-3" "-2" "-1" "0" "1" "2" "3" "4" "5"))
+  (equal (lish::expand-braces "{-20..20..5}")
+	 '("-20" "-15" "-10" "-5" "0" "5" "10" "15" "20"))
+  )
+
 (deftests (lish-all :doc "Test all the things!.")
-  shell-to-lisp-args-1 posix-to-lisp-args-1 expand-variables-1)
-  
+    shell-to-lisp-args-1 posix-to-lisp-args-1 expand-variables-1 expand-braces-1
+    expand-brace-sequences-1
+    ;; expand-brace-sequences-2 expand-brace-sequences-3
+    )
+
 (defun run ()
   (run-group-name 'lish-all :verbose t))
 

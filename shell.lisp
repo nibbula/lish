@@ -129,30 +129,41 @@ is like Lish arguments, e.g.:
 with SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
 those functions for more detail about prompt formatting."
   :default nil)
+
 (defoption prompt-function function
   :help "Function which takes a SHELL and returns a string to output as the
 prompt."
   :default make-prompt)		       ; N.B.: #'make-prompt doesn't work here
+
 (defoption sub-prompt string
   :help "String to print when prompting for more input."
   :default "- ")	; @@@ maybe we need sub-prompt-char & sub-prompt-func?
+
 (defoption ignore-eof integer
   :help "If true, prevent the EOF (^D) character from exiting the shell. If a 
 number ignore it that many times before exiting."
   :default nil)
+
 (defoption debug boolean
   :help "True to enter the debugger when there is an error."
   :default nil)
+
 (defoption collect-stats boolean
   :help "True to collect statistics on commands."
   :default nil)
+
 (defoption autoload-from-asdf boolean
   :help
   "True to try to load unknown commands from an ASDF system of the same name."
   :default t)
+
 (defoption history-expansion boolean
   :help "True if !<integer> should expand to a history item."
   :default nil)
+
+(defoption expand-braces boolean
+  :help "True to expand braces in shell commands."
+  :default t)
 
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.

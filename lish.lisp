@@ -252,7 +252,8 @@
 ;; 	    (not (elt (shell-expr-word-quoted expr) i)))))
 
 (defun unquoted-string-p (word)
-  "True if W in EXPR with index I is _not_ quoted."
+  "True if WORD is _not_ quoted."
+  ;; @@@ ??? I'm not sure why I'm requiring it to be of non-zero length.
   (or (and (stringp word) (> (length word) 0))
       (and (shell-word-p word)
 	   (stringp (shell-word-word word))
@@ -372,7 +373,7 @@ backslashes."
 
 ;; a.k.a. parameter expansion
 (defun expand-variables (s)
-  "Return S with variables expanded."
+  "Return a string based on the string S with variables expanded."
   (let ((start 0) (last-start 0) (len (length s)))
     (with-output-to-string (str)
       (loop
@@ -416,7 +417,7 @@ backslashes."
 				   "") str))
 		      (princ "$" str))
 		  (setf start end))))
-	   (t (error "Shouldn't happen")))
+	   (t (error "Variable parsing messed up somehow.")))
 	 ;;(format t "start = ~s last-start = ~s~%" start last-start)
 	 (setf last-start start)
 	 )
@@ -429,110 +430,28 @@ backslashes."
   "Expand a shell word starting with !. If the history-expansion shell option
 is set, and the expression is an integer, do history expansion.
 Otherwise, return words which will evaluate a lisp expression."
-  (let (results expansion)
-    (handler-case
-	(multiple-value-bind (obj pos)
-	    (read-from-string (subseq word 1) nil)
-	  (declare (ignore pos)) ;; @@@ wrong, should complain
-	  (if (and obj (integerp obj)
-		   *shell* (get-option *shell* 'history-expansion))
-	      ;;(setf expansion (shell-read (rl:history-nth obj))
-	      (setf expansion (rl:history-nth obj)
-		    results
-		    (typecase expansion
-		      (shell-expr (shell-expr-words expansion))
-		      (t (list expansion))))
-	      ;;(push (make-shell-word :word obj :eval t) results)))
-	      (push obj results)))
-      (end-of-file ())
-      (reader-error ()))
-    results))
-
-(defun do-expansions (expr)
-  "Perform shell syntax expansions / subsitutions on the expression.
-Remove backslash quotes."
-  (let ((new-words '()))
-    (loop :with w
-       :for word :in (shell-expr-words expr)
-       :do
-       (setf w (word-word word))
-       (cond
-	 ((not (unquoted-string-p word))
-	  ;; Quoted, so just push it verbatim
-	  (push word new-words))
-	 ((position #\$ w)
-	  ;; $ environment variable expansion
-	  (let ((expansion (expand-variables w)))
-	    (push (if (shell-word-p word)
-		      (make-shell-word
-		       :word expansion
-		       :start (shell-word-start word)
-		       ;; @@@ this could overlap a following word
-		       :end (+ (shell-word-start word) (length expansion))
-		       :quoted t
-		       :eval (shell-word-eval word))
-		      (make-shell-word :word expansion :quoted t))
-		new-words)))
-	 ((glob:pattern-p w nil t)
-	  ;; filename globbing, with ~ expansion on
-	  (let ((g (glob:glob w :tilde t)))
-	    (if g
-		(dolist (x g) (push x new-words)) ;; @@@ fix to not dup
-		;; There's no existing file expansions, but try just
-		;; twiddle, and also keep the literal glob expression
-		;; if no matches.
-		(push (glob:expand-tilde w) new-words))))
-	 ;; global aliases
-	 #|((setf v (get-alias w :global t :shell sh))
-	 (loop :for a :in (shell-expr-words
-	 (shell-read v #| :package *junk-package* |#))
-	 :do (push (or v "") new-words))) |#
-	 ((eql (char w 0) #\!)
-	  ;; !bang expansion
-	  (loop :for e :in (expand-bang w) :do
-	     ;; (format t "--> ~s~%" e)
-	     (push e new-words)))
-	 ((shell-word-p word)
-	  ;; quoted word without anything special to expand
-	  (setf (shell-word-word word) (remove-backslashes w))
-	  (push word new-words))
-	 ((stringp word)
-	  (push (remove-backslashes word) new-words))
-	 (t
-	  (push word new-words))))
-    (setf (shell-expr-words expr) (nreverse new-words)))
-  expr)
-
-(defun shell-expand-line (editor)
-  "A command to expand the current line."
-  ;;(format t "editor is a ~a = ~s~%" (type-of editor) editor)
-  (let* ((buf (rl:get-buffer-string editor))
-	 (words (shell-expr-words
-		 (possibly-expand-aliases
-		  *shell*
-		  (do-expansions
-		      (lisp-exp-eval (shell-read buf)))))))
-    (rl:replace-buffer
-     editor
-     (with-output-to-string (str)
-       (labels ((write-thing (w)
-		  (typecase w
-		     (string (princ (quotify w) str))
-		     (cons (write w :stream str :readably t :case :downcase))))
-		;;(write w :stream str :readably t :case :downcase))
-		(write-it (w)
-		  (cond
-		    ((and (shell-word-p w) (word-quoted w))
-		     (write-char #\" str)
-		     (write-thing (word-word w))
-		     (write-char #\" str))
-		    (t
-		     (write-thing (word-word w))))))
-	 (when (first words)
-	   (write-it (first words)))
-	 (loop :for w :in (rest words)
-	    :do (write-char #\space str)
-	    (write-it w)))))))
+  (or
+   (and
+    (and word (stringp word) (char= (char word 0) #\!))
+    (let (results expansion)
+      (handler-case
+	  (multiple-value-bind (obj pos)
+	      (read-from-string (subseq word 1) nil)
+	    (declare (ignore pos)) ;; @@@ wrong, should complain
+	    (if (and obj (integerp obj)
+		     *shell* (get-option *shell* 'history-expansion))
+		;;(setf expansion (shell-read (rl:history-nth obj))
+		(setf expansion (rl:history-nth obj)
+		      results
+		      (typecase expansion
+			(shell-expr (shell-expr-words expansion))
+			(t (list expansion))))
+		;;(push (make-shell-word :word obj :eval t) results)))
+		(push obj results)))
+	(end-of-file ())
+	(reader-error ()))
+      results))
+   word))
 
 (defun expr-from-args (args)
   "Return a shell expression made up of ARGS as the words."
@@ -576,6 +495,427 @@ Remove backslash quotes."
       :do (setf first-word nil))
    ;; @@@ doesn't fix the line
    :line (shell-expr-line expr)))
+
+;; @@@ should probably rename lisp-exp-eval to this
+(defun expand-lisp-exp (exp)
+  (lisp-exp-eval exp))
+
+(defun number-padding (i)
+  "Return how much padding we might need for an integer between zero and I."
+  (if (zerop i) 0 (1+ (realpart (log i 10)))))
+
+(defun starts-with-superfluous-zero (s)
+  "Return true if there's a pointless zero at the beginning of a string
+representing an integer."
+  (or (and (> (length s) 1) (char= (char s 0) #\0))
+      (and (> (length s) 2) (char= (char s 0) #\-) (char= (char s 1) #\0))))
+
+(defun range-padding (start start-int end end-int)
+  "How much padding might we need for the range START .. END."
+  (and (or (and start-int (starts-with-superfluous-zero start))
+	   (and end-int (starts-with-superfluous-zero end)))
+       (truncate (max (number-padding start-int)
+		      (length start)
+		      (number-padding end-int)
+		      (length end)))))
+
+(defun sequence-steps (start end step is-char prefix suffix)
+  "Return a list of strings in the sequence from START to END, by counting STEP.
+If IS-CHAR is true, return characters in the range instead of numbers.
+If IS-CHAR is not true, and START or END are not integers, return NIL."
+  (let* ((start-int
+	  (if is-char
+	      (char-code (char start 0))
+	      ;; (parse-integer start :junk-allowed t)))
+	      (ignore-errors (parse-integer start))))
+	 (end-int
+	  (if is-char
+	      (char-code (char end 0))
+	      ;; (parse-integer end :junk-allowed t)))
+	      (ignore-errors (parse-integer end))))
+	 test)
+    (when (not (and start-int end-int))
+      (return-from sequence-steps nil))
+    (cond
+      ((zerop step) (return-from sequence-steps nil))
+      ((and (> start-int end-int) (not (minusp step)))
+       (setf step (- step)))
+      ((and (< start-int end-int) (not (plusp step)))
+       (setf step (- step))))
+    (setf test
+	  (if (< start-int end-int)
+	      (if (plusp step) #'<= #'>=)
+	      (if (minusp step) #'>= #'<=)))
+    (if is-char
+	(loop
+	   :with i = start-int
+	   :and limit = end-int
+	   :while (funcall test i limit)
+	     :collect (s+ prefix (code-char i) suffix)
+	   :do (incf i step))
+	(let ((zero-padding (range-padding start start-int end end-int)))
+	  (loop
+	     :with i = start-int
+	     :and limit = end-int
+	     :while (funcall test i limit)
+	     :if zero-padding
+	       :collect (format nil "~a~v,'0d~a" prefix zero-padding i suffix)
+	     :else
+               :collect (s+ prefix i suffix)
+	     :end
+	     :do (incf i step))))))
+
+;; I don't think there's any formal specification of this. It isn't in POSIX.
+;; I don't know who came up with it. Maybe it's from ksh? My implementation is
+;; probably subtly different from others. I tend to agree with the way zsh
+;; seems to do braces, so I think this code probably works more like zsh than
+;; bash. It's just so convenient and useful, that I'm okay with sacrificing
+;; curly braces to it. But I'm not really into adding character classes like
+;; the zsh BRACE_CCL option, probably because it's so easy to generate arbitrary
+;; sequences with just plain Lisp.
+
+;; @@@ We should probably get rid of RECURSIVE keyword, by an flet or a
+;; sub-function.
+
+;; @@@ FIXME: "_{b{a,e}}_" expands to itself not "_{ba}_" "_{be}_"
+;; It's a malformed expression, but the way that it fails doesn't make sense,
+;; and isn't the same as other shells. I'm having trouble coming up with a fix
+;; that doesn't involve totally re-writing the way that I do recursive
+;; expressions.
+
+(defun expand-braces (string &key (do-sequences t) recursive)
+  "Expand shell braces expressions in a string. Return a list of expanded words,
+which may be a list of just the STRING if no expansion was done. If DO-SEQUENCES
+is true (the default), expand shell sequence expressions.
+
+For internal purposes, we pass RECURSIVE true when we are inside a nested brace
+expression, and return a second value to update how much of the string we
+consumed.
+
+Alternatives:
+alt_exp : '{' brace_term ( ',' brace_term )+ '}'
+brace_term : [^{},]+
+
+E.g.:
+{a,b,c}      -> a b c
+x{a,b,c}y    -> xay xby xcy
+{a,b{a,A},c} -> a ba bA c
+
+Sequences:
+seq_exp : '{' brace_char '..' brace_char [ '..' integer ] '}' |
+          '{' integer '..' integer [ '..' integer ] '}
+brace_char : [^{},]
+
+E.g.:
+{1..5}   -> 1 2 3 4 5
+x{1..5}y -> x1y x2y x3y x4y x5y
+{-2..2}  -> -2 -1 0 1 2
+{a..g}   -> a b c d e f g
+{
+"
+  (let ((len (length string))
+	(start 0) (i 0)
+	prefix suffix alternatives output-words
+	in-brace in-seq in-alts	seq-start)
+    (loop
+       :while (< i len)
+       :do
+       (case (aref string i)
+	 (#\{
+	  (if in-brace
+	      ;; Nested braces
+	      (multiple-value-bind (alts new-i)
+		  (expand-braces (subseq string start) :recursive t)
+		(append (or alternatives '()) alts)
+		(setf i (+ start new-i)))
+	      (setf prefix (subseq string start i)
+		    start (1+ i)
+		    seq-start (1+ i)
+		    in-brace t)))
+	 (#\,
+	  (when in-brace
+	    (when in-seq
+	      ;; Pretend the sequence was just an alternative.
+	      (setf start seq-start
+		    in-seq nil
+		    alternatives nil))
+	    (push (subseq string start i) alternatives)
+	    (setf start (1+ i)
+		  seq-start (1+ i)
+		  in-seq nil
+		  in-alts t)))
+	 (#\.
+	  (when (and in-brace do-sequences (not in-alts)
+		     (< (1+ i) len) (char= #\. (aref string (1+ i))))
+	    (push (subseq string start i) alternatives)
+	    (incf i)
+	    (setf start (1+ i)
+		  in-seq t)))
+	 (#\}
+	  (when in-brace
+	    (push (subseq string start i) alternatives)
+	    (setf suffix (if recursive
+			     (subseq string (1+ i)
+				     (position #\, string :start i))
+			     (subseq string (1+ i)))
+		  in-brace nil
+		  start (1+ i))
+	    (cond
+	      ((and in-seq alternatives)
+	       (setf alternatives (nreverse alternatives))
+	       (let ((is-char (and (= 1 (length (first alternatives)))
+				   (= 1 (length (second alternatives))))))
+		 ;; (format t "is-char = ~s~%alts = ~s~%" is-char alternatives)
+		 (case (length alternatives)
+		   (2
+		    (setf output-words
+			  (append output-words
+				  (sequence-steps (first alternatives)
+						  (second alternatives)
+						  1 is-char prefix suffix)))
+		    ;; (format t "output-words = ~s~%" output-words)
+		    )
+		   (3
+		    (let ((step (ignore-errors (parse-integer
+						(third alternatives)))))
+		      (when step
+			(setf output-words
+			      (append output-words
+				      (sequence-steps (first alternatives)
+						      (second alternatives)
+						      step is-char
+						      prefix suffix)))))
+		    ;; (format t "output-words = ~s~%" output-words)
+		    ))))
+	      ((and alternatives (> (length alternatives) 1))
+	       (loop :for i :in alternatives :do
+		  (push (s+ prefix i suffix) output-words))))
+	    ;; Expand possible remaining brace expressions in the suffix
+	    (if output-words
+		(progn
+		  ;; (format t "derp ~s~%" output-words)
+		  (setf output-words
+			(flatten
+			 (loop :for w :in output-words
+			    :collect (expand-braces w))))
+		  (loop-finish))
+		(progn
+		  ;; Ignore malformed things?
+		  (setf start 0
+			in-brace nil
+			alternatives nil
+			)))))
+	 (#\\ (incf i)))
+       (incf i))
+    (values (or output-words (list string)) i)))
+
+(defun expand-filenames (string)
+  "Expand filenames with glob in STRING. Return a list of filenames or just
+STRING if it's not a pattern or there's no matching files."
+  (or (and (glob:pattern-p string nil t)
+	   (glob:glob string :tilde t))
+      string))
+
+#|
+(defun expand-word-once (word)
+  "Try to exapnd the string WORD and return it's expansion. If no further
+expansion can be done, return WORD itself (i.e. eq)."
+  (cond
+    ((position #\$ w)
+     ;; $ environment variable expansion
+     (let ((expansion (expand-variables w)))
+       (push (if (shell-word-p word)
+		 (make-shell-word
+		  :word expansion
+		  :start (shell-word-start word)
+		  ;; @@@ this could overlap a following word
+		  :end (+ (shell-word-start word) (length expansion))
+		  :quoted t
+		  :eval (shell-word-eval word))
+		 (make-shell-word :word expansion :quoted t))
+	     new-words)))
+    ((glob:pattern-p w nil t)
+     ;; filename globbing, with ~ expansion on
+     (let ((g (glob:glob w :tilde t)))
+       (if g
+	   (dolist (x g) (push x new-words)) ;; @@@ fix to not dup
+	   ;; There's no existing file expansions, but try just
+	   ;; twiddle, and also keep the literal glob expression
+	   ;; if no matches.
+	   (push (glob:expand-tilde w) new-words))))
+    ((eql (char w 0) #\!)
+     ;; !bang expansion
+     (loop :for e :in (expand-bang w) :do
+	;; (format t "--> ~s~%" e)
+	(push e new-words)))
+    ((shell-word-p word)
+     ;; quoted word without anything special to expand
+     (setf (shell-word-word word) (remove-backslashes w))
+     (push word new-words))
+    ((stringp word)
+     (push (remove-backslashes word) new-words))
+    (t
+     (push word new-words))))
+|#
+
+;; In POSIX shells the order of expansion is:
+;;   history *
+;;   brace *
+;;   tilde
+;;   variables (and parameters)
+;;   arithmetic
+;;   command substitution
+;;   word splitting *
+;;   filename expansion *
+;;   quote removal
+;; Things with * can change the number of "words".
+;;
+;; Even though we have differnet expansions, and I'm not always fond of the way
+;; other shells do it, we should probably try not to violate peoples' general
+;; expectations much.
+
+(defparameter *expansions*
+  ;; function           until-stable?  word / line
+  `((expand-bang        nil            :word)
+    (expand-braces      nil            :word)
+    (expand-tilde       nil            :word)
+    (expand-variables   t              :word)
+    ;;(expand-lisp-exp    t              :line) ;; lisp-exp-eval
+    ;;(expand-lisp-exp    t              :expr)
+    (expand-filenames   nil            :word)
+    (remove-backslashes nil            :word)
+    ))
+
+(defparameter *recursive-expansion-limit* 100000
+  "Limit on how many recursive expansions to do.")
+
+(defun do-expansions (expr)
+  "Perform shell syntax expansions / subsitutions on the expression.
+Remove backslash quotes."
+  ;; (let ((words (map 'list #'word-word (shell-expr-words expr)))
+  (let ((words (shell-expr-words expr))
+	new-words func until-stable unit)
+    (labels
+	((push-word (w)
+	   (typecase w
+	     (string (push (make-shell-word :word w) new-words))
+	     (t (push w new-words))))
+	 (apply-func (func word until-stable unit)
+	   (let ((result word) (i 0))
+	     (if until-stable
+		 (loop :with last-result
+		    :while (not (equal last-result
+				       (setf result
+					     (funcall func result))))
+		    :do (setf last-result result)
+		    (incf i)
+		    (when (and *recursive-expansion-limit*
+			       (>= i *recursive-expansion-limit*))
+		      (cerror "Keep expanding"
+			      "Shell expansion bailed out after ~s iterations.
+Set lish::*recursive-expansion-limit* higher (or to nil) and continue if you
+really want to keep expanding." i)))
+		 (setf result (funcall func word)))
+	     (case unit
+	       ((:line :expr)
+		(setf new-words result))
+	       (:word
+		(if (listp result)
+		    (mapc (_ (push-word _)) result)
+		    (push-word result))))))
+	 (expand-word (word)
+	   (cond
+	     ((not (unquoted-string-p word))
+	      ;; Quoted, so just push it verbatim.
+	      (push-word word))
+	     ((shell-word-p word)
+	      (expand-word (shell-word-word word)))
+	     ((stringp word)
+	      (apply-func func word until-stable unit))
+	     ((consp word)
+	      ;; Assume it's one of the menagerie: (e.g. :pipe :redirect-*)
+	      (do-expansions (second word))
+	      (push-word word))
+	     (t
+	      ;; It's something else? like a pre-read or pre-evaled lisp obj?
+	      (push-word word)))))
+      (loop :for e :in *expansions*
+	 :do
+	 (setf func         (first e)
+	       until-stable (second e)
+	       unit         (third e))
+	 (ecase unit
+	   ;; (:expr
+	   ;;  (format t "~s expand expr ~s~%" func expr)
+	   ;;  (apply-func func  until-stable unit)
+	   ;;  )
+	   (:line
+	    ;; (format t "~s expand line ~s~%" func words)
+	    (apply-func func words until-stable unit))
+	   (:word
+	    (loop :for word :in words
+	       :do
+	       (expand-word word)
+	       ;; (format t "~s expand word ~s~%" func word)
+	       )
+	    (setf words (nreverse new-words)
+		  new-words nil)))
+	 (setf (shell-expr-words expr) words))))
+  expr)
+
+(defun old-do-expansions (expr)
+  "Perform shell syntax expansions / subsitutions on the expression.
+Remove backslash quotes."
+  (let ((new-words '()))
+    (loop :with w
+       :for word :in (shell-expr-words expr)
+       :do
+       (setf w (word-word word))
+       (cond
+	 ((not (unquoted-string-p word))
+	  ;; Quoted, so just push it verbatim
+	  (push word new-words))
+	 ((shell-word-p word)
+	  ;; quoted word without anything special to expand
+	  (setf (shell-word-word word) (remove-backslashes w))
+	  (push word new-words))
+	 ((stringp word)
+	  (push (remove-backslashes word) new-words))
+	 (t
+	  (push word new-words))))
+    (setf (shell-expr-words expr) (nreverse new-words)))
+  expr)
+
+(defun shell-expand-line (editor)
+  "A command to expand the current line."
+  ;;(format t "editor is a ~a = ~s~%" (type-of editor) editor)
+  (let* ((buf (rl:get-buffer-string editor))
+	 (words (shell-expr-words
+		 (possibly-expand-aliases
+		  *shell*
+		  (do-expansions
+		      (lisp-exp-eval (shell-read buf)))))))
+    (rl:replace-buffer
+     editor
+     (with-output-to-string (str)
+       (labels ((write-thing (w)
+		  (typecase w
+		     (string (princ (quotify w) str))
+		     (cons (write w :stream str :readably t :case :downcase))))
+		;;(write w :stream str :readably t :case :downcase))
+		(write-it (w)
+		  (cond
+		    ((and (shell-word-p w) (word-quoted w))
+		     (write-char #\" str)
+		     (write-thing (word-word w))
+		     (write-char #\" str))
+		    (t
+		     (write-thing (word-word w))))))
+	 (when (first words)
+	   (write-it (first words)))
+	 (loop :for w :in (rest words)
+	    :do (write-char #\space str)
+	    (write-it w)))))))
 
 (defvar *input* nil
   "The output of the previous command in pipeline.")
@@ -898,6 +1238,10 @@ read from."
 			   :background ,background))
 		  job (add-job program
 			       (join-by-string command-line #\space) pid))
+	    ;; &&& temporarily re-get the terminal so we can debug
+	    ;; (sleep .2)
+	    ;; (uos::syscall (uos:tcsetpgrp 0 (uos:getpid)))
+	    ;; (cerror "Keep going" "Your breakpoint, sir?")
 	    (if background
 		(setf (job-status job) :running)
 		;; Wait for it...
@@ -1271,6 +1615,10 @@ process ID or a resume function designator. STATUS defaults to :RUNNING."
       (integer
        (setf (job-pid job) thing
 	     (job-process-group job) thing))
+      (process-handle
+       (setf (job-pid job) (process-handle-value thing)
+	     ;; @@@ bullcrap workaround
+	     (job-process-group job) (process-handle-value thing)))
       ((or symbol function)
        (setf (job-resume-function job) thing)))
     (push job (lish-jobs *shell*))
@@ -1325,6 +1673,26 @@ suspend itself."
   this-command
   last-command)
 
+(defun set-signals ()
+  "Make sure signal handlers are set up for shell reading. Return a list of
+ (signal . action) to be reset later."
+  (let (result)
+    #+unix
+    (progn
+      ;; Ignore quit
+      (push (cons uos:+SIGQUIT+ (uos:signal-action uos:+SIGQUIT+)) result)
+      (uos:set-signal-action uos:+SIGQUIT+ :ignore)
+      ;; Ignore suspend
+      (push (cons uos:+SIGTSTP+ (uos:signal-action uos:+SIGTSTP+)) result)
+      (uos:set-signal-action uos:+SIGTSTP+ :ignore))
+    result))
+
+(defun restore-signals (actions)
+  "Restore (or really just set) the signal actions in ACTIONS."
+  #+unix
+  (loop :for (sig . act) :in actions
+     :do (uos:set-signal-action sig act)))
+
 (defun lish-read (sh state)
   "Read a string with the line editor and convert it shell expressions,
 handling errors."
@@ -1351,17 +1719,22 @@ handling errors."
 			    (progn
 			      #| (format t "~&~a" c) |#
 			      (signal c))))))
-	  (progn
-	    ;;(break)
-	    (setf str (rl
-		       :eof-value *real-eof-symbol*
-		       :quit-value *quit-symbol*
-		       :context :lish
-		       :editor (lish-editor sh)
-		       :prompt
-		       (if pre-str
-			   (lish-sub-prompt sh)
-			   (safety-prompt sh)))))
+	  (let (saved-signals)
+	    (unwind-protect
+	       (progn
+		 ;;(break)
+		 (setf saved-signals (set-signals)
+		       str (rl
+			    :eof-value *real-eof-symbol*
+			    :quit-value *quit-symbol*
+			    :context :lish
+			    :editor (lish-editor sh)
+			    :prompt
+			    (if pre-str
+				(lish-sub-prompt sh)
+				(safety-prompt sh)))))
+	      (when saved-signals
+		(restore-signals saved-signals))))
 	  (cond
 	    ((and (stringp str) (equal 0 (length str))) *empty-symbol*)
 	    ((equal str *real-eof-symbol*)		*real-eof-symbol*)
