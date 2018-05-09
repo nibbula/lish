@@ -952,7 +952,8 @@ become keyword arguments, in a way specified in the command's arglist."
 	       ;; -abcxyz (short args)
 	       (progn
 		 (setf boolean-taken nil
-		       boolean-value (is-normal-flag-char (char a 0)))
+		       boolean-value (is-normal-flag-char (char a 0))
+		       flag-taken nil)
 		 (loop :for cc :from 1 :below (length a) :do
 		    (setf flag-taken nil)
 		    (loop :for arg :in (command-arglist command) :do
@@ -979,9 +980,10 @@ become keyword arguments, in a way specified in the command's arglist."
 		  (if boolean-taken
 		      (setf old-list (delete-nth i old-list))
 		      (progn
-			;;(incf i)
 			(dbugf :lish-arg "skipping flag value ~a ~w~%"
 			       i (nth i old-list))
+			(when (not flag-taken)
+			  (incf i))
 			;;(setf old-list (delete-nth i old-list))
 			))))
 	   ;; Arg doesn't start with a dash, so skip it
