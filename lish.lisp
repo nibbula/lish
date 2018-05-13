@@ -432,6 +432,7 @@ is set, and the expression is an integer, do history expansion.
 Otherwise, return words which will evaluate a lisp expression."
   (or
    (and
+    (lish-history-expansion *shell*)
     (and word (stringp word) (char= (char word 0) #\!))
     (let (results expansion)
       (handler-case
@@ -613,6 +614,8 @@ x{1..5}y -> x1y x2y x3y x4y x5y
 {a..g}   -> a b c d e f g
 {
 "
+  (when (not (lish-expand-braces *shell*))
+    (return-from expand-braces string))
   (let ((len (length string))
 	(start 0) (i 0)
 	prefix suffix alternatives output-words
