@@ -81,7 +81,7 @@
      (push o (lish-options sh)))
   (init-commands))
 
-;; Most things that are designed to be settable by the operator should likely
+;; Most things that are designed to be settable by the user should likely
 ;; be made into an option. Options defined by DEFOPTION are accessible like a
 ;; typical class slot acessor method on the shell object, as well as being an
 ;; easily accesible using the 'opt' command.
