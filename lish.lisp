@@ -1590,12 +1590,16 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 
 (defun load-rc-file (init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
-  ;; I don't like this special case, but ...
-  (let ((file (expand-variables init-file))
-	(*lish-user-package* (find-package :lish-user)))
-    (if (probe-file file)
-	(load-file file)
-	(format t "Couldn't find RC file: ~s~%" file))))
+  (let ((*lish-user-package* (find-package :lish-user)))
+    (loop :for file :in (list init-file
+			      (path-append
+			       (config-dir "lish") "lishrc")
+			      *default-lishrc*)
+       :do
+       ;; @@@ I don't like this special expansion case, but ...
+       (when (and file (probe-file (expand-variables file)))
+	 (load-file file)
+	 (loop-finish)))))
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
@@ -1832,13 +1836,17 @@ handling errors."
       t))
 
 (defun lish (&key debug terminal-name
-	       (init-file (or *lishrc* *default-lishrc*))
+	       (terminal-type (pick-a-terminal-type))
+	       ;;(init-file (or *lishrc* *default-lishrc*))
+	       (init-file *lishrc*)
 	       command)
   "Unix Shell & Lisp somehow smushed together.
 Type the “help” command for more documentation.
 Arguments:
   DEBUG         - True to turn on entering the debugger on errors.
   TERMINAL-NAME - Device name of the terminal.
+  TERMINAL-TYPE - Type of terminal to read from. Defaults from
+                   pick-a-terminal-type and so *default-terminal-type*.
   INIT-FILE     - File to load on startup or *default-lishrc* if not given.
   COMMAND       - A command to evaluate and exit."
   (let* ((*shell* (make-instance 'shell :debug debug))
@@ -1856,9 +1864,7 @@ Arguments:
       (update-user-package))
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
-    ;;(when (or (not init-file-supplied-p) init-file *lishrc*)
-    (when init-file
-      (load-rc-file init-file))
+    (load-rc-file init-file)
 
     (when command
       (start-job-control)
@@ -1869,61 +1875,64 @@ Arguments:
 			      (values-list (lish-exit-values sh))
 			      result))))
 
-    ;; Make a customized line editor
-    (setf (lish-editor sh)
-	  (make-instance 'rl:line-editor
-			 :non-word-chars *shell-non-word-chars*
-			 :completion-func #'shell-complete
-			 :context *history-context*
-			 :terminal-device-name terminal-name
-			 :local-keymap (lish-keymap sh)
-			 :prompt-func nil))
+    (with-terminal (terminal-type *terminal* :device-name terminal-name)
+      (tt-set-input-mode :line) ; ?maybe?
 
-    (unwind-protect
-      (progn
-	(start-job-control)
-	(when (not (eq :lish-quick-exit (catch :lish-quick-exit
-          (loop
-           :named pippy
-	   :with expr = nil
-	   :and lvl = *lish-level*
-	   :and eof-count = 0
-	   :if (lish-exit-flag sh)
-	     :if (confirm-quit)
-	       :return (values-list (lish-exit-values sh))
-	     :else
-	       :do (setf (lish-exit-flag sh) nil)
+      ;; Make a customized line editor
+      (setf (lish-editor sh)
+	    (make-instance 'rl:line-editor
+			   :non-word-chars *shell-non-word-chars*
+			   :completion-func #'shell-complete
+			   :context *history-context*
+			   :terminal-device-name terminal-name
+			   :local-keymap (lish-keymap sh)
+			   :prompt-func nil))
+
+      (unwind-protect
+	(progn
+	  (start-job-control)
+	  (when (not (eq :lish-quick-exit (catch :lish-quick-exit
+	    (loop
+	     :named pippy
+	     :with expr = nil
+	     :and lvl = *lish-level*
+	     :and eof-count = 0
+	     :if (lish-exit-flag sh)
+	       :if (confirm-quit)
+		 :return (values-list (lish-exit-values sh))
+	       :else
+		 :do (setf (lish-exit-flag sh) nil)
+	       :end
 	     :end
-	   :end
-	   :do
-	   (restart-case
-	     (progn
-	       (check-job-status sh)
-	       (setf expr (lish-read sh state))
-	       (when (and (eq expr *real-eof-symbol*) (confirm-quit))
-		 (return-from pippy expr))
-	       (if (eq expr *quit-symbol*)
-		   (if (and (not (lish-ignore-eof sh)) (confirm-quit))
-		       (return-from pippy expr)
-		       (progn
-			 (when (numberp (lish-ignore-eof sh))
-			   (if (< eof-count (lish-ignore-eof sh))
-			       (incf eof-count)
-			       (if (confirm-quit)
-				   (return-from pippy expr)
-				   (setf eof-count 0))))
-			 (format t "Type 'exit' to exit the shell.~%")))
-		   (lish-eval sh expr state)))
-	     (abort ()
-	       :report
-	       (lambda (stream)
-		 (format stream
-			 "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
-			 (= lvl 0) (/= lvl 0) lvl))
-	       nil))))))))
-      (stop-job-control saved-sigs))
-    ;;(save-command-stats)
-    (run-hooks *exit-shell-hook*)
+	     :do
+	     (restart-case
+	       (progn
+		 (check-job-status sh)
+		 (setf expr (lish-read sh state))
+		 (when (and (eq expr *real-eof-symbol*) (confirm-quit))
+		   (return-from pippy expr))
+		 (if (eq expr *quit-symbol*)
+		     (if (and (not (lish-ignore-eof sh)) (confirm-quit))
+			 (return-from pippy expr)
+			 (progn
+			   (when (numberp (lish-ignore-eof sh))
+			     (if (< eof-count (lish-ignore-eof sh))
+				 (incf eof-count)
+				 (if (confirm-quit)
+				     (return-from pippy expr)
+				     (setf eof-count 0))))
+			   (format t "Type 'exit' to exit the shell.~%")))
+		     (lish-eval sh expr state)))
+	       (abort ()
+		 :report
+		 (lambda (stream)
+		   (format stream
+			   "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
+			   (= lvl 0) (/= lvl 0) lvl))
+		 nil))))))))
+	(stop-job-control saved-sigs))
+      ;;(save-command-stats)
+      (run-hooks *exit-shell-hook*))
     (when (lish-exit-flag sh)
       (return-from lish (when (lish-exit-values sh)
 			  (values-list (lish-exit-values sh)))))
