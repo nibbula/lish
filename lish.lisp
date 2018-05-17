@@ -1597,9 +1597,11 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			      *default-lishrc*)
        :do
        ;; @@@ I don't like this special expansion case, but ...
-       (when (and file (probe-file (expand-variables file)))
-	 (load-file file)
-	 (loop-finish)))))
+       (when file
+	 (let ((expanded-file (expand-variables file)))
+	   (when (and expanded-file (probe-file expanded-file))
+	     (load-file expanded-file)
+	     (loop-finish)))))))
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
