@@ -1590,18 +1590,19 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 
 (defun load-rc-file (init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
-  (let ((*lish-user-package* (find-package :lish-user)))
-    (loop :for file :in (list init-file
-			      (path-append
-			       (config-dir "lish") "lishrc")
-			      *default-lishrc*)
-       :do
-       ;; @@@ I don't like this special expansion case, but ...
-       (when file
-	 (let ((expanded-file (expand-variables file)))
-	   (when (and expanded-file (probe-file expanded-file))
-	     (load-file expanded-file)
-	     (loop-finish)))))))
+  (when init-file
+    (let ((*lish-user-package* (find-package :lish-user)))
+      (loop :for file :in (list init-file
+				(path-append
+				 (config-dir "lish") "lishrc")
+				*default-lishrc*)
+	 :do
+	 ;; @@@ I don't like this special expansion case, but ...
+	 (when file
+	   (let ((expanded-file (expand-variables file)))
+	     (when (and expanded-file (probe-file expanded-file))
+	       (load-file expanded-file)
+	       (loop-finish))))))))
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
@@ -1790,9 +1791,13 @@ handling errors."
 	   (setf pre-str (format nil "~a~%~a" pre-str str))
 	   (setf pre-str (format nil "~a" str)))
        (dbugf 'lish-repl "DO CONTIUE!!~%"))
-      ((or (eq expr *empty-symbol*) (eq expr *error-symbol*))
+      ((eq expr *empty-symbol*)
        ;; do nothing
-       (dbugf 'lish-repl "DO NOTHING!!~%"))
+       (dbugf 'lish-repl "EMPTY - DO NOTHING!!~%"))
+      ((eq expr *error-symbol*)
+       ;; do nothing
+       (break)
+       (dbugf 'lish-repl "ERROR - DO NOTHING!!~%"))
       (t
        (dbugf 'lish-repl "Do Something!!~%")
        (setf pre-str nil)
@@ -1867,6 +1872,8 @@ Arguments:
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
     (load-rc-file init-file)
+    (when (not theme:*theme*)
+      (setf theme:*theme* (theme:default-theme)))
 
     (when command
       (start-job-control)
@@ -1878,7 +1885,7 @@ Arguments:
 			      result))))
 
     (with-terminal (terminal-type *terminal* :device-name terminal-name)
-      (tt-set-input-mode :line) ; ?maybe?
+      (tt-set-input-mode :line)
 
       ;; Make a customized line editor
       (setf (lish-editor sh)
