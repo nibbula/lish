@@ -27,8 +27,8 @@ something stable and tested, I recommend not using it yet!
 #+END_SRC
 
 ** Dependencies
-   The dependencies, aside from , which should hopefully all be loaded from quicklisp,
-   are probably:
+   The dependencies, aside from the above, which should hopefully all be
+   loaded from quicklisp, are probably:
 
   - cl-ppcre
   - trivial-gray-streams
