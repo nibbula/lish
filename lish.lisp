@@ -1196,7 +1196,7 @@ read from."
     ;; Since run-program can't throw an error when the program is not found,
     ;; we try to do it here.
     (when (not path)
-      (signal ;; cerror "Fixypoo: "
+      (signal
        'unknown-command-error
        :name 'path
        :command-string program :format "not found."))
@@ -1211,6 +1211,8 @@ read from."
 	    ;; 	  in-pipe
 	    ;; 	  (slurp in-pipe))
 	    ;;   (file-position in-pipe 0))
+	    (dbugf :sheep "piping ~s args: ~s~%in-pipe ~s out-pipe ~a~%"
+		   path args in-pipe out-pipe)
 	    (setf result-stream
 		  (apply #'nos:pipe-program
 			 `(,path ,args
@@ -1229,6 +1231,7 @@ read from."
 	      (setf background t)
 	      ;; (format t "background = ~a~%args = ~s~%" background args)
 	      )
+	    (dbugf :sheep "system command ~s args: ~s~%" path args)
 	    (setf pid
 		  (apply
 		   ;; #+(or clisp ecl lispworks) #'fork-and-exec
@@ -1588,21 +1591,21 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	    (error "End of file in expression. Probably starting at line ~a."
 		   expression-start-line)))))))
 
+(defun pick-an-rc-file ()
+  (loop :for file :in (list *lishrc*
+			    (path-append (config-dir "lish") "lishrc")
+			    *default-lishrc*)
+     :do
+     (when file
+       (let ((expanded-file (expand-variables file)))
+	 (when (and expanded-file (probe-file expanded-file))
+	   (return expanded-file))))))
+  
 (defun load-rc-file (init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
   (when init-file
     (let ((*lish-user-package* (find-package :lish-user)))
-      (loop :for file :in (list init-file
-				(path-append
-				 (config-dir "lish") "lishrc")
-				*default-lishrc*)
-	 :do
-	 ;; @@@ I don't like this special expansion case, but ...
-	 (when file
-	   (let ((expanded-file (expand-variables file)))
-	     (when (and expanded-file (probe-file expanded-file))
-	       (load-file expanded-file)
-	       (loop-finish))))))))
+      (load-file init-file))))
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
@@ -1845,7 +1848,7 @@ handling errors."
 (defun lish (&key debug terminal-name
 	       (terminal-type (pick-a-terminal-type))
 	       ;;(init-file (or *lishrc* *default-lishrc*))
-	       (init-file *lishrc*)
+	       (init-file (pick-an-rc-file))
 	       command)
   "Unix Shell & Lisp somehow smushed together.
 Type the “help” command for more documentation.
@@ -1977,7 +1980,7 @@ Arguments:
   (when (and greeting (not command))
     (format t "Welcome to ~a ~a~%" *shell-name* *version*))
   (when (not init-file-supplied-p)
-    (setf init-file (or *lishrc* *default-lishrc*)))
+    (setf init-file (pick-an-rc-file)))
   ;;(format t "init-file = ~s~%" init-file)
   ;;(format t "command = ~s~%" command) (finish-output)
   (lish :command command :init-file init-file :debug debug))
