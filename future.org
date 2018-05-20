@@ -13,11 +13,13 @@ something stable and tested, I recommend not using it yet!
    This nearly goes without saying for anything related to Lisp.
 
 ** Install lish & dependencies into local-projects
+#+BEGIN_SRC shell
    cd ~/quicklisp/local-projects
    git clone https://github.com/nibbula/rl
    git clone https://github.com/nibbula/opsys
    git clone https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name
    git clone https://github.com/nibbula/lish
+#+END_SRC shell
 
 ** In your Lisp, use quicklisp to load Lish:
    (ql:quickload :lish)
@@ -35,11 +37,15 @@ something stable and tested, I recommend not using it yet!
 *** chipz
 
 * Running
+#+BEGIN_SRC lisp
   (lish:lish)
+#+END_SRC
 
 * Building an executable
 
+#+BEGIN_SRC lisp
   (lish:make-standlone)
+#+END_SRC
 
   This should make an executable named "lish" in your current directory.
   Put it wherevere you'd like.
