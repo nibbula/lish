@@ -1590,19 +1590,18 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 
 (defun load-rc-file (init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
-  (when init-file
-    (let ((*lish-user-package* (find-package :lish-user)))
-      (loop :for file :in (list init-file
-				(path-append
-				 (config-dir "lish") "lishrc")
-				*default-lishrc*)
-	 :do
-	 ;; @@@ I don't like this special expansion case, but ...
-	 (when file
-	   (let ((expanded-file (expand-variables file)))
-	     (when (and expanded-file (probe-file expanded-file))
-	       (load-file expanded-file)
-	       (loop-finish))))))))
+  (let ((*lish-user-package* (find-package :lish-user)))
+    (loop :for file :in (list init-file
+                              (path-append
+                               (config-dir "lish") "lishrc")
+                              *default-lishrc*)
+       :do
+       ;; @@@ I don't like this special expansion case, but ...
+       (when file
+         (let ((expanded-file (expand-variables file)))
+           (when (and expanded-file (probe-file expanded-file))
+             (load-file expanded-file)
+             (loop-finish)))))))
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
