@@ -1,0 +1,64 @@
+¡NOTA BENE! / WARNING
+
+Lish is full of bugs! Don't use it near any data that you don't want to risk
+losing! Since it's a shell, it's very good at recursively wreaking havoc upon
+files and commands. You may quite regularly use software highly dubious
+quality, but a shell is perhaps far more dangerous than most software. Lish
+is also very incomplete. It will certainly change in incompatible ways. Unless
+you intrepidly want to experiment, or are interested in helping turn it into
+something stable and tested, I recommend not using it yet!
+
+* Loading
+** Install quicklisp from https://quicklisp.org
+   This nearly goes without saying for anything related to Lisp.
+
+** Install lish & dependencies into local-projects
+   cd ~/quicklisp/local-projects
+   git clone https://github.com/nibbula/rl
+   git clone https://github.com/nibbula/opsys
+   git clone https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name
+   git clone https://github.com/nibbula/lish
+
+** In your Lisp, use quicklisp to load Lish:
+   (ql:quickload :lish)
+
+** Dependencies
+   The dependencies, aside from , which should hopefully all be loaded from quicklisp,
+   are probably:
+*** cl-ppcre
+*** trivial-gray-streams
+*** cffi
+**** uiop
+**** alexandria
+**** trivial-features
+**** babel
+*** chipz
+
+* Running
+  (lish:lish)
+
+* Building an executable
+
+  (lish:make-standlone)
+
+  This should make an executable named "lish" in your current directory.
+  Put it wherevere you'd like.
+
+* Using
+  Lish is a relatively boring combination of a Unix shell and Common Lisp
+  REPL. As you might expect, it allows you to both type Unix commands and
+  evaluate Lisp expressions. It tries to do so in way that would not be
+  too annoying to someone familiar with either one.
+
+  Lish does most of the things a normal shell does, but that being said, Lish
+  is **NOT** a POSIX shell! 
+
+** Differences from a POSIX shells
+*** Syntax
+*** Expansion
+*** Shell Commands
+*** Programming
+*** Completion
+*** Prompting
+*** Pipelines
+*** Job Control
