@@ -1,3 +1,0 @@
-Lish TODO list							    -*- org -*-
-
-whatever
