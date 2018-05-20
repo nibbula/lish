@@ -1,4 +1,4 @@
-¡NOTA BENE! / WARNING
+*¡NOTA BENE! / WARNING*
 
 Lish is full of bugs! Don't use it near any data that you don't want to risk
 losing! Since it's a shell, it's very good at recursively wreaking havoc upon
@@ -22,19 +22,22 @@ something stable and tested, I recommend not using it yet!
 #+END_SRC shell
 
 ** In your Lisp, use quicklisp to load Lish:
+#+BEGIN_SRC lisp
    (ql:quickload :lish)
+#+END_SRC
 
 ** Dependencies
    The dependencies, aside from , which should hopefully all be loaded from quicklisp,
    are probably:
-*** cl-ppcre
-*** trivial-gray-streams
-*** cffi
-**** uiop
-**** alexandria
-**** trivial-features
-**** babel
-*** chipz
+
+  - cl-ppcre
+  - trivial-gray-streams
+  - cffi
+    - uiop
+    - alexandria
+    - trivial-features
+    - babel
+  - chipz
 
 * Running
 #+BEGIN_SRC lisp
