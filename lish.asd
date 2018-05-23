@@ -32,5 +32,6 @@
      (:file "piping"	:depends-on ("package" "vars" "args" "commands"
 				     "shell" "lish"))
      (:file "mine"      :depends-on ("package" "vars" "args" "commands"
-				     "shell" "lish" "piping")))
+                                     "shell" "lish" "piping"))
+     (:file "user-utils" :depends-on ("package")))
     :in-order-to ((asdf:test-op (asdf:test-op :lish-test))))
