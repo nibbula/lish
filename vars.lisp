@@ -144,6 +144,15 @@ end points in the original string."
   quoted				; boolean, true if word quoted
   eval)					; boolean, true to evaluate word
 
+;; @@@ I'm not really sure if this is good idea yet.
+(defmethod print-object ((object shell-word) stream)
+  "Print a shell-word to STREAM."
+  (with-slots (word quoted) object
+    (cond
+      ((or *print-readably* *print-escape*) (call-next-method))
+      (quoted (format stream "\"~a\"" word))
+      (t (format stream "~a" word)))))
+
 (defstruct job
   "A job in the shell, which can be a process, thread, or closure."
   id					; unique integer
