@@ -215,7 +215,7 @@ $
 Colors, styles, and evaluated pieces can be put in the `prompt-string`.
 For example, here's a fancy prompt showing many features of prompt formatting:
 
-``
+```
 opt prompt '((:fg-cyan "%h") ":" (:fg-magenta "%i") ":"
               (:fg-white (:underline "%w")) " "
 	      (:fg-red (make-string (1+ *lish-level*) :initial-element #\@))
