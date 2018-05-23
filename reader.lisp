@@ -17,15 +17,15 @@ the end and didn't get a close quote, the third value is true.~
   (let ((v (make-stretchy-string 10))
 	(i 0)
 	(end-quote nil)
-	(do-quote nil))
+	(quote-next nil))
     (loop :for c :across s :do
-       (setf end-quote (and (eql c #\") (not do-quote)))
+       (setf end-quote (and (eql c #\") (not quote-next)))
        :while (not end-quote)
        :do
-       (if (and (eql c #\\) (not do-quote))
-	   (setf do-quote t)
+       (if (and (eql c #\\) (not quote-next))
+	   (setf quote-next t)
 	   (progn
-	     (setf do-quote nil)
+	     (setf quote-next nil)
 	     (vector-push-extend c v)))
        (incf i))
     (values v i (not end-quote))))
@@ -69,7 +69,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	(w (make-stretchy-string 12))	; temp word
 	(in-word nil)			; t if in word
 	(in-first-word t)		; t if in the first word on the line
-	(do-quote nil)
+	(string-quote nil)
+	(lisp-quote nil)
 	(in-compound nil)
 	(did-quote nil))		;
     (labels ((reset-word ()
@@ -130,7 +131,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 		   (setf word-start i
 		        i pos)
 		   (push (make-shell-word :word obj
-					  :eval t
+					  ;; :eval t
+					  :eval (not lisp-quote)
 					  :quoted nil
 					  :start word-start
 					  :end i)
@@ -202,7 +204,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 	 (setf c (aref line i))
 	 (cond
 	   ;; quoted char
-	   (do-quote
+	   (string-quote
 	     ;; @@@ Actually I think we should leave some quote chars in until
 	     ;; after expansion. That way we can expand part of word, while
 	     ;; having some chars protected from expansion, e.g. glob chars
@@ -213,7 +215,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 	     (when (not in-word)
 	       (push (1- i) word-start))
 	     (setf in-word t)
-	     (setf do-quote nil)
+	     (setf string-quote nil)
 	     (incf i))
 	   ;; a string
 	   ((eql c #\")
@@ -236,7 +238,12 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ;; a lisp function application
 	   ((eql c #\()
 	    (finish-word)
-	    (read-lisp-expr))
+	    (read-lisp-expr)
+	    (setf lisp-quote nil))
+	   ((and (eql c #\') (eql (next-char) #\())
+	    (finish-word)
+	    (setf lisp-quote t)
+	    (incf i))
 	   ((eql c #\#)
 	    ;; This is so we can use the Lisp reader interpretation of # at
 	    ;; the beginning of a shell line, but otherwise, in the rest of
@@ -284,7 +291,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 		)))
 	   ;; quote char
 	   ((eql c #\\)
-	    (setf do-quote t)
+	    (setf string-quote t)
 	    (incf i))
 	   ;; whitespace
 	   ((position c *whitespace*)
