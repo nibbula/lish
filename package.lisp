@@ -97,6 +97,11 @@ it's shell features.
    #:!and #:!or #:!bg
    #:!> #:!>> #:!>! #:!>>!
    #:!< #:!!<
+   ;; user-utils
+   #:getenv
+   #:setenv
+   #:with-cwd
+   #:with-env
    ;; internal-ish things that might want to be used
    #:get-command
    #:command-to-lisp-args
