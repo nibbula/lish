@@ -889,6 +889,33 @@ Remove backslash quotes."
     (setf (shell-expr-words expr) (nreverse new-words)))
   expr)
 
+(defun shell-words-to-string (words)
+  "Put a list of shell words, properly quoted, into a string separated by
+spaces. This of course loses some data in the words."
+  (with-output-to-string (str)
+    (labels ((write-thing (w)
+	       (typecase w
+		 (string (princ (quotify w) str))
+		 (cons (write w :stream str :readably t :case :downcase))))
+	     ;;(write w :stream str :readably t :case :downcase))
+	     (write-it (w)
+	       (cond
+		 ((and (shell-word-p w) (word-quoted w))
+		  (write-char #\" str)
+		  (write-thing (word-word w))
+		  (write-char #\" str))
+		 (t
+		  (write-thing (word-word w))))))
+      (when (first words)
+	(write-it (first words)))
+      (loop :for w :in (rest words)
+	 :do (write-char #\space str)
+	 (write-it w)))))
+
+(defun shell-words-to-list (words)
+  "Return shell words as a list of strings."
+  (mapcar #'word-word words))
+
 (defun shell-expand-line (editor)
   "A command to expand the current line."
   ;;(format t "editor is a ~a = ~s~%" (type-of editor) editor)
@@ -900,7 +927,9 @@ Remove backslash quotes."
 		      (lisp-exp-eval (shell-read buf)))))))
     (rl:replace-buffer
      editor
-     (with-output-to-string (str)
+     (shell-words-to-string words))))
+#|
+    (with-output-to-string (str)
        (labels ((write-thing (w)
 		  (typecase w
 		     (string (princ (quotify w) str))
@@ -919,6 +948,7 @@ Remove backslash quotes."
 	 (loop :for w :in (rest words)
 	    :do (write-char #\space str)
 	    (write-it w)))))))
+|#
 
 (defvar *input* nil
   "The output of the previous command in pipeline.")

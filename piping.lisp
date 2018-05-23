@@ -254,6 +254,10 @@ like $(command) in bash."
   "Return lines of output from command as a string of quoted words."
   (command-output-words (lisp-args-to-command command) t))
 
+(defun !@ (&rest command)
+  "Return the output from command, broken into words by the shell reader."
+  (shell-words-to-list (lish::shell-expr-words (shell-read (!- command)))))
+
 (defun !_ (&rest command)
   "Return a list of the lines of output from the command."
   (command-output-list (lisp-args-to-command command)))
@@ -354,6 +358,14 @@ like $(command) in bash."
   "Return lines of output from command as a string of quoted words."
   (command-output-words (expr-from-args command) t))
 
+(defun !@= (&rest command)
+  "Return the output from command, broken into words by the shell reader."
+  (shell-words-to-list
+   (lish::shell-expr-words
+    (shell-read
+     (with-output-to-string (str)
+       (run-with-output-to str (expr-from-args command)))))))
+
 (defun !_= (&rest args)
   "Run a command with the separate verbatim arguments, without shell syntax."
   (command-output-list (expr-from-args args)))
@@ -373,19 +385,5 @@ like $(command) in bash."
 	(progn
 	  (close stream)
 	  nil))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-
-;; Perhaps just use CL-INTERPOL?
-;;
-;; (defun !-reader (stream char arg)
-;;   (declare (ignore char arg))
-;;   (read stream nil nil t))
-
-;; (set-dispatch-macro-character #\# #\! #'!-reader)
-;; (set-macro-character #\! (get-macro-character #\)))))
-
-;; @@@ consider features in inferior-shell?
 
 ;; EOF
