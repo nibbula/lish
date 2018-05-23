@@ -43,15 +43,18 @@ Mister Noodle
 **Note**: Using single quotes results in:
 ```
 $ export name 'Mister Noodle'
-WARNING:
-   Extra arguments: (#S(LISH::SHELL-WORD
-                        :WORD Noodle'
-                        :START NIL
-                        :END NIL
-                        :QUOTED NIL
-                        :EVAL NIL))
+WARNING: Extra arguments: (Noodle')
 $ echo $name
 'Mister
+```
+
+Single quotes are instead used in the typical Lisp way of preventing evaluation
+of expressions, but only just before and inside parentheses. The un-specialness
+of single quotes otherwise, can help in avoiding getting tripped up by English
+contractions:
+
+```
+echo If'n '(+ 2 3) weren't indeed (+ 2 3), 'twould be broke'd.
 ```
 
 Variables are not split after substitution:
@@ -71,18 +74,18 @@ $ echo $PATH
 ```
 
 Environment variables can be accessed inside Lisp expressions using
-`nos:environment-variable`, which returns a string. This string can be
-split using the [str](https://github.com/vindarel/cl-str) library:
+`nos:environment-variable`, which returns a string. This string can be split
+using the split function.
+
 ```
-$ (ql:quickload :str)
-$ (str:split #\: (nos:environment-variable "PATH"))
+$ (split #\: (nos:environment-variable "PATH"))
 ("/home/testuser/local/bin" "/usr/local/bin" "/usr/bin" "/bin"
  "/usr/local/games" "/usr/games")
 ```
 
 A loop over all the entries in `PATH`:
 ```
-$ (loop for entry in (str:split #\: (nos:environment-variable "PATH")) do
+$ (loop for entry in (split #\: (nos:environment-variable "PATH")) do
 - (format t "entry: ~a~%" entry))
 
 entry: /home/testuser/local/bin
@@ -105,6 +108,8 @@ variable to a number, for example, results in a type error.
 
 Command substitution
 --------------------
+`!$` returns the lines output from a command as a string of words. This is
+basically like `$(command)` or backticks in POSIX shells.
 
 ```
 $ echo In (!$ 'pwd), running (!$ 'uname)
@@ -117,6 +122,29 @@ $ echo $os
 Linux
 ```
 
+There are a number command substitution functions, depending on how you want
+the output. For convenience they are named with very short names, starting with
+`!`. These functions aren't special or part of the syntax. You can define your
+own command substitution functions to suit your needs.
+
+For instance, `!_` turns the output in to a list of lines.
+
+```
+echo You have (count-if (_ (begins-with "??" _)) (!_ "git status --porcelain")) untracked files.
+```
+
+`!@` spreads the entire output into separate words, instead of one word.
+So,
+```
+touch (!$= "echo" "foo bar")
+```
+creates one file named "foo bar", but
+```
+touch (!@= "echo" "foo bar")
+```
+creates two files named "foo" and "bar".
+
+
 Separating commands
 -------------------
 
@@ -127,13 +155,20 @@ The usual way to separate commands therefore doesn't work:
 $ echo hello; echo world
 hello
 ```
+Instead you can use `^`:
+
+```
+$ echo hello ^ echo world
+hello
+world
+```
 
 Loops
 -----
 
 ```
 $ (dotimes (i 5)
-- (! (str:concat "touch file_" (write-to-string i) ".txt")))
+- (! "touch file_"  i ".txt")))
 NIL
 
 $ ls
@@ -146,7 +181,7 @@ and directories:
 
 ```
 $ (loop for file in (glob "*.txt") do
--   (! (format nil "cp \"~a\" \"~a.bak\"" file file)))
+-   (! "cp " file " " file ".bak"))
 $ ls
 file_0.txt      file_2.txt.bak
 file_0.txt.bak  file_3.txt
@@ -177,3 +212,25 @@ My prompt> opt prompt-function nil
 $ 
 ```
 
+Colors, styles, and evaluated pieces can be put in the `prompt-string`.
+For example, here's a fancy prompt showing many features of prompt formatting:
+
+``
+opt prompt '((:fg-cyan "%h") ":" (:fg-magenta "%i") ":"
+              (:fg-white (:underline "%w")) " "
+	      (:fg-red (make-string (1+ *lish-level*) :initial-element #\@))
+	      #\space)
+```
+
+For the details on this one can look at the documentation for `format-prompt`
+and `symbolic-prompt-to-string` which can usually be dredged up by the standard
+Lisp functions `describe` or `documentation`, e.g.:
+
+```
+(describe 'format-prompt)
+```
+and
+
+```
+(documentation 'symbolic-prompt-to-string 'function)
+```
