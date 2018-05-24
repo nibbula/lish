@@ -1184,6 +1184,7 @@ bound during command."
   "Apply the function to the line, and return the proper values. If there are
 not enough arguements supplied, and *INPUT* is set, i.e. it's a recipient of
 a non-I/O pipeline, supply *INPUT* as the missing tail argument."
+  ;;(format t "parenless line = ~s~%" line)
   (let ((parenless-args (read-parenless-args line))
 	(function-args (lambda-list
 			(if (functionp func)
@@ -1192,10 +1193,13 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 			      (function-lambda-expression func)))
 			    func)))
 	(*context* context))
+    ;; (format t "parenless args = ~s~%" parenless-args)
+    ;; (format t "function args = ~s~%" function-args)
+    ;; (format t "parenless *input* = ~s~%" *input*)
     (if (and (< (length parenless-args) (length function-args))
 	     *input*)
 	(progn
-	  ;;(format t "parenless input!~%")
+	  ;; (format t "parenless input!~%")
 	  (if parenless-args
 	      (progn
 		;;(format t "parenless-args = ~s~%" parenless-args)
@@ -1329,21 +1333,7 @@ probably fail, but perhaps in similar way to other shells."
 	   (rest-of-the-line (expr)
 	     "Return the rest of the line after the first word."
 	     (if (> (length (shell-expr-words expr)) 1)
-		 ;; (subseq (shell-expr-line expr)
-		 ;; 	 (elt (shell-expr-word-start expr) 1))
-		 ;; (join-by-string (subseq (shell-expr-words expr) 1) " ")
-		 (with-output-to-string (str)
-		   (loop :with first = t
-		      :for w :in (rest (shell-expr-words expr))
-		      :if first
-		        :do (setf first nil)
-		      :else
-		        :do (princ " " str)
-		      :end
-		      :if (and (shell-word-p w) (shell-word-quoted w))
-		        :do (print w str) ; make strings be strings
-		      :else
-		        :do (princ w str)))
+		 (shell-words-to-string (rest (shell-expr-words expr)))
 		 ""))
 	   (run-fun (func line)
 	     "Apply the func to the line, and return the proper values."
@@ -1453,6 +1443,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
   (let ((*context* (or context (make-context)))
 	first-word vals out-stream show-vals)
     (with-slots (in-pipe out-pipe environment flipped-io) *context*
+      (setf flipped-io nil)
       (macrolet
 	  ((eval-compound (test new-pipe)
 	     "Do a compound command. TEST determines whether the next~
@@ -1467,6 +1458,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 					  :out-pipe ,new-pipe
 					  :environment environment
 					  :flipped-io flipped-io)))
+					  ;;:flipped-io (not flipped-io))))
 		(declare (ignore show-vals) (ignorable vals))
 		(when ,test
 		  (with-package *lish-user-package*
@@ -1542,6 +1534,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	     (do-expansions expr))
 	   (case (first first-word)
 	     (:pipe
+	      (dbugf 'pipe "flipped-io = ~s~%" flipped-io)
 	      (when (not flipped-io)
 		(setf *input* *output*
 		      *output* nil
@@ -1578,6 +1571,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (with-package *lish-user-package*
 	     ;; accepts is :unspecified because we're last in the
 	     ;; pipeline.
+	     (dbugf 'pipe "flipped-io = ~s~%" flipped-io)
 	     (when (not flipped-io)
 	       (setf *input* *output*
 		     *output* nil
@@ -1833,7 +1827,9 @@ handling errors."
        (dbugf 'lish-repl "ERROR - DO NOTHING!!~%"))
       (t
        (dbugf 'lish-repl "Do Something!!~%")
-       (setf pre-str nil)
+       (setf pre-str nil
+	     *input* nil
+	     *output* nil)
        (handler-case
 	   (handler-bind
 	       (#+sbcl
