@@ -1178,7 +1178,8 @@ bound during command."
 		    (values (list (runky thing args)) nil t)))
 	      (if command-p
 		  (runky thing args)
-		  (values (list (runky thing args)) nil t))))))))
+		  ;; (values (list (runky thing args)) nil t))))))))
+		  (values (multiple-value-list (runky thing args)) nil t))))))))
 
 (defun call-parenless (func line context)
   "Apply the function to the line, and return the proper values. If there are
@@ -1492,7 +1493,18 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	      ;; (with-package *lish-user-package*
 	      ;; 	(values (multiple-value-list (eval expr)) nil t)))
 	      (with-package *lish-user-package*
-		(call-thing expr nil *context*)))
+		(dbugf 'pipe "flipped-io = ~s~%" flipped-io)
+		(when (not flipped-io)
+		    (setf *input* *output*
+			  *output* nil
+			  flipped-io t))
+		(dbugf 'pipe "*input* = ~s~%" *input*)
+		(let ((result-values (call-thing expr nil *context*)))
+		  (setf *output* (car result-values))
+		  (dbugf 'pipe "*output* = ~s~%" *output*)
+		  ;;(format t "results = ~s~%" result-values)
+		  (values result-values nil t))
+		))
 	     ((consp expr)
 	      (case (command-type shell (string-downcase (car expr)))
 		((:command :file)
