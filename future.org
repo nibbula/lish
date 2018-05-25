@@ -53,6 +53,14 @@ something stable and tested, I recommend not using it yet!
   This should make an executable named "lish" in your current directory.
   Put it wherevere you'd like.
 
+  Alternatively, you should be able to use:
+#+BEGIN_SRC lisp
+  (asdf:operate 'asdf:program-op :lish)
+#+END_SRC
+
+  Which will likely put an executable in whatever
+  `(asdf:apply-output-translations "lish")` returns.
+
 * Using
   Lish is a relatively boring combination of a Unix shell and Common Lisp
   REPL. As you might expect, it allows you to both type Unix commands and
@@ -71,3 +79,6 @@ something stable and tested, I recommend not using it yet!
 *** Prompting
 *** Pipelines
 *** Job Control
+** Quick tutorial examples
+   Take a look at `doc/lish-examples.md`.
+   It might be all you need to get started.
