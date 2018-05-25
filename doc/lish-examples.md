@@ -234,3 +234,78 @@ and
 ```
 (documentation 'symbolic-prompt-to-string 'function)
 ```
+
+Lisp functions
+--------------
+In a previous exmaple, we had shown how to evaluate Lisp s-expressions
+(a.k.a expressions in parentheses), but Lish can also call Lisp functions
+without parentheses:
+
+```
+Lish> lisp-implementation-version
+"1.3.7.62-a2d1969-dirty"
+Lish> sin pi
+1.2246467991473532d-16
+```
+
+Although note if you something like say:
+```
+Lish> sleep .5
+Lish> ; delayed by 1/2 a second.
+```
+
+you will probably get the system sleep command, instead of the Common Lisp
+sleep function. You can tell which one you might get first by using the `type`
+command, like in other shells.
+
+```
+Lish> type -a sleep
+sleep is /bin/sleep
+sleep is the function #<FUNCTION SLEEP>
+```
+
+One quirky feature of Lish is that Lisp functions and Lish commmands can return
+objects, and those objects are passed to subsequent functions in a pipeline.
+If that command happens to be a Lisp function with at least one less argument
+than it expects, that argument is taken from the result of the previous command
+in pipeline:
+
+```
+Lish> get-universal-time | decode-universal-time
+50 ;
+9 ;
+4 ;
+25 ;
+5 ;
+2018 ;
+4 ;
+T ;
+8
+Lish> sin pi | expt 2
+1.0d0
+Lish> (expt 2 (sin pi)) ; Same as the last line, but in s-exp style.
+1.0d0
+Lish> glob "/bin/d*" | mapcar 'reverse | mapcar 'string-capitalize
+```
+
+> I'd like to come up with more useful, interesting, or practical examples.
+> Unfortunately I don't use this feature much myself, as I'm so used to s-exps.
+> But I know not everyone finds this an easy way to say
+> "show me the top 10 linked files in root":
+```
+(format t "~{~a~%~}~%" (subseq (sort (mapcar (_ (cons (uos:file-status-links (car _)) (cdr _))) (mapcar (_ (cons (uos:stat _) _)) (glob "/*"))) #'> :key 'car) 0 10))
+```
+
+> This is probably quite a bit too much for an introduction.
+
+A little spell checker:
+
+```
+(defvar *dict* (!_ "cat /usr/share/dict/words"))
+mapcar (_ (split #\  _)) (!_ "cat README.md") |
+flatten | mapcar 'string-downcase |
+mapcar (_ (remove-if (_ (and (char/= #\' _) (not (alpha-char-p _)))) _)) |
+remove-if (_ (or (zerop (length _)) (member _ *dict* :test #'equalp))) |
+funcall (_ (remove-duplicates _ :test #'equal))
+```
+Perhaps because I have too much nostalgia for [this][https://www.youtube.com/watch?v=tc4ROCJYbm0]
