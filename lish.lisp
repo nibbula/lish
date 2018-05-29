@@ -1043,7 +1043,7 @@ them as a list."
   "Evaluuate BODY and set *OUTPUT* to first value."
   (with-unique-names (vals)
     `(values-list
-      (let* ((,vals (multiple-value-list (progn ,@body))))
+      (let ((,vals (multiple-value-list (progn ,@body))))
 	(setf *output* (first ,vals))
 	,vals))))
 
@@ -1090,49 +1090,31 @@ expanded."
     ((and (fboundp (symbolify command)))	:function)
     (t nil)))
 
-#|
-(defun call-command (command args context)
-  "Call a command with the given POSIX style arguments.
-COMMAND is a COMMAND object.
-ARGS is a list of POSIX style arguments, which are converted to Lisp arguments
-by POSIX-TO-LISP-ARGS and given to the COMMAND's function.
-If OUT-PIPE is true, return the values:
- a list of the values returned by COMMAND
- a input stream from which can be read the output of command
- and NIL.
-If IN-PIPE is true, it should be an input stream to which *STANDARD-INPUT* is
-bound during command."
-  (with-slots (in-pipe out-pipe environement) context
-    (dbugf :accepts "command ~s ~s~%" (command-name command) *accepts*)
-    (labels ((runky (command args)
-	       (let ((lisp-args (posix-to-lisp-args command args))
-		     (cmd-func (symbol-function (command-function command)))
-		     (*context* context))
-		 (if (> (length lisp-args) 0)
-		     (apply cmd-func lisp-args)
-		     (funcall cmd-func)))))
-      (if out-pipe
-	  (let ((out-str (make-stretchy-string 20)))
-	    (values
-	     ;; @@@ This is probably inefficient.
-	     (list (with-output-to-string (*standard-output* out-str)
-		     (if in-pipe
-			 (let ((*standard-input* in-pipe))
-			   (runky command args))
-			 (runky command args))))
-	     (let ((oo (make-string-input-stream out-str)))
-	       ;; (format t "out-str = ~w~%" out-str)
-	       ;; (format t "(slurp oo) = ~w~%" (slurp oo))
-	       ;; (file-position oo 0)
-	       oo)
-	     nil))
-	  (if in-pipe
-	      (let ((*standard-input* in-pipe))
-		(runky command args))
-	      (runky command args))))))
-|#
+(defun call-parenless (func line context)
+  "Apply the function to the line, and return the proper values. If there are
+not enough arguements supplied, and *INPUT* is set, i.e. it's a recipient of
+a non-I/O pipeline, supply *INPUT* as the missing tail argument."
+  (let ((parenless-args (read-parenless-args line))
+	(function-args (lambda-list
+			(if (functionp func)
+			    (third
+			     (multiple-value-list
+			      (function-lambda-expression func)))
+			    func)))
+	(*context* context))
+    (if (and (< (length parenless-args) (length function-args))
+	     *input*)
+	(progn
+	  (if parenless-args
+	      (progn
+		(with-first-value-to-output
+		    (apply func `(,@parenless-args ,*input*))))
+	      (progn
+		(with-first-value-to-output (apply func (list *input*))))))
+	;; no *input* stuffing
+	(with-first-value-to-output (apply func parenless-args)))))
 
-(defun call-thing (thing args context)
+(defun call-thing (thing args context &optional parenless)
   "Call a command or function with the given POSIX style arguments.
 THING is a COMMAND object or a function/callable symbol.
 ARGS is a list of POSIX style arguments, which are converted to Lisp arguments
@@ -1142,20 +1124,28 @@ If OUT-PIPE is true, return the values:
  a input stream from which can be read the output of command
  and NIL.
 If IN-PIPE is true, it should be an input stream to which *STANDARD-INPUT* is
-bound during command."
+bound during command.
+If PARENLESS is set, it's the text of rest of the line to be fed to
+CALL-PARENLESS."
   (with-slots (in-pipe out-pipe environement) context
     (let ((command-p (typep thing 'command)))
       (when command-p
 	(dbugf :accepts "command ~s ~s~%" (command-name thing) *accepts*))
       (labels ((runky (thing args)
-		 (if command-p
+		 (cond
+		   (command-p
 		     (let ((lisp-args (posix-to-lisp-args thing args))
 			   (cmd-func (symbol-function (command-function thing)))
 			   (*context* context))
 		       (if (> (length lisp-args) 0)
 			   (apply cmd-func lisp-args)
-			   (funcall cmd-func)))
-		     (eval thing))))
+			   (funcall cmd-func))))
+		   (parenless
+		    (dbugf :lish-eval "call-thing parenless ~s~%" thing)
+		    (call-parenless thing parenless context))
+		   (t
+		    (dbugf :lish-eval "call-thing plain eval ~s~%" thing)
+		    (eval thing)))))
       (if out-pipe
 	  (let ((out-str (make-stretchy-string 20)))
 	    (values
@@ -1175,42 +1165,16 @@ bound during command."
 	      (let ((*standard-input* in-pipe))
 		(if command-p
 		    (runky thing args)
-		    (values (list (runky thing args)) nil t)))
+		    (let ((vals (multiple-value-list (runky thing args))))
+		      (dbugf :lish-eval "call-thing in-pipe vals ~s~%" vals)
+		      (values vals nil t))))
 	      (if command-p
 		  (runky thing args)
 		  ;; (values (list (runky thing args)) nil t))))))))
-		  (values (multiple-value-list (runky thing args)) nil t))))))))
-
-(defun call-parenless (func line context)
-  "Apply the function to the line, and return the proper values. If there are
-not enough arguements supplied, and *INPUT* is set, i.e. it's a recipient of
-a non-I/O pipeline, supply *INPUT* as the missing tail argument."
-  ;;(format t "parenless line = ~s~%" line)
-  (let ((parenless-args (read-parenless-args line))
-	(function-args (lambda-list
-			(if (functionp func)
-			    (third
-			     (multiple-value-list
-			      (function-lambda-expression func)))
-			    func)))
-	(*context* context))
-    ;; (format t "parenless args = ~s~%" parenless-args)
-    ;; (format t "function args = ~s~%" function-args)
-    ;; (format t "parenless *input* = ~s~%" *input*)
-    (if (and (< (length parenless-args) (length function-args))
-	     *input*)
-	(progn
-	  ;; (format t "parenless input!~%")
-	  (if parenless-args
-	      (progn
-		;;(format t "parenless-args = ~s~%" parenless-args)
-		(with-first-value-to-output
-		    (apply func `(,@parenless-args ,*input*))))
-	      (progn
-		;;(format t "just input~%")
-		(with-first-value-to-output (apply func (list *input*))))))
-	;; no *input* stuffing
-	(with-first-value-to-output (apply func parenless-args)))))
+		  (let ((vals (multiple-value-list (runky thing args))))
+		    (dbugf :lish-eval "call-thing vals ~s~%" vals)
+		    (values vals nil t))
+		  )))))))
 
 (defun do-system-command (expr context)
   "Run a system command.
@@ -1339,12 +1303,12 @@ probably fail, but perhaps in similar way to other shells."
 	   (run-fun (func line)
 	     "Apply the func to the line, and return the proper values."
 	     (run-hooks *pre-command-hook* cmd :function)
-	     (values
-	      (prog1
-		  (multiple-value-list (call-parenless func line context))
-		(run-hooks *post-command-hook* cmd :function))
-	      nil  ;; stream
-	      t))) ;; show the values
+	     (values-list
+	      (let ((vals (multiple-value-list
+			   (call-thing func '() context line))))
+		(dbugf 'pipe "run-fun ~s~%" vals)
+		(run-hooks *post-command-hook* cmd :function)
+		vals))))
       (cond
 	;; Alias
 	((and alias (not no-alias))
@@ -1499,11 +1463,12 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			  *output* nil
 			  flipped-io t))
 		(dbugf 'pipe "*input* = ~s~%" *input*)
-		(let ((result-values (call-thing expr nil *context*)))
+		(multiple-value-bind (result-values output show-p)
+		    (call-thing expr nil *context*)
 		  (setf *output* (car result-values))
 		  (dbugf 'pipe "*output* = ~s~%" *output*)
-		  ;;(format t "results = ~s~%" result-values)
-		  (values result-values nil t))
+		  (dbugf :lish-eval "results = ~s~%" result-values)
+		  (values result-values output show-p))
 		))
 	     ((consp expr)
 	      (case (command-type shell (string-downcase (car expr)))
@@ -1722,6 +1687,14 @@ suspend itself."
   this-command
   last-command)
 
+(cffi:defcallback sigint-handler :void ((signal-number :int))
+  (declare (ignore signal-number))
+  (format t "[Control-C]~%") (finish-output)
+  ;; I'm scared of this.
+  ;; (invoke-restart (find-restart 'abort))
+  (throw 'interactive-interrupt nil)
+  )
+
 (defun set-signals ()
   "Make sure signal handlers are set up for shell reading. Return a list of
  (signal . action) to be reset later."
@@ -1733,7 +1706,13 @@ suspend itself."
       (uos:set-signal-action uos:+SIGQUIT+ :ignore)
       ;; Ignore suspend
       (push (cons uos:+SIGTSTP+ (uos:signal-action uos:+SIGTSTP+)) result)
-      (uos:set-signal-action uos:+SIGTSTP+ :ignore))
+      (uos:set-signal-action uos:+SIGTSTP+ :ignore)
+      ;; Handle interrupt
+      ;; #-sbcl
+      ;; (progn
+      ;;   (push (cons uos:+SIGINT+ (uos:signal-action uos:+SIGINT+)) result)
+      ;;   (uos:set-signal-action uos:+SIGINT+ 'sigint-handler))
+      )
     result))
 
 (defun restore-signals (actions)
@@ -1862,11 +1841,25 @@ handling errors."
 		     (if (lish-debug sh)
 			 (invoke-debugger c)))))
 	     (force-output)
-	     (multiple-value-bind (vals stream show-vals)
-		 (shell-eval expr :context nil)
-	       (declare (ignore stream))
-	       (when show-vals
-		 (lish-print vals))))
+	     (catch 'interactive-interrupt
+	       (multiple-value-bind (vals stream show-vals)
+		   #| @@@ This really fails.
+		   #+(and unix (not sbcl))
+		   ;; (uos:with-signal-handlers ((uos:+sigint+ . sigint-handler))
+		   ;;   (format t "Howdy pardner.~%")
+		   ;;   (shell-eval expr :context nil))
+		   (progn
+		     (uos:set-signal-action uos:+sigint+ 'sigint-handler)
+		     (shell-eval expr :context nil)
+		     (uos:set-signal-action uos:+sigint+ :default))
+
+		   #-(and unix (not sbcl))
+		   |#
+		   (shell-eval expr :context nil)
+
+		   (declare (ignore stream))
+		   (when show-vals
+		     (lish-print vals)))))
 	 ;; (condition (c)
 	 ;; 	 (if (lish-debug sh)
 	 ;; 	     (invoke-debugger c)
