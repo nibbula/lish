@@ -1042,9 +1042,8 @@ better just to use Lisp syntax.
   "Undefine a command."
   (cond
     (all-external
-     (loop :with cmd
-	:for c :in *command-list* :do
-	(when (typep (setf cmd (get-command c)) 'external-command)
+     (loop :for c :in *command-list* :do
+	(when (typep (get-command c) 'external-command)
 	  (undefine-command c))))
     (command
      (typecase command
