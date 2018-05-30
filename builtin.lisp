@@ -64,7 +64,8 @@ from stack."
   "Return a list of suspended job ids."
   (loop :for j :in (lish-jobs *shell*)
      :collect (job-id j))
-  (when (find-package :bt)
+  (when (and (find-package :bt)
+	     (symbol-value (intern (string '#:*supports-threads-p*) :bt)))
     (loop :for j :in (symbol-call :bt :all-threads)
        :collect (symbol-call :bt :thread-name j))))
 
