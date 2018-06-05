@@ -212,6 +212,14 @@ string as an argument."
 	(sub (cdr commands) (car commands))
 	(sub commands))))
 
+;; (defun spread (command &rest commands)
+;;   "Send output from a command to multiple commands in parallel."
+;;   )
+
+;; (defun gather (command &rest streams)
+;;   "Gather multiple streams and send them in order to a command."
+;;   )
+
 ;; (defvar *files-to-delete* '()
 ;;   "A list of files to delete at the end of a command.")
 ;;
