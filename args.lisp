@@ -270,6 +270,11 @@
   (declare (ignore arg quoted))
   value)
 
+(defclass arg-function (arg-symbol) () (:documentation "A function name."))
+;; (defmethod convert-arg ((arg arg-function) (value string) &optional quoted)
+;;   (declare (ignore arg quoted))
+;;   (symbolify value))
+
 (defclass arg-date (argument) () (:documentation "A date."))
 (defmethod convert-arg ((arg arg-date) (value string) &optional quoted)
   (declare (ignore arg quoted))

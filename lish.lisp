@@ -146,6 +146,8 @@
 	(os-unix:signal-action os-unix:+SIGTTOU+) :ignore))
 
 (defun stop-job-control (saved-sigs)
+  #-unix
+  (declare (ignore saved-sigs))
   #+unix
   (let ((tstp (first saved-sigs))
 	(ttin (second saved-sigs))
@@ -1717,6 +1719,8 @@ suspend itself."
 
 (defun restore-signals (actions)
   "Restore (or really just set) the signal actions in ACTIONS."
+  #-unix
+  (declare (ignore actions))
   #+unix
   (loop :for (sig . act) :in actions
      :do (uos:set-signal-action sig act)))
@@ -1919,7 +1923,7 @@ Arguments:
 			      result))))
 
     (with-terminal (terminal-type *terminal* :device-name terminal-name)
-      (tt-set-input-mode :line)
+      (setf (tt-input-mode) :line)
 
       ;; Make a customized line editor
       (setf (lish-editor sh)
