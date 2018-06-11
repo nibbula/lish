@@ -617,6 +617,7 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 	(did-one (gensym "move-repeating-did-one")))
     `(progn
        (let (,did-one)
+	 (declare (ignorable ,did-one)) ;; @@@ remove if fixed
 	 (if ,until
 	     (error "can't do until yet") ;; @@@
 	     (progn

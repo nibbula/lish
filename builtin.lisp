@@ -726,7 +726,7 @@ variables explicitly set in arguments are passed to the commands."
 (defun pseudo-kill (sig pid)
   (labels ((kill-pid (p)
 	     #+unix (os-unix:kill p (or sig uos:+SIGTERM+))
-	     #+windows (funcall (caddr (find value *siggy* :key #'second)) p))
+	     #+windows (funcall (caddr (find sig *siggy* :key #'second)) p))
 	   (kill-job (j)
 	     (cond
 	       ((job-pid j)
@@ -879,18 +879,19 @@ variables explicitly set in arguments are passed to the commands."
 	    (print-time children-s-sec children-s-ms nil))))
 
 (defbuiltin umask
-    (("print-command" boolean :short-arg #\p
+    ((print-command boolean :short-arg #\p
       :help "Print a command which sets the umask.")
-     ("symbolic"      boolean :short-arg #\S
+     (symbolic      boolean :short-arg #\S
       :help "Output in symbolic mode.")
-     ("mask"	     string
+     (mask	     string
       :help "Mask to set."))
   "Set or print the default file creation mode mask (a.k.a. permission mask).
 If mode is not given, print the current mode. If PRINT-COMMAND is true, print
 the mode as a command that can be executed. If SYMBOLIC is true, output in
 symbolic format, otherwise output in octal."
-  (declare (ignore symbolic)) ;; @@@
+  #+windows (declare (ignore print-command symbolic mask))
   #+windows (error "umask is not a thing on windows.")
+  #+unix (declare (ignore symbolic)) ;; @@@
   #+unix
   (if (not mask)
       ;; printing
@@ -927,10 +928,11 @@ symbolic format, otherwise output in octal."
 	    (format t "Unknown job changed ~a~%" pid)))))
   #-unix (values))
 
-(defbuiltin exec (("command-words" t :repeating t
+(defbuiltin exec ((command-words t :repeating t
                     :help "Words of the command to execute."))
   "Replace the whole Lisp system with another program. This seems like a rather
 drastic thing to do to a running Lisp system."
+  #+windows (declare (ignore command-words))
   #+windows (error "Wouldn't you prefer a nice game of chess?")
   #+unix
   (when command-words
@@ -938,11 +940,11 @@ drastic thing to do to a running Lisp system."
       (format t "path = ~w~%command-words = ~w~%" path command-words)
       (os-unix:exec path command-words))))
 
-(define-builtin-arg-type function (arg-symbol)
-  "A function name."
-  ()
-  :convert string
-  (find-symbol (string-upcase value)))
+;; (define-builtin-arg-type function (arg-symbol)
+;;   "A function name."
+;;   ()
+;;   :convert string
+;;   (find-symbol (string-upcase value)))
 
 (define-builtin-arg-type key-sequence (arg-string)
   "A key sequence."
