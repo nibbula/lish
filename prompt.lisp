@@ -80,18 +80,19 @@ Not implemented yet:
 				 (parse-integer
 				  (subseq prompt i (+ i 3)) :radix 8))
 				str))
-		   (#\s (write-string *shell-name* str))
+		   (#\s (write-string (princ-to-string *shell-name*) str))
 		   (#\v (princ *major-version* str))
-		   (#\V (write-string *version* str))
+		   (#\V (write-string (princ-to-string *version*) str))
 		   (#\u (write-string (nos:user-name) str))
-		   (#\h (write-string dlib:*host* str))
+		   (#\h (write-string (princ-to-string dlib:*host*) str))
 		   (#\H (write-string (machine-instance) str))
 		   (#\w (write-string (twiddlify (nos:current-directory)) str))
 		   (#\W (write-string
 			 (twiddlify (basename (nos:current-directory))) str))
 		   (#\$ (write-char
 			 (if (= (nos:user-id :effective t) 0) #\# #\$) str))
-		   (#\i (write-string *lisp-implementation-nickname* str))
+		   (#\i (write-string (princ-to-string
+				       *lisp-implementation-nickname*) str))
 		   (#\p (write-string
 			 (s+ (and *lish-user-package*
 				  (shortest-package-nick *lish-user-package*)))
