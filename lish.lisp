@@ -1700,8 +1700,8 @@ suspend itself."
 (defun set-signals ()
   "Make sure signal handlers are set up for shell reading. Return a list of
  (signal . action) to be reset later."
+  #+unix
   (let (result)
-    #+unix
     (progn
       ;; Ignore quit
       (push (cons uos:+SIGQUIT+ (uos:signal-action uos:+SIGQUIT+)) result)
@@ -1715,7 +1715,8 @@ suspend itself."
       ;;   (push (cons uos:+SIGINT+ (uos:signal-action uos:+SIGINT+)) result)
       ;;   (uos:set-signal-action uos:+SIGINT+ 'sigint-handler))
       )
-    result))
+    result)
+  #-unix t)
 
 (defun restore-signals (actions)
   "Restore (or really just set) the signal actions in ACTIONS."
