@@ -60,7 +60,8 @@ Not implemented yet:
 %j      The number of jobs currently managed by the shell.
 "
   (declare (ignore sh))
-  (let ((out (make-stretchy-string 80)))
+  ;;(let ((out (make-stretchy-string 80)))
+  (let ((out (make-stretchy-string (length prompt))))
     (with-output-to-string (str out)
       (loop :with c :for i :from 0 :below (length prompt) :do
 	 (setf c (aref prompt i))
@@ -121,6 +122,21 @@ Not implemented yet:
 ;; @@@ Consider dealing with the overlap between this and
 ;; fatchar:span-to-fatchar-string.
 
+(defun symbolic-prompt-to-string (sh symbolic-prompt #| &optional ts-in |#)
+  (fatchar:span-to-fat-string
+   symbolic-prompt
+   :filter (_ (format-prompt sh _))
+   :unknown-func
+   (lambda (x) ; eval is magic
+     (cond
+       ((and (listp x) (symbolp (car x)) (fboundp (car x)))
+	(apply (car x) (cdr x)))
+       ((symbolp x)
+	(when (boundp x)
+	  (symbol-value x)))
+       (t (princ-to-string x))))))
+
+#|
 (defun symbolic-prompt-to-string (symbolic-prompt &optional ts-in)
   "Take a symbolic prompt and turn it into a string. A symbolic prompt can be
 any printable lisp object, which is converted to a string. If it is a list, it
@@ -248,6 +264,7 @@ the primary result printed as a string."
 		(terminal-format ts "~a" s)
 		)))
 	  (terminal-finish-output ts)))))
+|#
 
 #|
 (defun fill-prompt ()
@@ -274,8 +291,9 @@ the primary result printed as a string."
 (defmethod make-prompt ((sh shell))
   "Return a string to prompt with."
   (or (and (lish-prompt sh)
-	   (format-prompt
-	    sh (symbolic-prompt-to-string (lish-prompt sh))))
+	   ;; (format-prompt
+	   ;;  sh (symbolic-prompt-to-string (lish-prompt sh))))
+	   (symbolic-prompt-to-string sh (lish-prompt sh)))
       ;; (if (and (lish-prompt-char sh)
       ;; 	       (characterp (lish-prompt-char sh)))
       ;; 	  (format nil "~a "
