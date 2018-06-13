@@ -587,10 +587,13 @@ value to be converted.
 ;; They must be keyworded if there are any flagged arguments.
 (defun args-keyworded (args)
   "Check if an argument must be keyworded."
-  (loop :for a :in args :do
-     (when (arg-has-flag a)
-       (return-from args-keyworded t)))
-  nil)
+  ;; (loop :for a :in args :do
+  ;;    (when (arg-has-flag a)
+  ;;      (return-from args-keyworded t)))
+  ;; nil)
+  ;; HOW ABOUT THIS:
+  (declare (ignore args))
+  t)
 
 ;; Thankfully this is nowhere near as hairy as posix-to-lisp-args.
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -604,29 +607,34 @@ value to be converted.
 	   (loop :for a :in command-args
 	      :if (arg-optional a)
 	      :collect a))
-	  (repeating
-	   (loop :for a :in command-args
-	      :if (arg-repeating a)
-	      :collect a))
-	  (keyworded (or (args-keyworded command-args) pass-keys-as))
+	  ;; (repeating
+	  ;;  (loop :for a :in command-args
+	  ;;     :if (arg-repeating a)
+	  ;;     :collect a))
+	  ;;(keyworded (or (args-keyworded command-args) pass-keys-as))
+	  ;; (keyworded t)
 	  (new-list '()))
       ;; Mandatory arguments
-      (loop :for a :in mandatories :do
-	 (push (symbolify (arg-name a)) new-list))
+      ;; (loop :for a :in mandatories :do
+      ;; 	 (push (symbolify (arg-name a)) new-list))
       ;; This is augmented here to allow for (mostly theoretical) paralellism
       ;; in the let above.
-      (setf keyworded (or keyworded
-			  (and optionals repeating
-			       (and (not (equal optionals repeating))
-				    (= (length optionals) 1)))
-			  (> (length repeating) 1)))
-      (if keyworded
+      ;; HOW ABOUT NOT!!:
+      ;; (setf keyworded (or keyworded
+      ;; 			  (and optionals repeating
+      ;; 			       (and (not (equal optionals repeating))
+      ;; 				    (= (length optionals) 1)))
+      ;; 			  (> (length repeating) 1)))
+      ;; (if keyworded
 	  (progn
 	    ;; Put in a rest argument to catch all the keys.
 	    (when pass-keys-as
 	      (push '&rest new-list)
 	      (push pass-keys-as new-list))
 	    (push '&key new-list)
+	    ;; Mandatory arguments
+	    (loop :for a :in mandatories :do
+	       (push (symbolify (arg-name a)) new-list))
 	    (loop :for a :in optionals :do
 	       (push
 		(if (arg-default a)
@@ -640,6 +648,7 @@ value to be converted.
 			      (symbolify (s+ (arg-name a) "-supplied-p")))
 			(symbolify (arg-name a))))
 		new-list)))
+	  #|
 	  (cond
 	    ;; If both optional and repeating, do repeating (i.e. &rest)
 	    (repeating
@@ -660,7 +669,7 @@ value to be converted.
 			 (list (symbolify (arg-name a)) NIL
 			       (symbolify (s+ (arg-name a) "-supplied-p")))
 			 (symbolify (arg-name a))))
-		 new-list)))))
+		 new-list))))) |#
       (nreverse new-list))))
 
 ;; EOF

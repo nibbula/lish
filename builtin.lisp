@@ -38,14 +38,14 @@ directory stack."
   (when (not directory)
     (setf directory (pop (lish-dir-list *shell*))))
   (push (nos:current-directory) (lish-dir-list *shell*))
-  (!cd directory))
+  (!cd :directory directory))
 
 (defbuiltin popd ((number number :help "Number of item to pop."))
   "Change the current directory to the top of the directory stack and remove it
 from stack."
   (declare (ignore number))
   (let ((dir (pop (lish-dir-list *shell*))))
-    (!cd dir)
+    (!cd :directory dir)
     dir))
 
 (defbuiltin dirs ()
