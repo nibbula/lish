@@ -161,23 +161,28 @@ a known compression suffix, then the stream is appropriately decompressed."
 (defun manpath ()
   "Return the manual path."
   (or (nos:environment-variable "MANPATH")
-      (!$ "manpath")
-      (error "Can't figure out the where the manuals are.")))
+      (and (nos:command-pathname "manpath") (!$ "manpath"))
+      #-windows
+      (warn "Can't figure out the where the manuals are.")
+      ))
 
 (defun find-manual-file (name)
   "Return the manual page file for something named NAME."
-  (loop :for dir :in (split-sequence #\: (manpath))
-     :do
-     ;;(format t "~a:~%" dir)
-     (loop :for sec :in *command-sections*
-	:do
-	;;(format t "  ~a:~%" sec)
-	(loop :for f :in (glob (s+ dir "/" sec "/*"))
-	   ;;:do
-	   ;; (format t "    ~a~%" (path-snip-ext
-	   ;; 			 (path-snip-ext (path-file-name f))))
-	   :when (equal name (path-snip-ext (path-snip-ext (path-file-name f))))
-	   :do (return-from find-manual-file f)))))
+  (let ((manpath (manpath)))
+    (when manpath
+      (loop :for dir :in (split-sequence #\: manpath)
+	 :do
+	 ;;(format t "~a:~%" dir)
+	 (loop :for sec :in *command-sections*
+	    :do
+	    ;;(format t "  ~a:~%" sec)
+	    (loop :for f :in (glob (s+ dir "/" sec "/*"))
+	       ;;:do
+	       ;; (format t "    ~a~%" (path-snip-ext
+	       ;; 			 (path-snip-ext (path-file-name f))))
+	       :when (equal name (path-snip-ext
+				  (path-snip-ext (path-file-name f))))
+	       :do (return-from find-manual-file f)))))))
 
 (defun mine-manual (command-name)
   (let ((file (find-manual-file command-name)))
