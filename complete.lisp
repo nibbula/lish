@@ -133,6 +133,22 @@ preceding exclamation point '!' ."
 	(complete-bang-symbol context pos all)
 	(complete-symbol context pos all))))
 
+;; Things in here:
+;;   quote char:                      \
+;;   word separation:                 #\space
+;;   history / variable expansion:    !
+;;   environment variable expansion:  $
+;;   piping:                          |  (maybe should also '&' and '^' ?)
+;;   comment char:                    ;
+;;   glob chars:                      []*?
+;;   parens (evaluation):             ()
+
+;; Note that backslash '\' must be first in this list, since otherwise you will
+;; get doubled backslashes.
+(defparameter *quote-needing-chars* "\\ !$|;[]*?()"
+  "Characters that may need quoting in shell syntax, like if they are in a file
+name, so they don't get interpreted by the shell.")
+
 (defun quotify (string)
   "Put a backslash in front of any character that might not be intrepreted
 literally in shell syntax."
@@ -141,9 +157,26 @@ literally in shell syntax."
 	     (when (position c result)
 	       (setf result (join-by-string (split-sequence c result)
 					    (s+ #\\ c))))))
-      (loop :for c :across " !$|;[]*?()" :do ;
+      (loop :for c :across *quote-needing-chars* :do ;
 	 (possibly-quote c))
       result)))
+
+;; perhaps would be faster with position and subseq?
+(defun de-quotify (string)
+  "Convert double backslashes into a single backslash."
+  (with-output-to-string (str)
+    (let* ((len (length string)) (i 0))
+      (loop :while (< i (1- len))
+	 :do
+	 (when (and (char= (char string i) #\\)
+		    (char= (char string (1+ i)) #\\))
+	   (incf i))
+	 (write-char (char string i) str)
+	 ;;(setf (char output o) (char string i))
+	 (incf i))
+      (when (< i len)
+	(write-char (char string i) str)
+	))))
 
 ;; (defun words-past (expr pos)
 ;;   "Return how many words the position POS is past in EXPR."
@@ -358,6 +391,14 @@ literally in shell syntax."
 	    ((and (arg-optional
 |#
 
+(defun shell-complete-filename (word position all)
+  "A version of complete-filename which does the right thing for the shell."
+  (let ((result (complete-filename (de-quotify word) position all)))
+    (when (and result (completion-result-completion result))
+      (setf (completion-result-completion result)
+	    (quotify (completion-result-completion result))))
+    result))
+
 ;; Note that this takes different args than a normal completion function.
 (defun complete-command-arg (context command expr pos all
 			     &optional word-num shell-word word-pos)
@@ -431,12 +472,12 @@ literally in shell syntax."
 		     (if (and fake-word choices)
 			 (complete-list fake-word
 					(length fake-word) all choices)
-			 (complete-filename fake-word pos all)))))
+			 (shell-complete-filename fake-word pos all)))))
 	     (progn
 	       (dbugf 'completion "not all : fake-word ~s" fake-word)
 	       (if choices
 		   (complete-list fake-word (length fake-word) all choices)
-		   (complete-filename fake-word pos all)))))))))
+		   (shell-complete-filename fake-word pos all)))))))))
 
 (defun start-of-a-compound-p (expr pos)
   "Return true if we are at the start of the last compound command."
@@ -506,9 +547,7 @@ complete, and call the appropriate completion function."
 	       ;; This is lame. Anything could be in a string.
 	       (dbugf 'completion "partial string ~s ~s~%" (second explanation)
 		      (third explanation))
-	       ;; (complete-filename (cdr explanation)
-	       ;; 			  (length (cdr explanation)) all))
-	       (simple-complete #'complete-filename (second explanation)
+	       (simple-complete #'shell-complete-filename (second explanation)
 				(third explanation)))
 	      (compound		  ; a compound connector with nothing after it
 	       (dbugf 'completion "partial compound ~s~%" (cdr explanation))
@@ -518,7 +557,7 @@ complete, and call the appropriate completion function."
 		  (prog1 (simple-complete #'complete-command "" pos)
 		    (dbugf 'completion "why?~%")))
 		 ((:redirect-to :redirect-from :append-to)
-		  (complete-filename "" 0 all))))))
+		  (shell-complete-filename "" 0 all))))))
 	   (t ;; This is probably a bug.
 	    (error "Unknown keyword returned from shell-read."))))
 	(cons
@@ -557,12 +596,10 @@ complete, and call the appropriate completion function."
 			       (progn
 				 (dbugf 'completion "in a command : Baaa~%")
 				 (complete-command-arg context cmd exp pos all))
-			       (complete-filename word
-						  (- (length word) from-end)
-						  all))))
-		      (when (not all)
-			(setf (completion-result-completion result)
-			      (quotify (completion-result-completion result))))
+			       (shell-complete-filename
+				word
+				(- (length word) from-end)
+				all))))
 		      (setf (completion-result-insert-position result)
 			    (or (and shell-word
 				     (shell-word-start shell-word))
@@ -617,15 +654,13 @@ complete, and call the appropriate completion function."
 			     all word-num word word-pos))
 			  (progn
 			    (dbugf 'completion "default to filename : jorky~%")
-			    (complete-filename
+			    (shell-complete-filename
 			     word (- (length word) from-end) all)))))
 		(dbugf 'completion "result = ~s~%" result)
 		(if all
 		    (setf (completion-result-count result)
 			  (length (completion-result-completion result)))
-		    (setf (completion-result-completion result)
-			  (quotify (completion-result-completion result))
-			  (completion-result-insert-position result)
+		    (setf (completion-result-insert-position result)
 			  (let ((ss (shell-word-start shell-word)))
 			    (if (shell-word-quoted shell-word)
 				(1+ ss) ss))))
