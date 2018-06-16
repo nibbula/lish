@@ -213,7 +213,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 	       (vector-push-extend #\\ w))
 	     (vector-push-extend c w)
 	     (when (not in-word)
-	       (push (1- i) word-start))
+	       (setf word-start (1- i)))
 	     (setf in-word t)
 	     (setf string-quote nil)
 	     (incf i))
