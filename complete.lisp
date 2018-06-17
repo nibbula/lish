@@ -613,6 +613,18 @@ complete, and call the appropriate completion function."
 	     ((consp word)		; (foo)
 	      (dbugf 'completion "junky~%")
 	      (shell-complete-symbol context pos all))
+	     ((not (stringp word))
+	      ;; We don't know how to complete it.
+	      ;; Of course we could implement completion for random typed
+	      ;; objects, like with a method, but what would that be like?
+	      ;; We could error here, that's probably just annoying.
+	      (dbugf 'completion "word of weird type ~s ~s~%"
+		     word (type-of word))
+	      (make-completion-result))
+	     ((zerop (length word))
+	      (dbugf 'completion "empty word~%")
+	      ;; It's probably !() or something so just list the symbols.
+	      (shell-complete-symbol context pos all))
 	     ((eql (aref word 0) #\()	; (foo
 	      (dbugf 'completion "half baka~%")
 	      (shell-complete-symbol context pos all))
