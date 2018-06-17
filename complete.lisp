@@ -112,7 +112,7 @@ facility. Usually it's a universal-time, or an alist of (<thing> . <time>).")
 	 (external nil))
     (dbugf 'completion "bang completion: word-start ~s word ~s~%"
 	   word-start word)
-    (when (eql #\! (aref word 0))
+    (when (and (plusp (length word)) (eql #\! (aref word 0)))
       (setf word (subseq word 1)
 	    word-start (1+ word-start)))
     (multiple-value-setq (pack external)
