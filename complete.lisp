@@ -110,7 +110,8 @@ facility. Usually it's a universal-time, or an alist of (<thing> . <time>).")
 	 (word (subseq context word-start pos))
 	 (pack nil)
 	 (external nil))
-;    (format t "Howdy: word-start ~s word ~s~%" word-start word)
+    (dbugf 'completion "bang completion: word-start ~s word ~s~%"
+	   word-start word)
     (when (eql #\! (aref word 0))
       (setf word (subseq word 1)
 	    word-start (1+ word-start)))
@@ -123,7 +124,8 @@ facility. Usually it's a universal-time, or an alist of (<thing> . <time>).")
 	       (completion::symbol-completion
 		word :package pack :external external)))
 	  (setf (completion-result-insert-position result)
-		word-start)))))
+		word-start)
+	  result))))
 
 (defun shell-complete-symbol (context pos all &optional bang-p)
   "Complete symbols in the *lish-user-package*, optionally with a
