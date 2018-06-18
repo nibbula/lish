@@ -283,7 +283,7 @@
 
 (defclass arg-pathname (arg-string) ()
   (:default-initargs
-   :completion-function #'complete-filename)
+   :completion-function #'shell-complete-filename)
   (:documentation "A file system path."))
 (defmethod convert-arg ((arg arg-pathname) (value string) &optional quoted)
   (declare (ignore arg quoted))
@@ -296,7 +296,7 @@
 
 (defclass arg-directory (arg-pathname) ()
   (:default-initargs
-   :completion-function #'complete-directory)
+   :completion-function #'shell-complete-directory)
   (:documentation "A file system directory."))
 (defmethod convert-arg ((arg arg-directory) (value string) &optional quoted)
   (declare (ignore arg quoted))

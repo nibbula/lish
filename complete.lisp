@@ -393,13 +393,24 @@ literally in shell syntax."
 	    ((and (arg-optional
 |#
 
-(defun shell-complete-filename (word position all)
-  "A version of complete-filename which does the right thing for the shell."
-  (let ((result (complete-filename (de-quotify word) position all)))
+(defun shell-complete-quoted (func word position all &key parsed-exp)
+  "Complete a thing that needs quoting, using the completion function FUNC."
+  (declare (ignore parsed-exp))
+  (let ((result (funcall func (de-quotify word) position all)))
     (when (and result (completion-result-completion result))
       (setf (completion-result-completion result)
 	    (quotify (completion-result-completion result))))
     result))
+
+(defun shell-complete-filename (word position all &key parsed-exp)
+  "A version of complete-filename which does the right thing for the shell."
+  (declare (ignore parsed-exp))
+  (shell-complete-quoted #'complete-filename word position all))
+
+(defun shell-complete-directory (word position all &key parsed-exp)
+  "A version of complete-directory which does the right thing for the shell."
+  (declare (ignore parsed-exp))
+  (shell-complete-quoted #'complete-directory word position all))
 
 ;; Note that this takes different args than a normal completion function.
 (defun complete-command-arg (context command expr pos all
