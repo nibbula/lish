@@ -175,6 +175,8 @@ variables."
   flipped-io
   ;; True if we should run things in the background.
   background
+  ;; True if we should map parenless function calls.
+  pipe-plus
   )
 
 (defvar *context* nil

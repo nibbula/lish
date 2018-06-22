@@ -66,19 +66,22 @@
 			   (in-pipe nil in-pipe-p)
 			   (out-pipe nil out-pipe-p)
 			   (environment nil environment-p)
-			   (flipped-io nil flipped-io-p))
+			   (flipped-io nil flipped-io-p)
+			   (pipe-plus nil pipe-plus-p))
   "Return a new context based on CONTEXT, with the given slots."
   (if (not context)
       (make-context 
        :in-pipe in-pipe
        :out-pipe out-pipe
        :environment environment
-       :flipped-io flipped-io)
+       :flipped-io flipped-io
+       :pipe-plus pipe-plus)
       (let ((c (copy-structure context)))
 	(when in-pipe-p     (setf (context-in-pipe     c) in-pipe))
 	(when out-pipe-p    (setf (context-out-pipe    c) out-pipe))
 	(when environment-p (setf (context-environment c) environment))
 	(when flipped-io-p  (setf (context-flipped-io  c) flipped-io))
+	(when pipe-plus-p   (setf (context-pipe-plus   c) pipe-plus))
 	c)))
 
 ;; (defstruct lisp-expression
@@ -1112,15 +1115,16 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	(progn
 	  (if parenless-args
 	      (progn
-		(dbugf 'pipe "applying *pipe-plus* = ~s~%" *pipe-plus*)
+		(dbugf 'pipe "applying *pipe-plus* = ~s~%"
+		       (context-pipe-plus *context*))
 		(with-first-value-to-output
-		    (if *pipe-plus*
+		    (if (context-pipe-plus *context*)
 			(apply #'omap func `(,@parenless-args ,*input*))
 			(apply func `(,@parenless-args ,*input*)))))
 	      (progn
 		(dbugf 'pipe "applying *pipe-plus* = ~s~%" *pipe-plus*)
 		(with-first-value-to-output
-		    (if *pipe-plus*
+		    (if (context-pipe-plus *context*)
 			(omap func *input*)
 			(apply func (list *input*)))))))
 	;; no *input* stuffing
@@ -1419,7 +1423,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 "
   (let ((*context* (or context (make-context)))
 	first-word vals out-stream show-vals)
-    (with-slots (in-pipe out-pipe environment flipped-io) *context*
+    (with-slots (in-pipe out-pipe environment flipped-io pipe-plus) *context*
       (setf flipped-io nil)
       (macrolet
 	  ((eval-compound (test new-pipe)
@@ -1434,7 +1438,8 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 					  :in-pipe in-pipe
 					  :out-pipe ,new-pipe
 					  :environment environment
-					  :flipped-io flipped-io)))
+					  :flipped-io flipped-io
+					  :pipe-plus pipe-plus)))
 					  ;;:flipped-io (not flipped-io))))
 		(declare (ignore show-vals) (ignorable vals))
 		(when ,test
@@ -1529,6 +1534,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		(setf *input* *output*
 		      *output* nil
 		      *pipe-plus* (eq (first first-word) :pipe-plus)
+		      (context-pipe-plus *context*) (eq (first first-word) :pipe-plus)
 		      flipped-io t))
 	      (dbugf 'pipe "*input* = ~s~%" *input*)
 	      (dbugf 'pipe "*pipe-plus* = ~s~%" *pipe-plus*)
