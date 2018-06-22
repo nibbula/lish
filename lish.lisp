@@ -961,6 +961,9 @@ spaces. This of course loses some data in the words."
 (defvar *accepts* nil
   "What the next command in the pipeline accepts.")
 
+(defvar *pipe-plus* nil
+  "True to omap objects to a parenless function call.")
+
 (defun nth-expr-word (n expr)
   "Return the Nth, potentially unwrapped, word of the shell-expr."
   (let ((w (nth n (shell-expr-words expr))))
@@ -1109,10 +1112,17 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	(progn
 	  (if parenless-args
 	      (progn
+		(dbugf 'pipe "applying *pipe-plus* = ~s~%" *pipe-plus*)
 		(with-first-value-to-output
-		    (apply func `(,@parenless-args ,*input*))))
+		    (if *pipe-plus*
+			(apply #'omap func `(,@parenless-args ,*input*))
+			(apply func `(,@parenless-args ,*input*)))))
 	      (progn
-		(with-first-value-to-output (apply func (list *input*))))))
+		(dbugf 'pipe "applying *pipe-plus* = ~s~%" *pipe-plus*)
+		(with-first-value-to-output
+		    (if *pipe-plus*
+			(omap func *input*)
+			(apply func (list *input*)))))))
 	;; no *input* stuffing
 	(with-first-value-to-output (apply func parenless-args)))))
 
@@ -1511,14 +1521,17 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (dbugf :lish-eval "Evaluating a compound expression ~a.~%" first-word)
 	   (unless no-expansions
 	     (do-expansions expr))
+	   (dbugf 'pipe "(first first-word) = ~s~%" (first first-word))
 	   (case (first first-word)
-	     (:pipe
+	     ((:pipe :pipe-plus)
 	      (dbugf 'pipe "flipped-io = ~s~%" flipped-io)
 	      (when (not flipped-io)
 		(setf *input* *output*
 		      *output* nil
+		      *pipe-plus* (eq (first first-word) :pipe-plus)
 		      flipped-io t))
 	      (dbugf 'pipe "*input* = ~s~%" *input*)
+	      (dbugf 'pipe "*pipe-plus* = ~s~%" *pipe-plus*)
 	      ;;(dbugf :accepts "*accepts* = ~s~%" *accepts*)
 	      (setf (values vals out-stream show-vals)
 		    (eval-compound (successful vals) t))

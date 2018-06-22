@@ -18,7 +18,7 @@ it's shell features.
 ")
   (:use :cl :dlib :opsys :dlib-misc :stretchy :char-util :glob :table-print
 	:completion :keymap :terminal :terminal-ansi :rl :cl-ppcre
-	:fatchar)
+	:fatchar :collections)
   (:export
    ;; Main entry point(s)
    #:lish
