@@ -123,6 +123,16 @@ Not implemented yet:
 ;; fatchar:span-to-fatchar-string.
 
 (defun symbolic-prompt-to-string (sh symbolic-prompt #| &optional ts-in |#)
+  "Take a symbolic prompt and turn it into a string. A symbolic prompt can be
+any printable lisp object, which is converted to a string. If it is a list, it
+translates sublists starting with certain keywords, to terminal codes to do
+text effects to the enclosed objects. The keywords recognized are:
+  :BOLD :UNDERLINE :INVERSE
+and the colors
+  :BLACK :RED :GREEN :YELLOW :BLUE :CYAN :WHITE and :DEFAULT.
+The colors can be prefixed by :FG- or :BG- for the foreground or background.
+Symbols will be replaced by their value. Functions will be evaluated with
+the primary result printed as a string."
   (fatchar:span-to-fat-string
    symbolic-prompt
    :filter (_ (format-prompt sh _))
@@ -135,136 +145,6 @@ Not implemented yet:
 	(when (boundp x)
 	  (symbol-value x)))
        (t (princ-to-string x))))))
-
-#|
-(defun symbolic-prompt-to-string (symbolic-prompt &optional ts-in)
-  "Take a symbolic prompt and turn it into a string. A symbolic prompt can be
-any printable lisp object, which is converted to a string. If it is a list, it
-translates sublists starting with certain keywords, to terminal codes to do
-text effects to the enclosed objects. The keywords recognized are:
-  :BOLD :UNDERLINE :INVERSE
-and the colors
-  :BLACK :RED :GREEN :YELLOW :BLUE :CYAN :WHITE and :DEFAULT.
-The colors can be prefixed by :FG- or :BG- for the foreground or background.
-Symbols will be replaced by their value. Functions will be evaluated with
-the primary result printed as a string."
-  (with-output-to-string (str)
-    (if (not (consp symbolic-prompt))
-	(princ symbolic-prompt str)
-	(let ((ts (or ts-in (make-terminal-stream str 'terminal-ansi))))
-	  (loop :for s :in symbolic-prompt :do
-	     (typecase s
-	       (string (terminal-write-string ts s))
-	       (character (terminal-write-char ts s))
-	       (cons
-		(cond
-		  ((keywordp (car s))
-		   (case (car s)
-		     (:normal
-		      (terminal-normal ts)
-		      (symbolic-prompt-to-string (cdr s) ts))
-		     (:bold
-		      (terminal-bold ts t)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-bold ts nil))
-		     (:underline
-		      (terminal-underline ts t)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-underline ts nil))
-		     (:inverse
-		      (terminal-inverse ts t)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-inverse ts nil))
-		     ((:black :fg-black)
-		      (terminal-color ts :black nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ((:red :fg-red)
-		      (terminal-color ts :red nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ((:green :fg-green)
-		      (terminal-color ts :green nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ((:yellow :fg-yellow)
-		      (terminal-color ts :yellow nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ((:blue :fg-blue)
-		      (terminal-color ts :blue nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ((:magenta :fg-magenta)
-		      (terminal-color ts :magenta nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ((:cyan :fg-cyan)
-		      (terminal-color ts :cyan nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ((:white :fg-white)
-		      (terminal-color ts :white nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ((:default :fg-default)
-		      (terminal-color ts :default nil)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts :default nil))
-		     ;; background
-		     ((:bg-black)
-		      (terminal-color ts nil :black)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     ((:bg-red)
-		      (terminal-color ts nil :red)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     ((:bg-green)
-		      (terminal-color ts nil :green)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     ((:bg-yellow)
-		      (terminal-color ts nil :yellow)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     ((:bg-blue)
-		      (terminal-color ts nil :blue)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     ((:bg-magenta)
-		      (terminal-color ts nil :magenta)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     ((:bg-cyan)
-		      (terminal-color ts nil :cyan)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     ((:bg-white)
-		      (terminal-color ts nil :white)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     ((:bg-default)
-		      (terminal-color ts nil :default)
-		      (symbolic-prompt-to-string (cdr s) ts)
-		      (terminal-color ts nil :default))
-		     (otherwise
-		      (error "Unrecognized attribute ~a" (car s)))))
-		  ((and (symbolp (car s)) (fboundp (car s)))
-		   ;; (terminal-format ts "~a"
-		   ;;   (apply (symbol-function (car s)) (cdr s))))
-		   (terminal-format ts "~a" (eval s)))
-		  (t
-		   (error "Unrecognized thing in attribute list ~a" (car s))
-		   )))
-	       (symbol
-		(when (boundp s)
-		  (terminal-format ts "~a" (symbol-value s))))
-	       (t
-		(terminal-format ts "~a" s)
-		)))
-	  (terminal-finish-output ts)))))
-|#
 
 #|
 (defun fill-prompt ()
