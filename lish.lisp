@@ -2029,13 +2029,15 @@ Arguments:
    (init-file pathname :short-arg #\i
     :default *default-lishrc* :use-supplied-flag t
     :help "File to execute on startup.")
-   (greeting  boolean  :short-arg #\g :help "True to print a greeting.")
+   (no-init-file boolean :short-arg #\n :help "Don't load any startup file.")
+   (greeting  boolean  :short-arg #\g :default t
+    :help "True to print a greeting.")
    (debug     boolean  :short-arg #\d :help "True to turn on debugging."))
   "Lisp Shell"
   (when (and greeting (not command))
     (format t "Welcome to ~a ~a~%" *shell-name* *version*))
   (when (not init-file-supplied-p)
-    (setf init-file (pick-an-rc-file)))
+    (setf init-file (when (not no-init-file) (pick-an-rc-file))))
   ;;(format t "init-file = ~s~%" init-file)
   ;;(format t "command = ~s~%" command) (finish-output)
   (lish :command command :init-file init-file :debug debug))
