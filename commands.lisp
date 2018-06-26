@@ -466,6 +466,8 @@ NIL on failure. The Lisp path is most likely the ASDF path."
   @@@ conviently usable from Lisp, since a Lisp API to the command's
   @@@ functionality will likely be more complicated and/or better served by a
   @@@ separate function. ???
+  @@@
+  @@@ ^^^^ DONE!
 
   The rules for converting POSIX arguments to lambda lists are fairly
   complicated. Here we try to examine some of the possiblities. We use a
@@ -659,6 +661,10 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 ;; at compile time, default arguments from the argument class may not be
 ;; availible yet if the argument class is defined in the same file, since the
 ;; class may not be fully defined until the end of the compilation phase?
+;;
+;; So far the only workaround I have is to define the argument class in
+;; a different compilation unit (a.k.a. file), which is very inconvenient.
+;; There must be another way.
 
 (defun extract-short-boolean-options (command posix-args)
   "Returns POSIX-ARGS with boolean options removed and as the second value,
@@ -751,6 +757,58 @@ value, a list of the converted arguments."
 	      ))))))
 |#
 
+;; This, quite stupidly, treats lists like arrays, so is very inefficient.
+(defmacro cut-range (list head-end tail-start)
+  "Cut the range between HEAD-END TAIL-START from LIST."
+  `(if (zerop ,head-end)
+       (setf ,list (nthcdr ,tail-start ,list))
+       (rplacd (nthcdr ,head-end ,list)	     ; double
+	       (nthcdr ,tail-start ,list)))) ; bad
+
+;; This is what we should use, but we'd have to fix the whole looping below.
+(defmacro decent-cut (list head-end tail-start)
+  "Cut the part between HEAD-END and TAIL-START out of LIST."
+  `(if (eq ,head-end ,list)
+       (setf ,list ,tail-start)
+       (rplacd ,head-end ,tail-start)))
+
+#|
+(defun posix-to-lisp-args (command p-args)
+  "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
+become keyword arguments, in a way specified in the command's arglist."
+  (let ((arg-list (command-arglist command))
+	(new-list '())
+	(has-rest-arg nil)
+	(flag-args '())
+	(spot arg-list))		; place we are in position args
+
+    ;; Pre-scan the command args
+    (loop :for a :in arg-list
+       :do
+       (cond
+	 ((arg-rest a)
+	  (setf has-rest-arg t))
+	 ((and (arg-optional a)
+	       (or (arg-short-arg a) (arg-long-arg a) (arg-old-long-arg a)))
+	  (push a flag-args))))
+    (setf flag-args (nreverse flag-args))
+
+    (loop :for p-arg :in p-args :do
+       ;; start state
+       ;;   flag-arg
+       ;;   first mandatory arg
+       ;;   first optional arg
+       
+       
+       (loop :for arg :in arg-list :do
+	  (cond
+	    ((arg-repeating arg))
+	    ((arg-rest arg))
+	    ((arg-optional arg))
+       
+  ))
+|#
+
 (defun posix-to-lisp-args (command p-args)
   "Convert POSIX style arguments to lisp arguments. This makes flags like '-t'
 become keyword arguments, in a way specified in the command's arglist."
@@ -771,11 +829,20 @@ become keyword arguments, in a way specified in the command's arglist."
 	(flag-taken      nil)
 	(boolean-taken   nil)
 	(boolean-value   t)
-	(possible-flags  (loop :for a :in (command-arglist command)
-			    :if (or (arg-short-arg a)
-				    (arg-long-arg a))
-			    :collect a))
-	#| (optionals '()) |#)
+	possible-flags
+	has-rest-arg
+	#| (optionals '()) |#
+	)
+
+    ;; Pre-set some things
+    (loop :for a :in (command-arglist command)
+       :do
+       (cond
+	 ((or (arg-short-arg a) (arg-long-arg a))
+	  (push a possible-flags))
+	 ((arg-rest a)
+	  (setf has-rest-arg t))))
+
     ;; Flagged arguments (optional or manditory)
     (dbugf :lish-arg "considering flagged: ~s~%" old-list)
     (loop :with a
@@ -802,7 +869,8 @@ become keyword arguments, in a way specified in the command's arglist."
 			    (move-flag old-list new-flags i arg)))
 		      (setf flag-taken t)))
 		 (when (not flag-taken)
-		   (warn "Unrecognized long option ~a" a)
+		   (when (not has-rest-arg)
+		     (warn "Unrecognized long option ~a" a))
 		   (incf i)))
 	       ;; -abcxyz (short args)
 	       (progn
@@ -831,16 +899,17 @@ become keyword arguments, in a way specified in the command's arglist."
 				   (move-flag old-list new-flags i arg))))))
 		    (when (not flag-taken)
 		      (incf i)
-		      (warn "Unrecognized option ~a" (char a cc))))
-		  (if boolean-taken
-		      (setf old-list (delete-nth i old-list))
-		      (progn
-			(dbugf :lish-arg "skipping flag value ~a ~w~%"
-			       i (nth i old-list))
-			(when (not flag-taken)
-			  (incf i))
-			;;(setf old-list (delete-nth i old-list))
-			))))
+		      (when (not has-rest-arg)
+			(warn "Unrecognized option ~a" (char a cc)))))
+		 (if boolean-taken
+		     (setf old-list (delete-nth i old-list))
+		     (progn
+		       (dbugf :lish-arg "skipping flag value ~a ~w~%"
+			      i (nth i old-list))
+		       (when (not flag-taken)
+			 (incf i))
+		       ;;(setf old-list (delete-nth i old-list))
+		       ))))
 	   ;; Arg doesn't start with a dash, so skip it
 	   (progn
 	     (dbugf :lish-arg "skipping arg ~a ~w~%" i a)
@@ -855,18 +924,56 @@ become keyword arguments, in a way specified in the command's arglist."
     (setf i 0)
     (dbugf :lish-arg "considering non-flagged: ~s~%" old-list)
     (loop
+       :for arglist-index :from 0
        :for arg :in (command-arglist command) :do
-       (if (not (or (arg-optional arg)
-		    (arg-has-flag arg)
-		    (arg-repeating arg)))
-	   (if (> (length old-list) 0)
-	       (progn
-		 (dbugf :lish-arg "found mandatory arg ~a~%" arg)
-		 ;; (move-arg old-list new-mandatories 0 arg))
-		 (move-key old-list new-mandatories 0 arg t))
-	       (error "Missing mandatory argument: ~a." (arg-name arg)))
-	   ;; skip
-	   (incf i)))
+       (when (not (or (arg-optional arg)
+		      (arg-has-flag arg)
+		      ;; (arg-repeating arg)
+		      ))
+	 (if (not (plusp (length old-list)))
+	     (error "Missing mandatory argument: ~a." (arg-name arg))
+	     (progn
+	       (dbugf :lish-arg "found mandatory arg ~a~%" arg)
+	       ;; (move-arg old-list new-mandatories 0 arg))
+	       (if (arg-repeating arg)
+		   (progn
+		     (dbugf :lish-arg "it's repeating~%")
+		     (let* ((remaining-mandatory-count
+			     (count-if
+			      (_ (not (arg-optional _)))
+			      (subseq (command-arglist command)
+				      (1+ arglist-index))))
+			    (snip-len (- (length old-list)
+					 remaining-mandatory-count))
+			    (repeating-list
+			     (loop
+				:for j :from i :below (+ i snip-len)
+				:collect
+				(convert-arg
+				 arg
+				 (word-word (nth j old-list))
+				 (word-quoted (nth j old-list))))))
+		       (when (zerop snip-len)
+			 ;; Really it's not this one missing, it's the next one.
+			 (error "Missing mandatory argument: ~a."
+				(arg-name (nth (1+ arglist-index)
+					       (command-arglist command)))))
+		       (dbugf :lish-arg "remaining-mandatory-count = ~s~%"
+			      remaining-mandatory-count)
+		       (dbugf :lish-arg "snip-len = ~s~%" snip-len)
+		       (dbugf :lish-arg "repeating-list = ~s~%" repeating-list)
+		       (push (arg-key arg) new-mandatories)
+		       (push repeating-list new-mandatories)
+		       ;; cut the repeating args out of old-list
+		       (cut-range old-list i (+ i (length repeating-list)))
+		       (incf i snip-len)
+		       (dbugf :lish-arg "old-list ~s~%i ~s~%" old-list i)))
+		   ;; not repeating just move it
+		   (progn
+		     (dbugf :lish-arg
+			    "taking non-reapting mandatory ~s~%" arg)
+		     (move-key old-list new-mandatories 0 arg t)
+		     (incf i)))))))
     (setf new-mandatories (nreverse new-mandatories))
     ;; Non-flagged optionals
     (dbugf :lish-arg "considering non-flagged optionals: ~s~%" old-list)
@@ -881,13 +988,18 @@ become keyword arguments, in a way specified in the command's arglist."
 	       ;; skip
 	       (incf i))))
     (setf new-optionals (nreverse new-optionals))
-    ;; Repeating
-    (dbugf :lish-arg "repeating i = ~s old-list = ~s~%" i old-list)
-    (setf i 0) 
+    ;; Optional repeating
+    (dbugf :lish-arg "optional repeating i = ~s old-list = ~s~%" i old-list)
+    ;; (setf i 0) 
     (loop #| :with i = 0 :and did-one = nil :and end-flag |#
        :for arg :in (command-arglist command) :do
+       (when (and (arg-repeating arg) (arg-optional arg))
+	 (move-repeating old-list new-repeating 0 arg keyworded)))
+#|
        (if (arg-repeating arg)
 	   (cond
+	     ;; @@@ I don't think this case can happen anymore, since we deal
+	     ;; with it above.
 	     ((and (>= i (length old-list)) (not (arg-optional arg)))
 	      (error "Missing repeating mandatory argument: ~a." (arg-name arg)))
 ;	     ((setf end-flag (arg-end-flag arg command))
@@ -899,6 +1011,7 @@ become keyword arguments, in a way specified in the command's arglist."
 	     (t
 	      ;; collect
 	      (move-repeating old-list new-repeating 0 arg keyworded)))))
+|#
     (setf new-repeating (nreverse new-repeating))
     (when (> (length old-list) 0)
       (warn "Extra arguments: ~w" old-list))

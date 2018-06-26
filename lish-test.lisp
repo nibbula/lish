@@ -36,6 +36,8 @@
 
 ;; You probably have to say: (with-package :lish (test-stla))
 ;; Unfortunately this may fail if not updated to reflect builtin changes.
+
+#| I changed it so everything is keywords!!!
 (deftests (shell-to-lisp-args-1 :doc "Test COMMAND-TO-LISP-ARGS.")
   (vuvu "cd"      '(&optional directory))
   (vuvu "pwd"     '())
@@ -64,6 +66,43 @@
   (vuvu "ulimit"  '())
   (vuvu "wait" 	  '())
   (vuvu "exec" 	  '(&rest command-words))
+  (vuvu "bind" 	  '(&key print-bindings print-readable-bindings query
+		    remove-function-bindings	remove-key-binding key-sequence
+		    function-name))
+  (vuvu "hash" 	  '(&key rehash packages commands))
+  (vuvu "type" 	  '(&key type-only path-only all names))
+  ;; (format t "SUCCEED!~%")
+  )
+|#
+
+(deftests (shell-to-lisp-args-1 :doc "Test COMMAND-TO-LISP-ARGS.")
+  (vuvu "cd"      '(&key directory))
+  (vuvu "pwd"     '())
+  (vuvu "pushd"   '(&key directory))
+  (vuvu "popd"    '(&key number))
+  (vuvu "dirs"    '())
+  (vuvu "suspend" '())
+  (vuvu "history" '(&key clear write read append read-not-read filename
+		    show-times delete))
+  ;; (vuvu ":"       '(&rest args))
+  (vuvu "echo" 	  '(&key no-newline args))
+  (vuvu "help" 	  '(&key subject))
+  (vuvu "alias"   '(&key global edit name expansion))
+  (vuvu "unalias" '(&key name))
+  (vuvu "exit" 	  '(&key values))
+  (vuvu "source"  '(&key filename))
+  (vuvu "debug"   '(&key (state :toggle)))
+  (vuvu "export"  '(&key remove name value))
+  (vuvu "jobs" 	  '(&key long))
+  (vuvu "kill" 	  '(&key list-signals (signal "term") pids))
+  ;; (vuvu "format"  '(format-string &rest args))
+  ;; (vuvu "read" 	  '(&key name prompt timeout editing))
+  (vuvu "time" 	  '(&key command))
+  (vuvu "times"   '())
+  (vuvu "umask"   '(&key print-command symbolic mask))
+  (vuvu "ulimit"  '())
+  (vuvu "wait" 	  '())
+  (vuvu "exec" 	  '(&key command-words))
   (vuvu "bind" 	  '(&key print-bindings print-readable-bindings query
 		    remove-function-bindings	remove-key-binding key-sequence
 		    function-name))
@@ -104,6 +143,18 @@
   "Test argument conversion."
   (format t "entry = ~s section = ~s~%" entry section))
 
+(defcommand clop
+  ((from string :repeating t #| :optional nil |#)
+   (to string :optional nil))
+  "Test argumnet conversion."
+  (format t "from = ~s to = ~a~%" from to))
+
+(defcommand snerp
+  ((from string :repeating t :optional nil)
+   (to string :optional nil))
+  "Test argumnet conversion."
+  (format t "from = ~s to = ~a~%" from to))
+
 (deftests (posix-to-lisp-args-1 :doc "Test POSIX-TO-LISP-ARGS.")
   ;; (vivi ":" '() '())
   ;; (vivi ":"
@@ -131,15 +182,23 @@
   (vivi "bind" "-P" '(:print-readable-bindings t))
   (vivi "bind" "-r foo" '(:remove-key-binding "foo"))
   (vivi "cd" "" '())
-  (vivi "cd" "dir" '("dir"))
+  (vivi "cd" "dir" '(:directory "dir"))
   (vivi "debug" "" '())
-  (vivi "debug" "on" '(t))
-  (vivi "debug" "off" '(nil))
+  (vivi "debug" "on" '(:state t))
+  (vivi "debug" "off" '(:state nil))
   ;; This is supposed to fail, since pecan isn't a boolean
 ;  (vivi "debug" '("pecan") '()) 
   (vivi "gurp"  "-i foo bar baz lemon"
-	'("foo" :files ("bar" "baz" "lemon") :invert t))
+	'(:pattern "foo" :files ("bar" "baz" "lemon") :invert t))
   (vivi "zurp"  "-s 3 chflags" '(:entry "chflags" :section "3"))
+  (vivi "clop" "foo the bar mmkay"  '(:from ("foo" "the" "bar") :to "mmkay"))
+  (vivi "clop" "foo bar"            '(:from ("foo") :to "bar"))
+  (vivi "clop" "zurpy"	            '(:to "zurpy"))
+  (vivi "snerp" "foo the bar mmkay" '(:from ("foo" "the" "bar") :to "mmkay"))
+  (vivi "snerp" "foo bar"           '(:from ("foo") :to "bar"))
+  ;; This should get a: "Missing mandatory agrument: to" error
+  ;; (vivi "snerp" "zurpy"
+  ;; 	'(:to "zurpy"))
 )
 
 ;(with-dbug (lish::posix-to-lisp-args (lish::get-command "bind") '("-r" "foo")))

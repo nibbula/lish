@@ -238,7 +238,7 @@ from stack."
 
 (defbuiltin echo
   ((no-newline boolean :short-arg #\n :help "Don't output a newline.")
-   (args t :repeating t))
+   (args t :rest t :help "Words to print."))
   "Output the arguments. If -n is given, then don't output a newline a the end."
   (format t "~{~a~#[~:; ~]~}" args)
   (when (not no-newline)

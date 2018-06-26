@@ -31,6 +31,15 @@
     :initarg :repeating
     :initform nil
     :accessor arg-repeating)
+   (rest
+    :type boolean
+    :documentation
+    "True if the argument is repeating and consumes the rest of the arguments,
+     ignoring arguments that look like flags. Setting this will also make
+     repeating be true."
+    :initarg :rest
+    :initform nil
+    :accessor arg-rest)
    (optional
     :type boolean
     :documentation "True if a value is not required."
@@ -109,7 +118,11 @@
     (setf (slot-value o 'long-arg) nil))
 
   (when (not (slot-boundp o 'old-long-arg))
-    (setf (slot-value o 'old-long-arg) nil)))
+    (setf (slot-value o 'old-long-arg) nil))
+
+  ;; Setting REST forces REPEATING to be true.
+  (when (and (slot-boundp o 'rest) (slot-value o 'rest))
+    (setf (slot-value o 'repeating) t)))
 
 (defvar *arg-normal-flag-char* #\-
   "Normal argument flag character.")
@@ -139,14 +152,14 @@
 	(long-arg (and (slot-boundp o 'long-arg) (arg-long-arg o))))
     (print-unreadable-object (o stream :identity nil :type t)
       (format stream
-	      ;;"~a ~s~:[~; repeating~]~:[~; optional~]~:[~; hidden~]~
-	      "~a~:[~; repeating~]~:[~; optional~]~:[~; hidden~]~
+	      "~a~:[~; repeating~]~:[~; optional~]~:[~; hidden~]~:[~; rest~]~
               ~:[~2*~; ~c~a~]~:[~3*~; ~c~c~a~]"
 	      (arg-name o)
 	      ;; (arg-type o)
 	      (arg-repeating o)
 	      (arg-optional o)
 	      (arg-hidden o)
+	      (arg-rest o)
 	      short-arg *arg-normal-flag-char* short-arg
 	      long-arg *arg-normal-flag-char* *arg-normal-flag-char* long-arg))))
 
