@@ -210,7 +210,7 @@ literally in shell syntax."
        (if (>= pos (shell-word-start w))
 	   w
 	   nil)) ; We couldn't find it?
-      ((and (consp w) (eq (car w) :pipe))
+      ((and (consp w) (member (car w) '(:pipe :pipe-plus)))
        (if (and w2 (shell-word-p w2)
 		(>= pos (shell-word-start w2)))
 	   w2
@@ -516,6 +516,7 @@ Uses the first available of:
   - a command which we load by the normal command path mechanism
   - a pre-defined external command, from an external command cache
   - a mined external command"
+  (assert command)			; Don't be calling this with NIL.
   (or (get-command command)
       (and (in-lisp-path command)
 	   (load-lisp-command command)
@@ -605,7 +606,8 @@ complete, and call the appropriate completion function."
 		  (let ((from-end (- (length context) pos)))
 		    (dbugf 'completion "blank spot : heyba~%")
 		    (let ((result
-			   (if (setf cmd (try-command first-word))
+			   (if (and first-word
+				    (setf cmd (try-command first-word)))
 			       (progn
 				 (dbugf 'completion "in a command : Baaa~%")
 				 (complete-command-arg context cmd exp pos all))
@@ -670,7 +672,7 @@ complete, and call the appropriate completion function."
 	      (dbugf 'completion "nothing special : hello ~a~%" word)
 	      (let* ((from-end (- (length context) pos))
 		     (result
-		      (if (setf cmd (try-command first-word))
+		      (if (and first-word (setf cmd (try-command first-word)))
 			  (progn
 			    (dbugf 'completion "command : blurgg~%")
 			    (complete-command-arg
