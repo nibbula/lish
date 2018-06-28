@@ -142,9 +142,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Job control
 
+(cffi:defcallback sigtstp-handler :void ((signal-number :int))
+  (declare (ignore signal-number))
+  ;;(format t "[Terminal Stop]~%") (finish-output)
+  (setf uos::*got-tstp* :dont-suspend)
+  ;; I'm scared of this.
+  ;; (invoke-restart (find-restart 'abort))
+  ;;(throw 'interactive-interrupt nil)
+  )
+
 (defun start-job-control ()
   #+unix
-  (setf (os-unix:signal-action os-unix:+SIGTSTP+) :ignore
+  (setf (os-unix:signal-action os-unix:+SIGTSTP+) 'sigtstp-handler
 	(os-unix:signal-action os-unix:+SIGTTIN+) :ignore
 	(os-unix:signal-action os-unix:+SIGTTOU+) :ignore))
 
@@ -158,9 +167,9 @@
     (setf (os-unix:signal-action os-unix:+SIGTSTP+)
 	  (if (keywordp tstp) tstp :default)
 	  (os-unix:signal-action os-unix:+SIGTTIN+)
-	  (if (keywordp tstp) ttin :default)
+	  (if (keywordp ttin) ttin :default)
 	  (os-unix:signal-action os-unix:+SIGTTOU+)
-	  (if (keywordp tstp) ttou :default))))
+	  (if (keywordp ttou) ttou :default))))
 
 (defun job-control-signals ()
   #+unix (list (os-unix:signal-action os-unix:+SIGTSTP+)
@@ -463,17 +472,18 @@ Otherwise, return words which will evaluate a lisp expression."
   "Return a shell expression made up of ARGS as the words."
   (let* (words
 	 (line (with-output-to-string (str)
-		(loop :with pos = 0
+		(loop :with pos = 0 :and as-string
 		   :for a :in args :do
 		   (when (not (zerop pos))
 		     (princ #\space str)
 		     (incf pos))
+		   (setf as-string (princ-to-string a))
 		   (push (make-shell-word
 			  :word a
 			  :start pos
-			  :end (+ pos (length a)))
+			  :end (+ pos (length as-string)))
 			 words)
-		   (incf pos (length a))
+		   (incf pos (length as-string))
 		   (princ a str)))))
     (make-shell-expr :line line :words (reverse words))))
 
@@ -1710,7 +1720,7 @@ suspend itself."
 
 (cffi:defcallback sigint-handler :void ((signal-number :int))
   (declare (ignore signal-number))
-  (format t "[Control-C]~%") (finish-output)
+  (format t "[Interrupt]~%") (finish-output)
   ;; I'm scared of this.
   ;; (invoke-restart (find-restart 'abort))
   (throw 'interactive-interrupt nil)
@@ -1727,7 +1737,8 @@ suspend itself."
       (uos:set-signal-action uos:+SIGQUIT+ :ignore)
       ;; Ignore suspend
       (push (cons uos:+SIGTSTP+ (uos:signal-action uos:+SIGTSTP+)) result)
-      (uos:set-signal-action uos:+SIGTSTP+ :ignore)
+      ;;(uos:set-signal-action uos:+SIGTSTP+ :ignore)
+      (uos:set-signal-action uos:+SIGTSTP+ 'sigtstp-handler)
       ;; Handle interrupt
       ;; #-sbcl
       ;; (progn
@@ -1934,10 +1945,12 @@ Arguments:
       (setf theme:*theme* (theme:default-theme)))
 
     (when command
-      (start-job-control)
-      (let ((result (lish-eval sh (shell-read command) (make-read-state))))
-	(stop-job-control saved-sigs)
-	(run-hooks *exit-shell-hook*)
+      (let (result)
+	(catch 'interactive-interrupt
+	  (start-job-control)
+	  (setf result (lish-eval sh (shell-read command) (make-read-state)))
+	  (stop-job-control saved-sigs)
+	  (run-hooks *exit-shell-hook*))
 	(return-from lish (if (lish-exit-values sh)
 			      (values-list (lish-exit-values sh))
 			      result))))

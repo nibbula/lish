@@ -136,7 +136,7 @@ from stack."
 	  ((job-pid job)
 	   #+unix
 	   (multiple-value-bind (result status)
-	       (os-unix::resume-pid (job-pid job))
+	       (os-unix::resume-background-pid (job-pid job))
 	     (handle-job-change job result status))
 	   )
 	  (t
