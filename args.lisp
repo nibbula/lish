@@ -406,7 +406,10 @@
       (t ""))))
 
 (defclass arg-lenient-choice (arg-choice)
-  ()
+  ((quiet
+    :initarg :quiet :accessor arg-lenient-choice-quiet
+    :initform nil :type boolean
+    :documentation "True to not warn if the choice is not in the list."))
   (:documentation
    "An argument with known choices, but accepting anything."))
   
@@ -416,12 +419,14 @@
   (let (choice
 	(choices (argument-choices arg)))
     (if (not choices)
-	(warn "Choice argument has no choices ~a." (arg-name arg))
+	(when (not (arg-lenient-choice-quiet arg))
+	  (warn "Choice argument has no choices ~a." (arg-name arg)))
 	(if (setf choice (find value choices :test (arg-choice-test arg)))
 	    choice
 	    (progn
-	      (warn "~s is not one of the choices for the argument ~:@(~a~)."
-		    value (arg-name arg))
+	      (when (not (arg-lenient-choice-quiet arg))
+		(warn "~s is not one of the choices for the argument ~:@(~a~)."
+		      value (arg-name arg)))
 	      value)))))
 
 ;; This is so if it's not provided, it can toggle.
