@@ -130,7 +130,7 @@ with SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
 those functions for more detail about prompt formatting."
 ;;  :default nil
   :default
-  ((:magenta "%u") "@" (:cyan "%h") " " (:green "%w") (:red ">") " ")
+  ((:green "%u") "@" (:cyan "%h") " " (:white "%w") (:red ">") " ")
  )
 
 (defoption prompt-function function
