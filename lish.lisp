@@ -145,7 +145,7 @@
 (cffi:defcallback sigtstp-handler :void ((signal-number :int))
   (declare (ignore signal-number))
   ;;(format t "[Terminal Stop]~%") (finish-output)
-  (setf uos::*got-tstp* :dont-suspend)
+  #+unix (setf uos::*got-tstp* :dont-suspend)
   ;; I'm scared of this.
   ;; (invoke-restart (find-restart 'abort))
   ;;(throw 'interactive-interrupt nil)
