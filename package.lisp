@@ -85,12 +85,15 @@ it's shell features.
    ;; convenience / scripting
    #:set-alias #:unset-alias #:get-alias
    #:command-paths
-   #:input-line-words
-   #:input-line-list
-   #:command-output-words
-   #:command-output-list
    #:pipe
    #:append-file #:append-files
+   #:run-with-output-to
+   #:run-with-input-from
+   #:input-line-words
+   #:input-line-list
+   #:map-output-lines
+   #:command-output-words
+   #:command-output-list
    ;; magic punctuation
    #:!  #:!?  #:!!  #:!$  #:!$$  #:!@  #:!_  #:!-
    #:!= #:!?= #:!!= #:!$= #:!$$= #:!@= #:!_= #:!-=
