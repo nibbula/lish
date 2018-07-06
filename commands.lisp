@@ -289,13 +289,17 @@ we want to use it for something in the future."
 (defmacro defcommand (name (&rest arglist) &body body)
   "Define a command for the shell.
 NAME is the name it is invoked by.
-ARGLIST is a shell argument list.
+ARGLIST is a shell argument list, which has the form:
+  ([(name type [initargs...])...])
+where initargs are initializing keyword arguments for calling make-instance
+of ARG-<type>.
 BODY is the body of the function it calls.
 BODY recognizes some special keywords:
-  :ACCEPTS followed by a single or list of accept keywords to indicate what
-           kind of things the command accepts from a pipeline.
+  :ACCEPTS followed by a single indicator or list of indicators that can be
+           types or special keywords to indicate what kind of things the
+           command accepts from a pipeline.
   :KEYS-AS followed by a symbol which will be a list of the keywords and values
-           given to the command function. "
+           given to the command function."
   `(%defcommand ,name shell-command t (,@arglist) ,@body))
 
 (defclass builtin-command (internal-command)
