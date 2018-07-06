@@ -542,10 +542,12 @@ NAME is replaced by EXPANSION before any other evaluation."
   (format t "Debugging is ~:[OFF~;ON~].~%" (lish-debug *shell*)))
 
 (defbuiltin export
-  (("remove" boolean :short-arg #\n
+  ((remove boolean :short-arg #\n
     :help "True to stop the NAME from being exported.")
-   ("name"  string :help "Name of the variable to export.")
-   ("value" string :help "Value of the variable to export."))
+   (edit boolean :short-arg #\e
+    :help "True to edit the value of the variable.")
+   (name  string :help "Name of the variable to export.")
+   (value string :help "Value of the variable to export."))
   "Set environment variable NAME to be VALUE. Omitting VALUE, just makes sure
 the current value of NAME is exported. Omitting both, prints all the exported
 environment variables. If NAME and VALUE are converted to strings if necessary.
@@ -563,6 +565,10 @@ If NAME has an equal sign ‘=’ in it, do the POSIX shell style of NAME=value.
 	     (setf (nos:environment-variable n) v)))
 	  (remove
 	   (setf (nos:environment-variable name) nil))
+	  (edit
+	   (setf (nos:environment-variable name)
+		 (rl :prompt (s+ "export " name #\=)
+		     :string (or value (nos:environment-variable name)))))
 	  (value
 	   (setf (nos:environment-variable name) value))
 	  (t
@@ -576,7 +582,7 @@ If NAME has an equal sign ‘=’ in it, do the POSIX shell style of NAME=value.
  |\|
  |\|   as a lambda list:
  |\|
- |\|     (&key ignore-environment variable-assignment shell-command)
+ |\|     (&key ignore-environment variable-assignments shell-command)
  |\|
  |\|   but that doesn't have enough information. So
  |\|
