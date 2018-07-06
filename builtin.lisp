@@ -21,6 +21,8 @@
 
 (defbuiltin cd ((directory directory :help "Directory to change to."))
   "Change the current directory to DIRECTORY."
+  (when (equal directory "-")
+    (setf directory (lish-old-pwd *shell*)))
   (setf (lish-old-pwd *shell*) (nos:current-directory))
   (nos:change-directory (or directory (nos:environment-variable "HOME")))
   ;; Update $PWD like traditional Unix shells.
