@@ -102,7 +102,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 (defun get-request (line)
   (let (req args)
     (multiple-value-setq (req args) 
-      (ppcre:scan-to-strings "\\.([^ ]*)\\s+(.*)$" line))
+      (scan-to-strings "\\.([^ ]*)\\s+(.*)$" line))
     (when req
       args)))
 
@@ -120,7 +120,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 	     (setf (mined-cmd-name cmd) (subseq line 4)
 		   next 'short-description))
 	    ((multiple-value-setq (match strings)
-	       (ppcre:scan-to-strings "^\\s*(\\w+)\\s+\\\\-\\s+(.*)$" line))
+	       (scan-to-strings "^\\s*(\\w+)\\s+\\\\-\\s+(.*)$" line))
 	     (dbugf 'mine-man "got name~%")
 	     (setf (mined-cmd-name cmd) (aref strings 0)
 		   (mined-cmd-short-description cmd) (aref strings 1))))
@@ -256,7 +256,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 	     (incf i))
 	  (setf style :gnu))
 	(setf arg-count (loop :for u :in usage
-			   :if (ppcre:scan "^\\s*-" u) :count u))
+			   :if (scan "^\\s*-" u) :count u))
 	;;(format t "arg-count = ~s~%" arg-count)
 	(when (or (not usage)
 		  (< arg-count 2))
@@ -299,7 +299,7 @@ a known compression suffix, then the stream is appropriately decompressed."
     (setf strings (flatten (mapcar (_ (split-sequence #\newline _)) strings)))
     (macrolet ((match (string)
 		 `(multiple-value-setq (b e starts ends)
-		    (ppcre:scan ,string line)))
+		    (scan ,string line)))
 	       (slarg (&rest props)
 		 `(progn
 		    (when arg
@@ -313,10 +313,10 @@ a known compression suffix, then the stream is appropriately decompressed."
        (dbugf 'mine-bin "line = ~s~%" line)
        (cond
 	 ;; initial usage line
-	 ((and (not usage-line) (ppcre:all-matches "^[Uu]sage:" line))
+	 ((and (not usage-line) (all-matches "^[Uu]sage:" line))
 	  (setf usage-line line))
 	 ;; lines of documentation before main arguments
-	 ((and (not args) (not (ppcre:scan "^\\s*-" line)))
+	 ((and (not args) (not (scan "^\\s*-" line)))
 	  (if (zerop (length line))
 	      (when (stringp (car doc))
 		(rplaca doc (s+ (car doc) #\newline)))
@@ -354,7 +354,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 		 :long-arg (subseq line (aref starts 0) (aref ends 0))
 		 :help (trim (subseq line (aref starts 2) (aref ends 2)))))
 	 ;; lines starting with spaces after args
-	 ((and arg (ppcre:scan "^\\s+" line))
+	 ((and arg (scan "^\\s+" line))
 	  (setf (getf arg :help)
 		(s+ (getf arg :help)
 		    (if (not (zerop (length (getf arg :help))))

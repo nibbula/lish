@@ -83,7 +83,10 @@ means every dumped executable.")
   "The current shell instance.")
 
 (defvar *lish-user-package*
-  (make-package "LISH-USER" :use '(:cl :lish :cl-ppcre :glob)
+  (make-package "LISH-USER" :use '(:cl :lish
+				   #+use-regex :regex
+				   #-use-regex :cl-ppcre
+				   :glob)
 		:nicknames '("LU"))
   "Package for lish to hang out in. Auto-updates from :cl-user.")
 
