@@ -26,24 +26,41 @@
 
 ;; This is such a lame hack. But what would be a better way?
 
-(define-constant +version-file-name+ "version.lisp")
+;; Actually, on second thought, this is a very bogus "page counter"-like thing
+;; which doesn't really do anything for us, and introduces needless complexity.
+;; Let's just lose it. But maybe keep the code around for a while, in case we
+;; really need some stupid thing like this one day. For now, if there really
+;; is some subtle version incompatibility that we need to check for, just
+;; increase the version number by hand.
+#|
+(define-constant +build-version-file-name+ "build-version")
+(define-constant +release-version-file-name+ "release-version")
 
-(defparameter *version-file*
-  (or (asdf:system-relative-pathname :lish +version-file-name+)
-      (probe-file (s+ (dirname
-		       (or *compile-file-truename* *load-truename*))
-		      *directory-separator* +version-file-name+))
-      (probe-file (s+ (dirname (or *compile-file-truename* *load-truename*))
-		      *directory-separator* ".."
-		      *directory-separator* +version-file-name+))
-      +version-file-name+))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun version-file-name (base)
+    (or (asdf:system-relative-pathname :lish base)
+	(probe-file (s+ (dirname
+			 (or *compile-file-truename* *load-truename*))
+			*directory-separator* base))
+	(probe-file (s+ (dirname (or *compile-file-truename* *load-truename*))
+			*directory-separator* ".."
+			*directory-separator* base))
+	base)))
+
+(defparameter *build-version-file*
+  (version-file-name +build-version-file-name+))
+
+(defparameter *release-version-file*
+  (version-file-name +release-version-file-name+))
 
 (defun read-version ()
-  (when (not (probe-file *version-file*))
-    (format t "I thought it might be in ~s, but...~%" *version-file*)
-    (setf *version-file* (rl:read-filename
-			  :prompt "Where is version.lisp? ")))
-  (with-open-file (str *version-file*)
+  (when (not (probe-file *build-version-file*))
+    (when (not (probe-file *release-version-file*))
+      (format t "I thought it might be in ~s, but...~%" *release-version-file*)
+      (setf *release-version-file* (rl:read-filename
+				    :prompt ("Where is ? "))))
+    (uiop:copy-file *release-version-file* *build-version-file*))
+  (with-open-file (str *build-version-file*)
     (safe-read-from-string (read-line str))))
 
 (defun write-version (version)
@@ -55,6 +72,7 @@
 
 (defun update-version ()
   (write-version (1+ (read-version))))
+|#
 
 ;; We should almost always provide backwards compatibility as an option, but
 ;; releases with the same major version number should always be compatible
@@ -66,9 +84,13 @@ compatible in the default configuration.")
 (defparameter *minor-version* 1
   "Minor version number. This should change at least for every release.")
 
+#|
 (defparameter *build-version* (read-version)
   "Build version number. This should increase for every build, which probably
 means every dumped executable.")
+|#
+(defvar *build-version* 222
+  "Build version number. Just add to it whenever you want to.")
 
 (defparameter *version*
   (format nil "~d.~d.~d" *major-version* *minor-version* *build-version*))
