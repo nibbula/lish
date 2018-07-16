@@ -57,6 +57,7 @@ lishp:
 	echo "(load \"~/quicklisp/setup.lisp\") \
 (push \"../\" asdf:*central-registry*) \
 (push \"../opsys/\" asdf:*central-registry*) \
+(push \"../rl/\" asdf:*central-registry*) \
 (push \"./\" asdf:*central-registry*) \
 (asdf:load-system :lish) \
 (setf asdf:*central-registry* \
