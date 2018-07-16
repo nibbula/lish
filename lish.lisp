@@ -2087,7 +2087,7 @@ by spaces."
 
 (defun make-standalone (&optional (name "lish"))
   "FUFKFUFUFUFUFF"
-  (update-version)
+  ;; (update-version)
   (save-image-and-exit name #'lish:shell-toplevel))
 
 ;; So we can conditionalize adding of lish commands in other packages.
