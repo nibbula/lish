@@ -17,7 +17,7 @@ between a Lisp REPL and a Unix shell. But you might just want to use Lish for
 it's shell features.
 ")
   (:use :cl :dlib :opsys :dlib-misc :stretchy :char-util :glob :table-print
-	:completion :keymap :terminal :terminal-ansi :rl
+	:reader-ext :completion :keymap :terminal :terminal-ansi :rl
 	#+use-regex :regex #-use-regex :cl-ppcre
 	:fatchar :collections)
   (:export
