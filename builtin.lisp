@@ -979,7 +979,7 @@ drastic thing to do to a running Lisp system."
     (error "Mutually exclusive arguments provided."))
   (cond
     (print-bindings
-     (keymap:dump-keymap rl:*normal-keymap*))
+     (keymap:describe-keymap rl:*normal-keymap*))
     (print-readable-bindings
      (keymap:map-keymap
       #'(lambda (key val)
