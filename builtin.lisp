@@ -645,10 +645,24 @@ Vauguely like how I would like:
 But instead we have to to a kludgey version:
 |#
 
+;; Another problem is, it's rather counter-intuitive to POSIX shell users
+;; (including me), that, say,
+;;
+;;   env "CFLAGS=-g -Wall -O2" ./configure --enable-impossible-color ...
+;;
+;; works, but
+;;
+;;   env CFLAGS="-g -Wall -O2" ./configure --enable-impossible-color ...
+;;
+;; doesn't work.
+;; It doesn't work because the shell reader splits words at double quotes,
+;; so it becomes "env" "CFLAGS" "=-g -Wall -O2". The reader splits words like
+;; that for what I think is good reason, so I'm not sure I want to change it.
+
 (defbuiltin env
     ((ignore-environment boolean :short-arg #\i
       :help "Ignore the environment.")
-     (arguments string :repeating t
+     (arguments string :rest t
       :help "Variable assignments, commands and command arguments."))
   "Modify the command environment. If ignore-environment is true, only
 variables explicitly set in arguments are passed to the commands."
