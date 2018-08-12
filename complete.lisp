@@ -678,7 +678,11 @@ complete, and call the appropriate completion function."
 			    (complete-command-arg
 			     context cmd exp pos
 			     #| (- (length word) from-end) |#
-			     all word-num word word-pos))
+			     all word-num word
+			     ;; @@@ band-aid : this code's days are numbered
+			     ;; bug shows up e.g. : foo "+<tab>
+			     (min word-pos (length word))
+			     ))
 			  (progn
 			    (dbugf 'completion "default to filename : jorky~%")
 			    (shell-complete-filename
