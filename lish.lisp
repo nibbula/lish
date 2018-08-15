@@ -2063,6 +2063,8 @@ by spaces."
      :collect (make-shell-word :word w :start pos :end (+ pos (length w)))
      :do (incf pos (1+ (length w)))))
 
+(defvar *saved-default-external-format* nil)
+
 (defun shell-toplevel ()
   "For being invoked as a standalone shell."
   (setf *standalone* t)
@@ -2077,17 +2079,25 @@ by spaces."
 	 )
     (when level-string
       (setf *lish-level* (parse-integer level-string)))
-    (if (cdr (nos:lisp-args))
-	(apply #'!lish
-	       `(,@(posix-to-lisp-args (get-command "lish")
-				       (wordify-list (cdr (nos:lisp-args))))
-		   :greeting t))
-	(!lish :greeting t)))
-  (nos:exit-lisp))
+
+    ;; @@@ Of course this is wrong. We really get it from LANG or LC_CYTPE, or
+    ;; whatever it is on Windows or whatever O/S.
+    #+sbcl (setf sb-impl::*default-external-format*
+		 (or *saved-default-external-format* :utf-8))
+    (with-new-terminal ()
+      (if (cdr (nos:lisp-args))
+	  (apply #'!lish
+		 `(,@(posix-to-lisp-args (get-command "lish")
+					 (wordify-list (cdr (nos:lisp-args))))
+		     :greeting t))
+	  (!lish :greeting t)))
+    (nos:exit-lisp)))
 
 (defun make-standalone (&optional (name "lish"))
   "FUFKFUFUFUFUFF"
   ;; (update-version)
+  #+sbcl (setf *saved-default-external-format*
+	       sb-impl::*default-external-format*)
   (save-image-and-exit name #'lish:shell-toplevel))
 
 ;; So we can conditionalize adding of lish commands in other packages.
