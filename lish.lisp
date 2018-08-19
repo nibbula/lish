@@ -1955,7 +1955,8 @@ Arguments:
 			      (values-list (lish-exit-values sh))
 			      result))))
 
-    (with-terminal (terminal-type *terminal* :device-name terminal-name)
+    (with-terminal (terminal-type *terminal* :device-name terminal-name
+				  :start-at-current-line t)
       (setf (tt-input-mode) :line)
 
       ;; Make a customized line editor
