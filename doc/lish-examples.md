@@ -287,25 +287,3 @@ Lish> (expt 2 (sin pi)) ; Same as the last line, but in s-exp style.
 1.0d0
 Lish> glob "/bin/d*" | mapcar 'reverse | mapcar 'string-capitalize
 ```
-
-> I'd like to come up with more useful, interesting, or practical examples.
-> Unfortunately I don't use this feature much myself, as I'm so used to s-exps.
-> But I know not everyone finds this an easy way to say
-> "show me the top 10 linked files in root":
-```
-(format t "~{~a~%~}~%" (subseq (sort (mapcar (_ (cons (uos:file-status-links (car _)) (cdr _))) (mapcar (_ (cons (uos:stat _) _)) (glob "/*"))) #'> :key 'car) 0 10))
-```
-
-> This is probably quite a bit too much for an introduction.
-
-A little spell checker:
-
-```
-(defvar *dict* (!_ "cat /usr/share/dict/words"))
-mapcar (_ (split #\  _)) (!_ "cat README.md") |
-flatten | mapcar 'string-downcase |
-mapcar (_ (remove-if (_ (and (char/= #\' _) (not (alpha-char-p _)))) _)) |
-remove-if (_ (or (zerop (length _)) (member _ *dict* :test #'equalp))) |
-funcall (_ (remove-duplicates _ :test #'equal))
-```
-Perhaps because I have too much nostalgia for [this][https://www.youtube.com/watch?v=tc4ROCJYbm0]

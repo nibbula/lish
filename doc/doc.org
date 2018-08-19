@@ -10,6 +10,11 @@ Lish Documentation                                        -*- org -*-
 
   Lish does most of the things a normal shell does, but that being said, Lish
   is **NOT** a POSIX shell! 
+
+** Design philosphy
+*** Development story
+*** Command interface vs. programming interface
+*** Unix philosophy, Lisp philosophy, and a mixture thereof
 * Using Lish
 ** Installation
 *** Loading from source

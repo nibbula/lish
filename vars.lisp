@@ -214,13 +214,13 @@ input, output and environment.")
 
 (defvar *pre-command-hook* nil
   "Called before a command is run. Arguments are:
-COMMAND-NAME : string   - The name of the command.
-COMMAND-TYPE : keyword  - What kind of command it is.")
+ COMMAND-NAME : string   - The name of the command.
+ COMMAND-TYPE : keyword  - What kind of command it is.")
 
 (defvar *post-command-hook* nil
   "Called after a command is run. Arguments are:
-COMMAND-NAME : string   - The name of the command.
-COMMAND-TYPE : keyword  - What kind of command it is.")
+ COMMAND-NAME : string   - The name of the command.
+ COMMAND-TYPE : keyword  - What kind of command it is.")
 
 (defvar *exit-shell-hook* nil
   "Called when the shell exits.")

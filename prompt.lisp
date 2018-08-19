@@ -119,9 +119,7 @@ Not implemented yet:
 	     (write-char c str))))
     out))
 
-;; @@@ Consider dealing with the overlap between this and
-;; fatchar:span-to-fatchar-string.
-
+;; @@@ Docstring is WRONG!
 (defun symbolic-prompt-to-string (sh symbolic-prompt #| &optional ts-in |#)
   "Take a symbolic prompt and turn it into a string. A symbolic prompt can be
 any printable lisp object, which is converted to a string. If it is a list, it
