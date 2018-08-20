@@ -1786,6 +1786,8 @@ handling errors."
 	    (unwind-protect
 	       (progn
 		 ;;(break)
+		 (finish-output)
+		 (tt-finish-output)
 		 (setf saved-signals (set-signals)
 		       str (rl
 			    :eof-value *real-eof-symbol*
