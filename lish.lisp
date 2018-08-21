@@ -1950,6 +1950,7 @@ Arguments:
       (let (result)
 	(catch 'interactive-interrupt
 	  (start-job-control)
+	  (run-hooks *enter-shell-hook*)
 	  (setf result (lish-eval sh (shell-read command) (make-read-state)))
 	  (stop-job-control saved-sigs)
 	  (run-hooks *exit-shell-hook*))
@@ -1974,6 +1975,7 @@ Arguments:
       (unwind-protect
 	(progn
 	  (start-job-control)
+	  (run-hooks *enter-shell-hook*)
 	  (when (not (eq :lish-quick-exit (catch :lish-quick-exit
 	    (loop
 	     :named pippy

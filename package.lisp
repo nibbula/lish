@@ -38,6 +38,7 @@ it's shell features.
    ;; hooks
    #:*pre-command-hook*
    #:*post-command-hook*
+   #:*enter-shell-hook*
    #:*exit-shell-hook*
    ;; (installation)
    #:make-standalone

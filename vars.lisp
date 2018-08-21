@@ -222,6 +222,9 @@ input, output and environment.")
  COMMAND-NAME : string   - The name of the command.
  COMMAND-TYPE : keyword  - What kind of command it is.")
 
+(defvar *enter-shell-hook* nil
+  "Called when the shell starts, after loading the *lishrc*.")
+
 (defvar *exit-shell-hook* nil
   "Called when the shell exits.")
 
