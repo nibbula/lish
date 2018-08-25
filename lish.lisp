@@ -1914,7 +1914,8 @@ handling errors."
       t))
 
 (defun lish (&key debug terminal-name
-	       (terminal-type (pick-a-terminal-type))
+	       ;;(terminal-type (pick-a-terminal-type))
+	       terminal-type
 	       ;;(init-file (or *lishrc* *default-lishrc*))
 	       (init-file (pick-an-rc-file))
 	       command)
@@ -1957,7 +1958,11 @@ Arguments:
 	(return-from lish (if (lish-exit-values sh)
 			      (values-list (lish-exit-values sh))
 			      result))))
-
+    (setf terminal-type (or terminal-type
+			    (and *terminal*
+				 (find-terminal-type-for-class
+				  (type-of *terminal*)))
+			    (pick-a-terminal-type)))
     (with-terminal (terminal-type *terminal* :device-name terminal-name
 				  :start-at-current-line t)
       (setf (tt-input-mode) :line)
