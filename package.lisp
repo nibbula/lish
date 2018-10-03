@@ -13,8 +13,8 @@ hopefully have little annoyance to people familair with a POSIX shell. But it
 does not have exact compatibility with POSIX shells.
 
 The motivation for writing Lish came from the annoyance of having to swtich
-between a Lisp REPL and a Unix shell. But you might just want to use Lish for
-it's shell features.
+between a Lisp REPL and a Unix shell. Lish may be used as a command shell,
+without any particular knowledge of it's Lisp programming features.
 ")
   (:use :cl :dlib :opsys :dlib-misc :stretchy :char-util :glob :table-print
 	:reader-ext :completion :keymap :terminal :terminal-ansi :rl

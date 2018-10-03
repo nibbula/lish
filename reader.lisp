@@ -91,10 +91,10 @@ value, an explaination which consists of (tag-symbol datum...)."
 			:quoted did-quote)
 		       args))
 	       (reset-word))
-	     (ignore-word ()
-	       "Ignore the current word."
-	       (when in-word
-		 (reset-word)))
+	     ;; (ignore-word ()
+	     ;;   "Ignore the current word."
+	     ;;   (when in-word
+	     ;; 	 (reset-word)))
 	     (add-to-word ()
 	       "Add the character to the current word or start a new one."
 	       (when (not in-word)
@@ -187,7 +187,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	       ;; 	     word-eval (list nil)
 	       ;; 	     in-compound t)))
 	       (dbugf 'reader "make-compound ~s~%" key)
-	       (ignore-word)
+	       ;; (ignore-word)
+	       (finish-word)
 	       (reverse-things)
 	       (let ((e (list key (make-the-expr))))
 	       	 (setf args (list e)))
