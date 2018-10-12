@@ -251,6 +251,7 @@ we want to use it for something in the future."
 	(name-string (string-downcase name))
 	(accepts :unspecified)
 	(fixed-body body)
+	(fixed-arglist arglist)
 	pass-keys-as params ignorables defun-clause)
     ;; Pull out special body tags:
     (loop :with tag
@@ -270,21 +271,30 @@ we want to use it for something in the future."
 	  defun-clause
 	  (if do-defun
 	      `((defun ,func-name ,params
-		 ,@ignorables
-		 ,@fixed-body))
+		  ,@ignorables
+		  ,@fixed-body))
 	      `((defun ,func-name ()
-		 ,@body))))
+		  ,@body))))
+    (setf fixed-arglist (loop :for a :in arglist
+			   :do (check-argument a)
+			   :collect
+			   `(make-instance
+			     ',(new-argument-type-class (second a))
+			     ,@(transform-arg a))))
     `(progn
        ,@defun-clause
        (pushnew ,name-string lish::*command-list* :test #'equal)
        (set-command ,name-string
-		    (make-instance ',type
-				   :name ,name-string
-				   :loaded-from *load-pathname*
-				   :accepts ',accepts
-				   :pass-keys-as
-				   ,(and pass-keys-as `(quote ,pass-keys-as))
-				   :arglist (make-argument-list ',arglist))))))
+		    (make-instance
+		     ',type
+		     :name ,name-string
+		     :loaded-from *load-pathname*
+		     :accepts ',accepts
+		     :pass-keys-as
+		     ,(and pass-keys-as `(quote ,pass-keys-as))
+		     ;;:arglist (make-argument-list ',arglist)
+		     :arglist (list ,@fixed-arglist)
+		     )))))
 
 (defmacro defcommand (name (&rest arglist) &body body)
   "Define a command for the shell.
@@ -578,13 +588,15 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 
 (defmacro push-key (new arg value keyworded)
   "Push a possibly keyworded arg VALUE to the NEW list."
-  `(progn
-     (when ,keyworded
-       (setf ,new (push (arg-key ,arg) ,new)))
-     (setf ,new (push (convert-arg ,arg
-				   (word-word ,value)
-				   (word-quoted ,value)))
-	   ,new)))
+  (with-unique-names (val)
+    `(progn
+       (when ,keyworded
+	 (setf ,new (push (arg-key ,arg) ,new)))
+       (let ((,val ,value))
+	 (setf ,new (push (convert-arg ,arg
+				       (word-word ,val)
+				       (word-quoted ,val))
+			  ,new))))))
 
 (defmacro move-flag (old new i arg)
   `(progn
@@ -649,11 +661,11 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 			    ,did-one t))) |#
 	       (setf ,old (subseq ,old 0 ,start))
 	       ;; Push default if we have one and didn't get any values.
-#|	       (when (and (not ,did-one) (arg-default ,arg))
-		 (when ,keyworded
-		   (setf ,new (push (arg-key ,arg) ,new)))
+	       (when (and (not ,did-one) (arg-default ,arg))
+		 ;(when ,keyworded
+		 (setf ,new (push (arg-key ,arg) ,new))
 		 (setf ,new (push (convert-arg
-				   ,arg (arg-default ,arg)) ,new))) |#
+				   ,arg (eval (arg-default ,arg))) ,new)))
 	       ))))))
 
 ;; I used to handle default values to arguments here, but they were not getting
@@ -669,6 +681,14 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 ;; So far the only workaround I have is to define the argument class in
 ;; a different compilation unit (a.k.a. file), which is very inconvenient.
 ;; There must be another way.
+
+;;; @@@ Potential change:
+;;; - defaults get normally evaled at defcommand time
+;;; - defaults get re-evaled at arg popping time
+;; SO, the default can be the value from the defcommand environment
+;; OR if it's quoted or self-quoting, the value at command calling time
+;; Maybe this will resolve the problems? But you have to be careful to
+;; quote defaults in defcommands.
 
 (defun extract-short-boolean-options (command posix-args)
   "Returns POSIX-ARGS with boolean options removed and as the second value,
@@ -918,11 +938,11 @@ become keyword arguments, in a way specified in the command's arglist."
 	   (progn
 	     (dbugf :lish-arg "skipping arg ~a ~w~%" i a)
 	     (incf i))))
-#|    ;; Default any left over defaultable flags
+    ;; Default any left over defaultable flags
     (loop :for a :in possible-flags :do
        (when (arg-default a)
 	 (push (arg-key a) new-flags)
-	 (push (arg-default a) new-flags))) |#
+	 (push (eval (arg-default a)) new-flags)))
     (setf new-flags (nreverse new-flags))
     ;; Non-flagged mandatories.
     (setf i 0)
@@ -987,10 +1007,12 @@ become keyword arguments, in a way specified in the command's arglist."
 		(not (arg-has-flag arg)))
 	   (if (> (length old-list) 0)
 	       (move-key old-list new-optionals 0 arg keyworded)
-	       #| (if (arg-default arg)
-	           (push-key new-optionals arg (arg-default arg) keyworded) |#
-	       ;; skip
-	       (incf i))))
+	       (if (arg-default arg)
+	           (push-key new-optionals arg (eval (arg-default arg))
+			     keyworded)
+	           ;; (move-key arg new-optionals 0 (eval (arg-default arg))
+		   ;;  	     keyworded)
+		   (incf i)))))        ;; or skip
     (setf new-optionals (nreverse new-optionals))
     ;; Optional repeating
     (dbugf :lish-arg "optional repeating i = ~s old-list = ~s~%" i old-list)

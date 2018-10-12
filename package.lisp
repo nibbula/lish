@@ -16,8 +16,9 @@ The motivation for writing Lish came from the annoyance of having to swtich
 between a Lisp REPL and a Unix shell. Lish may be used as a command shell,
 without any particular knowledge of it's Lisp programming features.
 ")
-  (:use :cl :dlib :opsys :dlib-misc :stretchy :char-util :glob :table-print
-	:reader-ext :completion :keymap :terminal :terminal-ansi :rl
+  (:use :cl :dlib :opsys :dlib-misc :stretchy :char-util :glob
+	:table :table-print :reader-ext :completion :keymap
+	:terminal :terminal-ansi :rl
 	#+use-regex :regex #-use-regex :cl-ppcre
 	:fatchar :collections)
   (:export
@@ -66,11 +67,14 @@ without any particular knowledge of it's Lisp programming features.
    #:arg-long-arg
    ;; argument types
    #:arg-boolean #:arg-number #:arg-integer #:arg-float #:arg-string
-   #:arg-keyword #:arg-object #:arg-date #:arg-pathname
-   #:arg-choice #:arg-choices #:arg-choice-labels
-   #:arg-choice-test
+   #:arg-symbol #:arg-keyword #:arg-object #:arg-case-preserving-object
+   #:arg-sequence #:arg-date #:arg-pathname #:arg-directory #:arg-choice
+   #:arg-choices #:arg-choice-labels #:arg-choice-test
    #:arg-choice-compare-ignore-case #:arg-choice-compare
-   #:arg-lenient-choice 
+   #:arg-lenient-choice #:arg-option #:arg-input-stream-or-filename
+   ;; argument types for builtins
+   #:arg-job-descriptor #:arg-help-subject #:arg-boolean-toggle #:arg-signal
+   #:arg-pid-or-job #:arg-function #:arg-key-sequence #:arg-command
    ;; argument generics
    #:convert-arg #:argument-choices
    #:defargtype

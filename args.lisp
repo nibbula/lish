@@ -435,11 +435,13 @@
   (:default-initargs
    :default :toggle)
   (:documentation "A true or false value, that can be toggled."))
+
 (defmethod initialize-instance
     :after ((o arg-boolean-toggle) &rest initargs &key &allow-other-keys)
   "Initialize a arg-boolean-toggle."
   (declare (ignore initargs))
   (setf (arg-default o) :toggle))
+
 ;; (defmethod convert-arg ((arg arg-boolean-toggle) (value string) &optional quoted)
 ;;   (declare (ignore quoted))
 ;;   (cond
@@ -489,12 +491,44 @@ ARG-* class, it defaults to the generic ARGUMENT class."
       (t
        (error "Argument type is not a symbol, string or T.")))))
 
+(defun new-argument-type-class (type)
+  (cond
+    ((listp type)
+     (if (not (eq (car type) 'or))
+	 (error "Only (or ...) compound types are supported.")
+	 'argument))
+    ((or (eq type t) (eq type 't) (and (stringp type) (equalp type "T")))
+     'argument)
+    ((or (symbolp type) (stringp type))
+     (symbolify (argument-class-name type) :package :lish-user))
+    (t
+     (error "Argument type is not a symbol, string or T."))))
+
 (defun arglist-value (arglist key)
   "Return a value from a DEFCOMMAND arglist argument."
   (let ((p (position key arglist)))
     (and p (elt arglist (1+ p)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+
+  (defun check-argument (a)
+    (let (name type)
+      (when (not (listp a))
+	(error "Argument list element must be a list."))
+      (setf name (first a)
+	    type (second a))
+      (when (not name)
+	(error "Arguments must have a name."))
+      (when (not type)
+	(error "Arguments must have a type."))))
+
+  (defun transform-arg (a)
+    (let ((name (first a))
+	  (type (second a)))
+      (when (symbolp name)
+	(setf name (string-downcase name)))
+      (setf a (append `(:name ,name :type ',type) (cddr a)))))
+
   (defun make-argument (a &optional compile-time)
     (let (name type)
       (when (not (listp a))
@@ -542,9 +576,10 @@ objects, like in the command object."
 	 (slots (if (listp (first bod))
 		    (pop bod)
 		    (error "Missing slot list in defargtype.")))
+	 default-initargs
 	 (conversions '()))
     (loop
-       :for form = bod :then (cdr bod)
+       :for form = bod :then (cdr form)
        :while (not (endp form))
        :do
        (cond
@@ -552,23 +587,33 @@ objects, like in the command object."
 	  (case (car form)
 	    (:convert
 	     (let ((val-type (cadr form))
-		   (conv-body (cddr form)))
-	       (pop bod)
-	       (pop bod)
+		   (conv-body (copy-list (caddr form))))
+	       ;;(format *debug-io* "before form = ~s~%" form) (finish-output *debug-io*)
+	       (setf form (cdddr form))
+	       ;;(format *debug-io* "after form = ~s~%" form) (finish-output *debug-io*)
 	       (push
 		`(defmethod convert-arg ((arg ,class-name) (value ,val-type)
 					 &optional quoted)
 		   (declare (ignorable arg value quoted))
-		   ,@conv-body)
+		   ,conv-body)
 		conversions)))
-	    ;; @@@ What about :default-initargs or :metaclass ?
+	    ;; @@@ What about :metaclass ?
 	    (otherwise
 	     (error "Unknown keyword in defargtype: ~s." (car form)))))
+	 ((listp (car form))
+	  (case (caar form)
+	    (:default-initargs
+	     (setf default-initargs (car form))
+	     ;;(pop form)
+	      )
+	    (otherwise
+	     (error "Unknown clause in defargtype: ~s." (car form)))))
 	 (t
 	  (error "Unknown form in defargtype: ~s." (car form)))))
     `(progn
        (defclass ,class-name ,superclasses
 	 ,slots
+	 ,@(when default-initargs `(,default-initargs))
 	 ,@(when doc `((:documentation ,doc))))
        ,@conversions)))
 
@@ -578,6 +623,7 @@ objects, like in the command object."
 (defargtype foo (superclasses...)
   \"doc\"
   ((slot :blah blah))
+  [ (:default-initargs ...) ]
   :convert zoo-type
     (and (arg-foo-ish arg) (bar-ize value))
   :convert zib-type

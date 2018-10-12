@@ -58,10 +58,6 @@ from stack."
   "Suspend the shell."
   (opsys:suspend-process))
 
-;; (define-builtin-arg-type job-descriptor (arg-object)
-;;   "A job descriptor."
-;;   ())
-
 (defun job-id-list ()
   "Return a list of suspended job ids."
   (loop :for j :in (lish-jobs *shell*)
@@ -71,11 +67,17 @@ from stack."
     (loop :for j :in (symbol-call :bt :all-threads)
        :collect (symbol-call :bt :thread-name j))))
 
-(defclass arg-job-descriptor (arg-lenient-choice)
+(define-builtin-arg-type job-descriptor (arg-lenient-choice)
+  "A job descriptor."
   ()
   (:default-initargs
-   :choice-func #'job-id-list)
-  (:documentation "A job descriptor."))
+   :choice-func #'job-id-list))
+
+;; (defclass arg-job-descriptor (arg-lenient-choice)
+;;   ()
+;;   (:default-initargs
+;;    :choice-func #'job-id-list)
+;;   (:documentation "A job descriptor."))
 
 (defun find-job (job-descriptor)
   "Return a job given a descriptor."
@@ -260,13 +262,21 @@ from stack."
 		   x))
 	   *command-list*)))
 
-(defclass arg-help-subject (arg-choice)
+;; (defclass arg-help-subject (arg-choice)
+;;   ()
+;;   (:default-initargs
+;;    :choice-func
+;;       #+clisp 'help-choices		; I'm not sure why.
+;;       #-clisp #'help-choices)
+;;   (:documentation "Something which we can get help on."))
+
+(define-builtin-arg-type help-subject (arg-choice)
+  "Something which we can get help on."
   ()
   (:default-initargs
    :choice-func
       #+clisp 'help-choices		; I'm not sure why.
-      #-clisp #'help-choices)
-  (:documentation "Something which we can get help on."))
+      #-clisp #'help-choices))
 
 (defparameter *basic-help*
 "~
@@ -535,7 +545,7 @@ NAME is replaced by EXPANSION before any other evaluation."
 ;; understand.
 
 (defbuiltin debug
-  (("state" boolean-toggle :help "State of debugging." :use-supplied-flag t))
+  ((state boolean-toggle :help "State of debugging." :use-supplied-flag t))
   "Toggle shell debugging."
   (setf (lish-debug *shell*)
 	(if (or (not state-supplied-p) (eql state :toggle))
@@ -780,17 +790,17 @@ variables explicitly set in arguments are passed to the commands."
   "Return a list of jobs and process IDs."
   `(,@(job-id-list) ,@(mapcar #'nos:os-process-id (nos:process-list))))
 
-(defclass arg-pid-or-job (arg-lenient-choice)
-  ()
-  (:default-initargs
-   :choice-func #'pid-or-job-list)
-  (:documentation "A job descriptor or process ID."))
-
-;; (define-builtin-arg-type pid-or-job (arg-lenient-choice)
-;;   "A process ID or a job."
+;; (defclass arg-pid-or-job (arg-lenient-choice)
 ;;   ()
 ;;   (:default-initargs
-;;    :choice-func #'pid-or-job-list))
+;;    :choice-func #'pid-or-job-list)
+;;   (:documentation "A job descriptor or process ID."))
+
+(define-builtin-arg-type pid-or-job (arg-lenient-choice)
+  "A process ID or a job."
+  ()
+  (:default-initargs
+   :choice-func #'pid-or-job-list))
 
 (defbuiltin kill
   ((list-signals boolean    :short-arg #\l  :help "List available signals.")
@@ -842,7 +852,7 @@ variables explicitly set in arguments are passed to the commands."
       (read-line nil nil)))
 |#
 
-(defbuiltin time (("command" string :repeating t :help "Command to time."))
+(defbuiltin time ((command string :repeating t :help "Command to time."))
   "Shows some time statistics resulting from the execution of COMMNAD."
   (time (shell-eval (expr-from-args command))))
 
@@ -1059,6 +1069,18 @@ better just to use Lisp syntax.
   "Convert a string to a command."
   (get-command value))
 |#
+
+;; @@@ should it be here or in commands.lisp???
+;; (define-builtin-arg-type command (arg-choice)
+;;   "The name of a lish command."
+;;   ()
+;;   (:default-initargs
+;;    :choice-func #'verb-list)
+;;   :convert string (get-command value))
+
+;; (defmethod convert-arg ((arg arg-command) (value string) &optional quoted)
+;;   "Convert a string to a command."
+;;   (get-command value))
 
 (defbuiltin undefcommand
   ((command command :optional t :help "The command to forget.")
