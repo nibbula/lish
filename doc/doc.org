@@ -41,7 +41,7 @@ Lish Documentation                                        -*- org -*-
 #+END_SRC
 
     This should make an executable named "lish" in your current directory.
-    Put it wherevere you'd like.
+    Put it wherever you'd like.
 
 **** Executables with pre-loaded commands
 *** Implementation specific
