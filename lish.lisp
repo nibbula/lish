@@ -1858,7 +1858,7 @@ handling errors."
        (setf pre-str nil
 	     *input* nil
 	     *output* nil)
-       (handler-case
+       ;;(handler-case
 	   (handler-bind
 	       (#+sbcl
 		(sb-sys:interactive-interrupt
@@ -1876,7 +1876,10 @@ handling errors."
 		(serious-condition
 		 #'(lambda (c)
 		     (if (lish-debug sh)
-			 (invoke-debugger c)))))
+			 (invoke-debugger c)
+			 (progn
+			   (format t "~a~%" c)
+			   (invoke-restart (find-restart 'abort)))))))
 	     (force-output)
 	     (catch 'interactive-interrupt
 	       (multiple-value-bind (vals stream show-vals)
@@ -1893,18 +1896,25 @@ handling errors."
 		   #-(and unix (not sbcl))
 		   |#
 		   (shell-eval expr :context nil)
-
-		   (declare (ignore stream))
+		 (declare (ignore stream))
+		 (let ((vals-list (if (listp vals) vals (list vals))))
+		   (setf /// //
+			 // /
+			 / vals-list
+			 *** **
+			 ** *
+			 * (car vals-list))
 		   (when show-vals
-		     (lish-print vals)))))
+		     (lish-print vals))))))
 	 ;; (condition (c)
 	 ;; 	 (if (lish-debug sh)
 	 ;; 	     (invoke-debugger c)
 	 ;; 	     (format t "GOO ~a~%" c)))
-	 (error (c)
-	   (if (lish-debug sh)
-	       (invoke-debugger c)
-	       (format t "~a~%" c))))))))
+	 ;; (error (c)
+	 ;;   (if (lish-debug sh)
+	 ;;       (invoke-debugger c)
+	 ;;       (format t "~a~%" c))))
+	   ))))
 
 (defun confirm-quit ()
   (if (lish-jobs *shell*)
