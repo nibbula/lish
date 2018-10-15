@@ -12,9 +12,9 @@
     :source-control	:git
     :long-description   "Lish is a Lisp shell. Don't hold your breath."
     :entry-point	"lish:shell-toplevel"
-    :depends-on (:dlib :opsys :dlib-misc :stretchy :char-util :glob :table-print
-		 :reader-ext :dlib-interactive :completion :keymap :terminal
-		 :terminal-ansi :rl
+    :depends-on (:dlib :opsys :dlib-misc :stretchy :char-util :glob
+		 :table :table-print :reader-ext :dlib-interactive :completion
+		 :keymap :terminal :terminal-ansi :rl
 		 #+use-re :re
 		 #-use-re :cl-ppcre
 		 :chipz :fatchar :magic :theme :collections

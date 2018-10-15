@@ -241,31 +241,11 @@ literally in shell syntax."
 			    :count (length comp-list)
 			    :prefix prefix-str)))
 
-;; (defun show-dash-arglist (arglist)
-;;   (list
-;;    (with-output-to-string (str)
-;;      (loop :with print-newline = nil
-;; 	:for a :in arglist
-;; 	:when (and (arg-short-arg a)
-;; 		   (not (arg-hidden a)))
-;; 	:do
-;; #|	(format str "~:[~;~%~]-~a ~:[~;[T] ~]~25a~@[ ~a~]"
-;; 		print-newline
-;; 		(arg-short-arg a) (arg-default a) (arg-name a)
-;; 		(and (slot-boundp a 'help) (arg-help a))) |#
-;; 	(format str "~:[~;~%~] -~a ~@[ ~a~] ~:[~;~1:*[~a] ~]"
-;; 		print-newline
-;; 		(arg-short-arg a)
-;; 		(or (and (slot-boundp a 'help) (arg-help a))
-;; 		    (arg-name a))
-;; 		(arg-default a))
-;; 	(when (not print-newline)
-;; 	  (setf print-newline t))))))
-
 (defun show-dash-arglist (arglist)
   (let ((result (make-stretchy-string 200)))
     (with-output-to-string (str result)
-      (nice-print-table
+      (output-table
+       (make-table-from
        (loop :for a :in arglist
 	  :when (and (arg-short-arg a)
 		     (not (arg-hidden a)))
@@ -287,12 +267,16 @@ literally in shell syntax."
 		    (if (arg-default a)
 			(s+ " [" (arg-default a) "]")
 			""))))
-       '("Arg" ("desc" :wrap)) :stream str :trailing-spaces nil
+       :column-names '("Arg" ("desc" :wrap)))
+       (make-instance 'text-table-renderer)
+       str
+       :trailing-spaces nil
        :print-titles nil :max-width (term-cols)))
     ;; Get rid of the final newline
     (when (and (> (length result) 0)
 	       (char= #\newline (aref result (- (length result) 1))))
-      (setf (fill-pointer result) (- (length result) 2)))
+      ;; (setf (fill-pointer result) (- (length result) 2))
+      (setf (fill-pointer result) (- (length result) 1)))
     (make-completion-result :completion (list result) :count 1)))
 
 (defvar *long-double-dash-help* nil
@@ -301,7 +285,8 @@ literally in shell syntax."
 (defun show-double-dash-arglist (arglist)
   (let ((result (make-stretchy-string 200)))
     (with-output-to-string (str result)
-      (nice-print-table
+      (output-table
+       (make-table-from
        (loop :for a :in arglist
 	  :when (and (arg-long-arg a)
 		     (not (arg-hidden a)))
@@ -317,8 +302,9 @@ literally in shell syntax."
 			     (substitute #\space #\newline (arg-help a)))
 			(format nil "~s ~(~a~)"
 				(arg-default a) (arg-type a))))))
-       '(("Arg" :overflow) ("desc" :wrap)) :stream str :trailing-spaces nil
-       :print-titles nil :max-width (term-cols)))
+       :column-names '(("Arg" :overflow) ("desc" :wrap)))
+       (make-instance 'text-table-renderer) str
+       :trailing-spaces nil :print-titles nil :max-width (term-cols)))
     ;; Get rid of the final newline
     (when (and (> (length result) 0)
 	       (char= #\newline (aref result (- (length result) 1))))
