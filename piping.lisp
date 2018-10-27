@@ -266,6 +266,24 @@ like $(command) in bash."
   "Return the output from command, broken into words by the shell reader."
   (shell-words-to-list (lish::shell-expr-words (shell-read (!- command)))))
 
+;; @@@ What about something like:
+(defmacro !q (&rest args)
+  `(!@ ,@(loop :for a :in args :collect
+	    (typecase a
+	      (symbol (string-downcase a))
+	      (string (s+ #\" a #\"))
+	      (t a)))))
+
+;; @@@ or even
+(defmacro !qq (&rest args)
+  `(!@ ,@(loop :for a :in args :collect
+	    (typecase a
+	      (symbol (if (boundp a)
+			  (symbol-value a)
+			  (string-downcase a)))
+	      (string (s+ #\" a #\"))
+	      (t a)))))
+
 (defun !_ (&rest command)
   "Return a list of the lines of output from the command."
   (command-output-list (lisp-args-to-command command)))
