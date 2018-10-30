@@ -1716,7 +1716,8 @@ suspend itself."
   string
   prefix-string
   this-command
-  last-command)
+  last-command
+  (error-count 0))
 
 (cffi:defcallback sigint-handler :void ((signal-number :int))
   (declare (ignore signal-number))
@@ -1757,72 +1758,39 @@ suspend itself."
      :do (uos:set-signal-action sig act)))
 
 (defun lish-read (sh state)
-  "Read a string with the line editor and convert it shell expressions,
-handling errors."
+  "Read a string with the line editor and convert it shell expressions."
   (with-slots ((str string) (pre-str prefix-string) this-command last-command)
       state
-    (handler-case
-	(handler-bind
-	    (#+sbcl
-	     ;; So we can do something on ^C
-	     (sb-sys:interactive-interrupt
-	      #'(lambda (c)
-		  (declare (ignore c))
-		  (format t "~%") (finish-output)
-		  (invoke-restart (find-restart 'abort))))
-	     ;; So we can step through functions
-#|	     #+sbcl (sb-ext::step-condition 'rl::repple-stepper) |#
-#|	     (condition #'(lambda (c)
-			    (if (lish-debug sh)
-				(invoke-debugger c)
-				(format t "~&~a" c)))) |#
-	     (error #'(lambda (c)
-			(if (lish-debug sh)
-			    (invoke-debugger c)
-			    (progn
-			      #| (format t "~&~a" c) |#
-			      (signal c))))))
-	  (let (saved-signals)
-	    (unwind-protect
-	       (progn
-		 ;;(break)
-		 (finish-output)
-		 (tt-finish-output)
-		 (setf saved-signals (set-signals)
-		       str (rl
-			    :eof-value *real-eof-symbol*
-			    :quit-value *quit-symbol*
-			    :context :lish
-			    :editor (lish-editor sh)
-			    :prompt
-			    (if pre-str
-				(lish-sub-prompt sh)
-				(safety-prompt sh)))))
-	      (when saved-signals
-		(restore-signals saved-signals))))
-	  (cond
-	    ((and (stringp str) (equal 0 (length str))) *empty-symbol*)
-	    ((equal str *real-eof-symbol*)		*real-eof-symbol*)
-	    ((equal str *quit-symbol*)	  		*quit-symbol*)
-	    (t
-	     (setf ! last-command
-		   last-command (copy-seq this-command))
-	     ;; This is THE read of the REPL.
-	     (shell-read (setf this-command
-			       (if pre-str
-				   (s+ pre-str #\newline str)
-				   str))))))
-      #+sbcl
-      (sb-sys:interactive-interrupt ()
-	(format t "~%") (finish-output)
-	(invoke-restart (find-restart 'abort)))
-      (end-of-file () *continue-symbol*)
-      #| (condition (c) |#
-      (error (c)
-	(if (lish-debug sh)
-	    (invoke-debugger c)
-	    (format t "~&~a~&" c))
-	*error-symbol*))))
+    (let (saved-signals)
+      (unwind-protect
+	   (progn
+	     ;;(break)
+	     (finish-output)
+	     (tt-finish-output)
+	     (setf saved-signals (set-signals)
+		   str (rl
+			:eof-value *real-eof-symbol*
+			:quit-value *quit-symbol*
+			:context :lish
+			:editor (lish-editor sh)
+			:prompt
+			(if pre-str
+			    (lish-sub-prompt sh)
+			    (safety-prompt sh)))))
+	(when saved-signals
+	  (restore-signals saved-signals))))
+    (cond
+      ((and (stringp str) (equal 0 (length str))) *empty-symbol*)
+      ((equal str *real-eof-symbol*)		  *real-eof-symbol*)
+      ((equal str *quit-symbol*)	  	  *quit-symbol*)
+      (t
+       (setf ! last-command
+	     last-command (copy-seq this-command))
+       ;; This is THE read of the REPL.
+       (shell-read (setf this-command
+			 (if pre-str
+			     (s+ pre-str #\newline str)
+			     str)))))))
 
 (defun lish-print (values)
   "Print the results of an evaluation. VALUES are a list of values to print."
@@ -1837,6 +1805,7 @@ handling errors."
 
 (defun lish-eval (sh expr state)
   "Evaluate the shell expressions in EXPR."
+  (declare (ignore sh))
   (dbugf 'lish-repl
 	 "~s (~a) ~s~%" expr (type-of expr) (eq expr *empty-symbol*))
   (with-slots ((str string) (pre-str prefix-string)) state
@@ -1858,63 +1827,31 @@ handling errors."
        (setf pre-str nil
 	     *input* nil
 	     *output* nil)
-       ;;(handler-case
-	   (handler-bind
-	       (#+sbcl
-		(sb-sys:interactive-interrupt
-		 #'(lambda (c)
-		     (declare (ignore c))
-		     (format t "~%") (finish-output)
-		     (invoke-restart (find-restart 'abort))))
-		#| (warning
-		 #'(lambda (c)
-		     (format t "Warning: ~a~%" c)
-		     (muffle-warning))) |#
-		#| #+excl (excl::compiler-note
-		    #'(lambda (c)
-		(format t "Note: ~a~%" c))) |#
-		(serious-condition
-		 #'(lambda (c)
-		     (if (lish-debug sh)
-			 (invoke-debugger c)
-			 (progn
-			   (format t "~a~%" c)
-			   (invoke-restart (find-restart 'abort)))))))
-	     (force-output)
-	     (catch 'interactive-interrupt
-	       (multiple-value-bind (vals stream show-vals)
-		   #| @@@ This really fails.
-		   #+(and unix (not sbcl))
-		   ;; (uos:with-signal-handlers ((uos:+sigint+ . sigint-handler))
-		   ;;   (format t "Howdy pardner.~%")
-		   ;;   (shell-eval expr :context nil))
-		   (progn
-		     (uos:set-signal-action uos:+sigint+ 'sigint-handler)
-		     (shell-eval expr :context nil)
-		     (uos:set-signal-action uos:+sigint+ :default))
-
-		   #-(and unix (not sbcl))
-		   |#
-		   (shell-eval expr :context nil)
-		 (declare (ignore stream))
-		 (let ((vals-list (if (listp vals) vals (list vals))))
-		   (setf /// //
-			 // /
-			 / vals-list
-			 *** **
-			 ** *
-			 * (car vals-list))
-		   (when show-vals
-		     (lish-print vals))))))
-	 ;; (condition (c)
-	 ;; 	 (if (lish-debug sh)
-	 ;; 	     (invoke-debugger c)
-	 ;; 	     (format t "GOO ~a~%" c)))
-	 ;; (error (c)
-	 ;;   (if (lish-debug sh)
-	 ;;       (invoke-debugger c)
-	 ;;       (format t "~a~%" c))))
-	   ))))
+       (force-output)
+       (catch 'interactive-interrupt
+	 (multiple-value-bind (vals stream show-vals)
+	     #| @@@ This really fails.
+	     #+(and unix (not sbcl))
+	     ;; (uos:with-signal-handlers ((uos:+sigint+ . sigint-handler))
+	     ;;   (format t "Howdy pardner.~%")
+	     ;;   (shell-eval expr :context nil))
+	     (progn
+	     (uos:set-signal-action uos:+sigint+ 'sigint-handler)
+	     (shell-eval expr :context nil)
+	     (uos:set-signal-action uos:+sigint+ :default))
+	     #-(and unix (not sbcl))
+	     |#
+	     (shell-eval expr :context nil)
+	   (declare (ignore stream))
+	   (let ((vals-list (if (listp vals) vals (list vals))))
+	     (setf /// //
+		   // /
+		   / vals-list
+		   *** **
+		   ** *
+		   * (car vals-list))
+	     (when show-vals
+	       (lish-print vals)))))))))
 
 (defun confirm-quit ()
   (if (lish-jobs *shell*)
@@ -1922,6 +1859,31 @@ handling errors."
 	(format t "There are stopped jobs. ")
 	(confirm "quit the shell"))
       t))
+
+(defmacro with-error-handling ((state) &body body)
+  `(handler-bind
+       (#+sbcl (sb-ext::step-condition 'repple-stepper)
+	#+sbcl
+	;; So we can do something on ^C
+	(sb-sys:interactive-interrupt
+	 #'(lambda (c)
+	     (declare (ignore c))
+	     (format t "~%") (finish-output)
+	     (invoke-restart (find-restart 'abort))))
+	;; Normal error handling
+	(serious-condition
+	 #'(lambda (c)
+	     (dbugf :lish "Handler bind~%")
+	     (incf (read-state-error-count ,state))
+	     (when (> (read-state-error-count ,state) 10)
+	       (format t "Too many errors!~%")
+	       (break))
+	     (if (lish-debug *shell*)
+		 (invoke-debugger c)
+		 (progn
+		   (format t "~&~a~&" c)
+		   (invoke-restart 'abort))))))
+    ,@body))
 
 (defun lish (&key debug terminal-name
 	       ;;(terminal-type (pick-a-terminal-type))
@@ -2006,7 +1968,7 @@ Arguments:
 	     :end
 	     :do
 	     (restart-case
-	       (progn
+	       (with-error-handling (state)
 		 (check-job-status sh)
 		 (setf expr (lish-read sh state))
 		 (when (and (eq expr *real-eof-symbol*) (confirm-quit))
@@ -2022,7 +1984,8 @@ Arguments:
 				     (return-from pippy expr)
 				     (setf eof-count 0))))
 			   (format t "Type 'exit' to exit the shell.~%")))
-		     (lish-eval sh expr state)))
+		     (lish-eval sh expr state))
+		 (setf (read-state-error-count state) 0))
 	       (abort ()
 		 :report
 		 (lambda (stream)
