@@ -85,7 +85,8 @@ Not implemented yet:
 		   (#\v (princ *major-version* str))
 		   (#\V (write-string (princ-to-string *version*) str))
 		   (#\u (write-string (nos:user-name) str))
-		   (#\h (write-string (princ-to-string dlib:*host*) str))
+		   (#\h (write-string
+			 (initial-span (os-machine-instance) ".") str))
 		   (#\H (write-string (machine-instance) str))
 		   (#\w (write-string (twiddlify (nos:current-directory)) str))
 		   (#\W (write-string
