@@ -1717,7 +1717,8 @@ suspend itself."
   prefix-string
   this-command
   last-command
-  (error-count 0))
+  ;; (error-count 0)
+  )
 
 (cffi:defcallback sigint-handler :void ((signal-number :int))
   (declare (ignore signal-number))
@@ -1860,7 +1861,7 @@ suspend itself."
 	(confirm "quit the shell"))
       t))
 
-(defmacro with-error-handling ((state) &body body)
+(defmacro with-error-handling ((#|state|#) &body body)
   `(handler-bind
        (#+sbcl (sb-ext::step-condition 'repple-stepper)
 	#+sbcl
@@ -1874,10 +1875,11 @@ suspend itself."
 	(serious-condition
 	 #'(lambda (c)
 	     (dbugf :lish "Handler bind~%")
-	     (incf (read-state-error-count ,state))
-	     (when (> (read-state-error-count ,state) 10)
-	       (format t "Too many errors!~%")
-	       (break))
+	     ;; This should be the purview of the debugger.
+	     ;; (incf (read-state-error-count ,state))
+	     ;; (when (> (read-state-error-count ,state) 10)
+	     ;;   (format t "Too many errors!~%")
+	     ;;   (break))
 	     (if (lish-debug *shell*)
 		 (invoke-debugger c)
 		 (progn
@@ -1968,7 +1970,7 @@ Arguments:
 	     :end
 	     :do
 	     (restart-case
-	       (with-error-handling (state)
+	       (with-error-handling (#|state|#)
 		 (check-job-status sh)
 		 (setf expr (lish-read sh state))
 		 (when (and (eq expr *real-eof-symbol*) (confirm-quit))
@@ -1985,7 +1987,8 @@ Arguments:
 				     (setf eof-count 0))))
 			   (format t "Type 'exit' to exit the shell.~%")))
 		     (lish-eval sh expr state))
-		 (setf (read-state-error-count state) 0))
+		 ;; (setf (read-state-error-count state) 0)
+		 )
 	       (abort ()
 		 :report
 		 (lambda (stream)
