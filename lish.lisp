@@ -1869,8 +1869,11 @@ suspend itself."
 	(sb-sys:interactive-interrupt
 	 #'(lambda (c)
 	     (declare (ignore c))
-	     (format t "~%") (finish-output)
-	     (invoke-restart (find-restart 'abort))))
+	     (if (lish-debug *shell*)
+		 (invoke-debugger c)
+		 (progn
+		   (format t "~%") (finish-output)
+		   (invoke-restart (find-restart 'abort))))))
 	;; Normal error handling
 	(serious-condition
 	 #'(lambda (c)
