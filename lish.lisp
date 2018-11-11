@@ -1868,7 +1868,6 @@ suspend itself."
 	;; So we can do something on ^C
 	(sb-sys:interactive-interrupt
 	 #'(lambda (c)
-	     (declare (ignore c))
 	     (if (lish-debug *shell*)
 		 (invoke-debugger c)
 		 (progn
