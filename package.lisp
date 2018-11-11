@@ -66,11 +66,11 @@ without any particular knowledge of it's Lisp programming features.
    #:arg-optional #:arg-hidden #:arg-prompt #:arg-help #:arg-short-arg
    #:arg-long-arg
    ;; argument types
-   #:arg-boolean #:arg-number #:arg-integer #:arg-float #:arg-string
-   #:arg-symbol #:arg-keyword #:arg-object #:arg-case-preserving-object
-   #:arg-sequence #:arg-date #:arg-pathname #:arg-directory #:arg-choice
-   #:arg-choices #:arg-choice-labels #:arg-choice-test
-   #:arg-choice-compare-ignore-case #:arg-choice-compare
+   #:arg-boolean #:arg-number #:arg-integer #:arg-float #:arg-character
+   #:arg-string #:arg-symbol #:arg-keyword #:arg-object
+   #:arg-case-preserving-object #:arg-sequence #:arg-date #:arg-pathname
+   #:arg-directory #:arg-choice #:arg-choices #:arg-choice-labels
+   #:arg-choice-test #:arg-choice-compare-ignore-case #:arg-choice-compare
    #:arg-lenient-choice #:arg-option #:arg-input-stream-or-filename
    ;; argument types for builtins
    #:arg-job-descriptor #:arg-help-subject #:arg-boolean-toggle #:arg-signal
