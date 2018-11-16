@@ -1140,6 +1140,19 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	;; no *input* stuffing
 	(with-first-value-to-output (apply func parenless-args)))))
 
+(defmacro maybe-do-in-background ((bg-p name) &body body)
+  (with-unique-names (thunk)
+    `(flet ((,thunk () (progn ,@body)))
+       (if (and ,bg-p (find-package :bt)
+		(symbol-value (intern (string '#:*supports-threads-p*) :bt)))
+	   (progn
+	     (dbugf :lish-eval "in the BG ~s~%" ,name)
+	     (symbol-call :bt :make-thread #',thunk
+			  :name (prin1-to-string ,name)))
+	   (progn
+	     (dbugf :lish-eval "not in th BG ~s~%" ,name)
+	     (funcall #',thunk))))))
+
 (defun call-thing (thing args context &optional parenless)
   "Call a command or function with the given POSIX style arguments.
 THING is a COMMAND object or a function/callable symbol.
@@ -1154,7 +1167,8 @@ bound during command.
 If PARENLESS is set, it's the text of rest of the line to be fed to
 CALL-PARENLESS."
   (with-slots (in-pipe out-pipe environement) context
-    (let ((command-p (typep thing 'command)))
+    (let ((command-p (typep thing 'command))
+	  (bg (context-background context)))
       (when command-p
 	(dbugf :accepts "command ~s ~s~%" (command-name thing) *accepts*))
       (labels ((runky (thing args)
@@ -1163,44 +1177,49 @@ CALL-PARENLESS."
 		     (let ((lisp-args (posix-to-lisp-args thing args))
 			   (cmd-func (symbol-function (command-function thing)))
 			   (*context* context))
+		       (dbugf :lish-eval "call-thing command ~s~%" cmd-func)
 		       (if (> (length lisp-args) 0)
-			   (apply cmd-func lisp-args)
-			   (funcall cmd-func))))
+			   (maybe-do-in-background (bg (command-name thing))
+			     (apply cmd-func lisp-args))
+			   (maybe-do-in-background (bg (command-name thing))
+                             (funcall cmd-func)))))
 		   (parenless
 		    (dbugf :lish-eval "call-thing parenless ~s~%" thing)
 		    (call-parenless thing parenless context))
 		   (t
-		    (dbugf :lish-eval "call-thing plain eval ~s~%" thing)
-		    (eval thing)))))
-      (if out-pipe
-	  (let ((out-str (make-stretchy-string 20)))
-	    (values
-	     ;; @@@ This totally stupid
-	     (list (with-output-to-string (*standard-output* out-str)
-		     (if in-pipe
-			 (let ((*standard-input* in-pipe))
-			   (runky thing args))
-			 (runky thing args))))
-	     (let ((oo (make-string-input-stream out-str)))
-	       ;; (format t "out-str = ~w~%" out-str)
-	       ;; (format t "(slurp oo) = ~w~%" (slurp oo))
-	       ;; (file-position oo 0)
-	       oo)
-	     nil))
-	  (if in-pipe
-	      (let ((*standard-input* in-pipe))
+		    (dbugf :lish-eval "call-thing plain eval ~s ~s~%" thing
+			   context)
+		    (maybe-do-in-background (bg thing)
+		      (eval thing))))))
+	(dbugf :lish-eval "call-thing args = ~s~%" args)
+	(if out-pipe
+	    (let ((out-str (make-stretchy-string 20)))
+	      (values
+	       ;; @@@ This totally stupid
+	       (list (with-output-to-string (*standard-output* out-str)
+		       (if in-pipe
+			   (let ((*standard-input* in-pipe))
+			     (runky thing args))
+			   (runky thing args))))
+	       (let ((oo (make-string-input-stream out-str)))
+		 ;; (format t "out-str = ~w~%" out-str)
+		 ;; (format t "(slurp oo) = ~w~%" (slurp oo))
+		 ;; (file-position oo 0)
+		 oo)
+	       nil))
+	    (if in-pipe
+		(let ((*standard-input* in-pipe))
+		  (if command-p
+		      (runky thing args)
+		      (let ((vals (multiple-value-list (runky thing args))))
+			(dbugf :lish-eval "call-thing in-pipe vals ~s~%" vals)
+			(values vals nil t))))
 		(if command-p
 		    (runky thing args)
+		    ;; (values (list (runky thing args)) nil t))))))))
 		    (let ((vals (multiple-value-list (runky thing args))))
-		      (dbugf :lish-eval "call-thing in-pipe vals ~s~%" vals)
-		      (values vals nil t))))
-	      (if command-p
-		  (runky thing args)
-		  ;; (values (list (runky thing args)) nil t))))))))
-		  (let ((vals (multiple-value-list (runky thing args))))
-		    (dbugf :lish-eval "call-thing vals ~s~%" vals)
-		    (values vals nil t))
-		  )))))))
+		      (dbugf :lish-eval "call-thing vals ~s~%" vals)
+		      (values vals nil t)))))))))
 
 (defun do-system-command (expr context)
   "Run a system command.
@@ -1228,7 +1247,7 @@ read from."
 
     ;; This actually should be in the child process:
     ;;(set-default-job-sigs)
-    (with-slots (in-pipe out-pipe environment) context
+    (with-slots (in-pipe out-pipe environment background) context
       (if (or in-pipe out-pipe)
 	  (progn
 	    ;; (when in-pipe
@@ -1248,14 +1267,16 @@ read from."
 	    (when (not out-pipe)
 	      (setf result-stream nil)))
 	  ;; No pipes
-	  (let ((tail (last args))
-		background)
+	  (let (#|(tail (last args))
+		background |#)
 	    ;;(format t "tail = ~s~%" tail)
+	    #|
 	    (when (equal (car tail) "&")
 	      (setf args (nbutlast args))
 	      (setf background t)
 	      ;; (format t "background = ~a~%args = ~s~%" background args)
 	      )
+	    |#
 	    (dbugf :sheep "system command ~s args: ~s~%" path args)
 	    (setf pid
 		  (apply
@@ -1433,7 +1454,8 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 "
   (let ((*context* (or context (make-context)))
 	first-word vals out-stream show-vals)
-    (with-slots (in-pipe out-pipe environment flipped-io pipe-plus) *context*
+    (with-slots (in-pipe out-pipe environment flipped-io pipe-plus background)
+	*context*
       (setf flipped-io nil)
       (macrolet
 	  ((eval-compound (test new-pipe)
@@ -1576,6 +1598,11 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (unless no-expansions
 	     (do-expansions expr))
 	   (dbug "~w~%" expr)
+	   ;; this is stupid
+	   (when (equal (word-word (car (last (shell-expr-words expr)))) "&")
+	     (dbugf :lish-eval "simple command in the BG.~%")
+	     (setf background t
+		   (shell-expr-words expr) (nbutlast (shell-expr-words expr))))
 	   (with-package *lish-user-package*
 	     ;; accepts is :unspecified because we're last in the
 	     ;; pipeline.
