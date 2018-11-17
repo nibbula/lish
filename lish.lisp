@@ -258,7 +258,6 @@
      (setf (job-status job) :suspended)
      nil)))
 
-
 ;; (defun unquoted-string-p (w expr i)
 ;;   "True if W in EXPR with index I is _not_ quoted."
 ;;   (and (stringp w) (> (length w) 0)
@@ -1140,15 +1139,16 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	;; no *input* stuffing
 	(with-first-value-to-output (apply func parenless-args)))))
 
-(defmacro maybe-do-in-background ((bg-p name) &body body)
+(defmacro maybe-do-in-background ((bg-p name args) &body body)
   (with-unique-names (thunk)
     `(flet ((,thunk () (progn ,@body)))
-       (if (and ,bg-p (find-package :bt)
-		(symbol-value (intern (string '#:*supports-threads-p*) :bt)))
+       (if (and ,bg-p bt:*supports-threads-p*)
 	   (progn
 	     (dbugf :lish-eval "in the BG ~s~%" ,name)
-	     (symbol-call :bt :make-thread #',thunk
-			  :name (prin1-to-string ,name)))
+	     (let ((nn (prin1-to-string ,name))
+		   (aa ,args))		; so we only eval once
+	       (add-job nn (or (and aa (shell-words-to-string aa)) "")
+			(bt:make-thread #',thunk :name nn))))
 	   (progn
 	     (dbugf :lish-eval "not in th BG ~s~%" ,name)
 	     (funcall #',thunk))))))
@@ -1179,9 +1179,9 @@ CALL-PARENLESS."
 			   (*context* context))
 		       (dbugf :lish-eval "call-thing command ~s~%" cmd-func)
 		       (if (> (length lisp-args) 0)
-			   (maybe-do-in-background (bg (command-name thing))
+			   (maybe-do-in-background (bg (command-name thing) args)
 			     (apply cmd-func lisp-args))
-			   (maybe-do-in-background (bg (command-name thing))
+			   (maybe-do-in-background (bg (command-name thing) args)
                              (funcall cmd-func)))))
 		   (parenless
 		    (dbugf :lish-eval "call-thing parenless ~s~%" thing)
@@ -1189,7 +1189,7 @@ CALL-PARENLESS."
 		   (t
 		    (dbugf :lish-eval "call-thing plain eval ~s ~s~%" thing
 			   context)
-		    (maybe-do-in-background (bg thing)
+		    (maybe-do-in-background (bg thing args)
 		      (eval thing))))))
 	(dbugf :lish-eval "call-thing args = ~s~%" args)
 	(if out-pipe
@@ -1296,8 +1296,8 @@ read from."
 	    ;; (cerror "Keep going" "Your breakpoint, sir?")
 	    (if background
 		(setf (job-status job) :running)
-		;; Wait for it...
 		(progn
+		  ;; Wait for it...
 		  (multiple-value-setq (result status)
 		    (nos:wait-and-chill pid))
 		  (handle-job-change job result status :foreground t))))))
@@ -1678,21 +1678,39 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 (defun add-job (name command-line thing &key (status :running))
   "Add a job with the given NAME and COMMAND-LINE. THING is either an integer
 process ID or a resume function designator. STATUS defaults to :RUNNING."
-  (let ((job (make-job
-	      :id (find-id *shell*)
-	      :name name
-	      :command-line command-line
-	      :status status)))
+  (let (job)
     (etypecase thing
       (integer
-       (setf (job-pid job) thing
-	     (job-process-group job) thing))
+       (setf job (make-instance 'system-job
+				:id (find-id *shell*)
+				:name name
+				:command-line command-line
+				:status status
+				:pid thing
+				:process-group thing)))
       (process-handle
-       (setf (job-pid job) (process-handle-value thing)
-	     ;; @@@ bullcrap workaround
-	     (job-process-group job) (process-handle-value thing)))
+       (setf job (make-instance 'system-job
+				:id (find-id *shell*)
+				:name name
+				:command-line command-line
+				:status status
+				;; @@@ bullcrap workaround
+				:pid (process-handle-value thing)
+				:process-group (process-handle-value thing))))
       ((or symbol function)
-       (setf (job-resume-function job) thing)))
+       (setf job (make-instance 'lisp-job
+			       :id (find-id *shell*)
+			       :name name
+			       :command-line command-line
+			       :status status
+			       :resume-function thing)))
+      (bt:thread
+       (setf job (make-instance 'thread-job
+				:id (find-id *shell*)
+				:name name
+				:command-line command-line
+				:status status
+				:thread thing))))
     (push job (lish-jobs *shell*))
     job))
 
@@ -1705,20 +1723,16 @@ suspend itself."
   "Delete the job. JOB is either a JOB struct or a JOB-ID."
   (when (not (or (job-p job) (integerp job)))
     (error "JOB must be a JOB or an integer JOB-ID."))
-  (let ((job-id (if (integerp job) job (job-id job))))
-    (setf (lish-jobs *shell*)
-	  (delete job-id
-		  (lish-jobs *shell*) :test #'= :key #'job-id))))
+  (setf (lish-jobs *shell*)
+	(typecase job
+	  (integer
+	   (delete job (lish-jobs *shell*) :test #'= :key #'job-id))
+	  (job
+	   (delete job (lish-jobs *shell*) :test #'eq)))))
 
-(defun check-job-status (sh)
-  (let (job pid result status)
-    (loop :do
-       (multiple-value-setq (pid result status) (nos:check-jobs))
-       :while pid
-       :do
-	(if (setf job (find pid (lish-jobs sh) :test #'eql :key #'job-pid))
-	    (handle-job-change job result status)
-	    (format t "Unknown job changed ~a~%" pid)))))
+(defun check-all-job-status (sh)
+  "Check the status of all jobs and perform appropriate actions."
+  (mapc (_ (check-job-status sh _)) *job-types*))
 
 (defvar *shell-non-word-chars*
   #(#\space #\tab #\newline #\linefeed #\page #\return
@@ -2000,7 +2014,7 @@ Arguments:
 	     :do
 	     (restart-case
 	       (with-error-handling (#|state|#)
-		 (check-job-status sh)
+		 (check-all-job-status sh)
 		 (setf expr (lish-read sh state))
 		 (when (and (eq expr *real-eof-symbol*) (confirm-quit))
 		   (return-from pippy expr))

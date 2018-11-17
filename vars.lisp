@@ -178,16 +178,6 @@ end points in the original string."
       (quoted (format stream "\"~a\"" word))
       (t (format stream "~a" word)))))
 
-(defstruct job
-  "A job in the shell, which can be a process, thread, or closure."
-  id					; unique integer
-  name					; string
-  command-line				; string
-  resume-function			; closure to resume
-  pid					; process ID
-  process-group				; process group ID
-  status)				; what's going on with the job?
-
 (defstruct context
   "The context for a command. It's input and output streams and environment
 variables."
