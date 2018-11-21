@@ -17,7 +17,7 @@
 		 :keymap :terminal :terminal-ansi :rl
 		 #+use-re :re
 		 #-use-re :cl-ppcre
-		 :chipz :fatchar :magic :theme :collections
+		 :chipz :fatchar :magic :theme :style :collections
 		 :bordeaux-threads)
     :components
     ((:file "package")

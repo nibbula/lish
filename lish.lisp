@@ -1099,13 +1099,19 @@ expanded."
 
 (defun command-type (sh command)
   "Return a keyword representing the command type of COMMAND, or NIL."
-  (cond
-    ((gethash command (lish-commands))	        :command)
-    ((gethash command (lish-aliases sh))        :alias)
-    ((gethash command (lish-global-aliases sh)) :global-alias)
-    ((get-command-path command)		        :file)
-    ((and (fboundp (symbolify command)))	:function)
-    (t nil)))
+  (let (cmd)
+    (cond
+      ((setf cmd (gethash command (lish-commands)))
+       (typecase cmd
+	 (external-command			  :external-command)
+	 (builtin-command			  :builtin-command)
+	 (shell-command				  :shell-command)
+	 (t					  :command)))
+      ((gethash command (lish-aliases sh))        :alias)
+      ((gethash command (lish-global-aliases sh)) :global-alias)
+      ((get-command-path command)		  :file)
+      ((and (fboundp (symbolify command)))	  :function)
+      (t nil))))
 
 (defun call-parenless (func line context)
   "Apply the function to the line, and return the proper values. If there are
@@ -1955,6 +1961,7 @@ Arguments:
 	 (*lishrc* init-file) ;; So it's inherited by sub-shells.
 	 ! ;-) !
 	 (saved-sigs (job-control-signals)))
+    (setf (lish-debug *shell*) debug)	; @@@ the arg to make-instance doesn't
     ;; Don't do the wacky package updating in other packages.
     (when (eq *lish-user-package* (find-package :lish-user))
       (update-user-package))
@@ -1992,7 +1999,8 @@ Arguments:
 			   :context *history-context*
 			   :terminal-device-name terminal-name
 			   :local-keymap (lish-keymap sh)
-			   :prompt-func nil))
+			   :prompt-func nil
+			   :filter-hook `(colorize)))
 
       (unwind-protect
 	(progn

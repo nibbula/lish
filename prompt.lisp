@@ -191,4 +191,59 @@ the primary result printed as a string."
 	    (format t "Your prompt is broken.~%")
 	    *fallback-prompt*))))
 
+(defun is-lisp-expr-p (expr)
+  "Return true if the the shell expr is likely just a wrapped Lisp expr."
+  (and (= 1 (length (shell-expr-words expr)))
+       (consp (elt (shell-expr-words expr) 0))))
+
+(defun colorize-lisp (expr fat-string)
+  "Colorize a lisp expression."
+  (declare (ignore expr fat-string))
+  ;; @@@
+  nil)
+
+(defun themify-shell-word-in-fat-string (word string theme-item)
+  "Apply the THEME-ITEM, which should be a style, to the WORD in the fat
+string STRING."
+  (let ((fcs string #| (fat-string-string string) |#)
+	(style (oelt (style:themed-string theme-item '("x")) 0)))
+    (dbugf :recolor "style ~s~%item ~s~%" style theme-item)
+    (loop :for i :from (shell-word-start word) :below (shell-word-end word)
+       :do (copy-fatchar-effects style (aref fcs i)))))
+
+(defun colorize-expr (expr fat-str)
+  "Colorize a shell expression."
+  (let* ((first-word (and (shell-expr-p expr) (first (shell-expr-words expr))))
+	 type)
+    (flet ((theme-it (tt word)
+	     "Apply theme TT to WORD."
+	     (themify-shell-word-in-fat-string word fat-str tt)))
+      (cond
+	((is-lisp-expr-p expr)
+	 (colorize-lisp expr fat-str))
+	((and (listp first-word) (keywordp (first first-word)))
+	 ;; colorize the sub-expression of a compound expression
+	 (colorize-expr (second first-word) fat-str))
+	(t
+	 (when (and first-word (stringp (word-word first-word)))
+	   (setf type (command-type *shell* (word-word first-word)))
+	   (dbugf :recolor "command-type ~s~%" type)
+	   (case type
+	     ((:external-command :builtin-command :shell-command :command
+	       :alias :global-alias :function)
+	      (theme-it `(:command ,type :style) first-word))
+	     (:file    (theme-it '(:command :system-command :style) first-word))
+	     (otherwise (theme-it '(:command :not-found :style) first-word)))
+	   t))))))
+
+(defun colorize (e)
+  "Colorize the editor buffer."
+  (when (lish-colorize *shell*)
+    ;;(format t "buf = ~s ~s~%" (type-of (rl::buf e)) (rl::buf e))
+    (when (colorize-expr (shell-read (char-util:simplify-string (rl::buf e))
+				     :partial t)
+			 (rl::buf e))
+      (dbugf :recolor "fat-str ~s~%" (rl::buf e))
+      (setf (rl::need-to-recolor e) t))))
+
 ;; EOF

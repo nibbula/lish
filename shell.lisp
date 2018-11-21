@@ -169,6 +169,10 @@ number ignore it that many times before exiting."
   :help "True to expand braces in shell commands."
   :default t)
 
+(defoption colorize boolean
+  :help "True to colorize the command line."
+  :default t)
+
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.
 (defvar *shell-path* '()
