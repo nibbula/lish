@@ -244,6 +244,7 @@ string STRING."
 				     :partial t)
 			 (rl::buf e))
       (dbugf :recolor "fat-str ~s~%" (rl::buf e))
-      (setf (rl::need-to-recolor e) t))))
+      ;; (setf (rl::need-to-recolor e) t)
+      )))
 
 ;; EOF
