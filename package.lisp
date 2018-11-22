@@ -18,9 +18,8 @@ without any particular knowledge of it's Lisp programming features.
 ")
   (:use :cl :dlib :opsys :dlib-misc :stretchy :char-util :glob
 	:table :table-print :reader-ext :completion :keymap
-	:terminal :terminal-ansi :rl
-	#+use-regex :regex #-use-regex :cl-ppcre
-	:fatchar :collections)
+	:terminal :terminal-ansi :rl :fatchar :collections :ostring :ochar
+	#+use-regex :regex #-use-regex :cl-ppcre)
   (:export
    ;; Main entry point(s)
    #:lish

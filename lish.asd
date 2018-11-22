@@ -15,10 +15,10 @@
     :depends-on (:dlib :opsys :dlib-misc :stretchy :char-util :glob
 		 :table :table-print :reader-ext :dlib-interactive :completion
 		 :keymap :terminal :terminal-ansi :rl
+		 :fatchar :magic :theme :style :collections :ostring :ochar
 		 #+use-re :re
 		 #-use-re :cl-ppcre
-		 :chipz :fatchar :magic :theme :style :collections
-		 :bordeaux-threads)
+		 :chipz :bordeaux-threads)
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))
