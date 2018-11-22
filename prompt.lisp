@@ -196,6 +196,11 @@ the primary result printed as a string."
   (and (= 1 (length (shell-expr-words expr)))
        (consp (elt (shell-expr-words expr) 0))))
 
+(defun is-probably-a-lisp-expr-p (word)
+  (let ((trimmed (ltrim word)))
+    (and (not (zerop (length trimmed)))
+	 (eql #\( (aref trimmed 0)))))
+
 (defun colorize-lisp (expr fat-string)
   "Colorize a lisp expression."
   (declare (ignore expr fat-string))
@@ -226,25 +231,26 @@ string STRING."
 	 (colorize-expr (second first-word) fat-str))
 	(t
 	 (when (and first-word (stringp (word-word first-word)))
-	   (setf type (command-type *shell* (word-word first-word)))
-	   (dbugf :recolor "command-type ~s~%" type)
-	   (case type
-	     ((:external-command :builtin-command :shell-command :command
-	       :alias :global-alias :function)
-	      (theme-it `(:command ,type :style) first-word))
-	     (:file    (theme-it '(:command :system-command :style) first-word))
-	     (otherwise (theme-it '(:command :not-found :style) first-word)))
-	   t))))))
+	   ;; @@@ stupid hack to not turn lisp red
+	   (when (not (is-probably-a-lisp-expr-p (word-word first-word)))
+	     (setf type (command-type *shell* (word-word first-word)))
+	     (dbugf :recolor "command-type ~s~%" type)
+	     (case type
+	       ((:external-command :builtin-command :shell-command :command
+	         :alias :global-alias :function)
+		(theme-it `(:command ,type :style) first-word))
+	       (:file (theme-it '(:command :system-command :style) first-word))
+	       (otherwise (theme-it '(:command :not-found :style) first-word)))
+	     t)))))))
 
 (defun colorize (e)
   "Colorize the editor buffer."
   (when (lish-colorize *shell*)
     ;;(format t "buf = ~s ~s~%" (type-of (rl::buf e)) (rl::buf e))
-    (when (colorize-expr (shell-read (char-util:simplify-string (rl::buf e))
-				     :partial t)
-			 (rl::buf e))
-      (dbugf :recolor "fat-str ~s~%" (rl::buf e))
-      ;; (setf (rl::need-to-recolor e) t)
-      )))
+    (let ((expr (shell-read (char-util:simplify-string (rl::buf e))
+			    :partial t)))
+      (when (shell-expr-p expr)
+	(colorize-expr expr (rl::buf e))
+	(dbugf :recolor "fat-str ~s~%" (rl::buf e))))))
 
 ;; EOF
