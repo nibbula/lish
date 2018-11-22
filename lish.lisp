@@ -1772,7 +1772,7 @@ suspend itself."
   (format t "[Interrupt]~%") (finish-output)
   ;; I'm scared of this.
   ;; (invoke-restart (find-restart 'abort))
-  (throw 'interactive-interrupt nil)
+  (throw 'interactive-interrupt t)
   )
 
 (defun set-signals ()
@@ -1876,30 +1876,34 @@ suspend itself."
 	     *input* nil
 	     *output* nil)
        (force-output)
-       (catch 'interactive-interrupt
-	 (multiple-value-bind (vals stream show-vals)
-	     #| @@@ This really fails.
-	     #+(and unix (not sbcl))
-	     ;; (uos:with-signal-handlers ((uos:+sigint+ . sigint-handler))
-	     ;;   (format t "Howdy pardner.~%")
-	     ;;   (shell-eval expr :context nil))
-	     (progn
-	     (uos:set-signal-action uos:+sigint+ 'sigint-handler)
-	     (shell-eval expr :context nil)
-	     (uos:set-signal-action uos:+sigint+ :default))
-	     #-(and unix (not sbcl))
-	     |#
-	     (shell-eval expr :context nil)
-	   (declare (ignore stream))
-	   (let ((vals-list (if (listp vals) vals (list vals))))
-	     (setf /// //
-		   // /
-		   / vals-list
-		   *** **
-		   ** *
-		   * (car vals-list))
-	     (when show-vals
-	       (lish-print vals)))))))))
+       (when (catch 'interactive-interrupt
+	       (multiple-value-bind (vals stream show-vals)
+		   #| @@@ This really fails.
+		   #+(and unix (not sbcl))
+		   ;; (uos:with-signal-handlers ((uos:+sigint+ . sigint-handler))
+		   ;;   (format t "Howdy pardner.~%")
+		   ;;   (shell-eval expr :context nil))
+		   (progn
+		   (uos:set-signal-action uos:+sigint+ 'sigint-handler)
+		   (shell-eval expr :context nil)
+		   (uos:set-signal-action uos:+sigint+ :default))
+		   #-(and unix (not sbcl))
+		   |#
+		   (shell-eval expr :context nil)
+		 (declare (ignore stream))
+		 (let ((vals-list (if (listp vals) vals (list vals))))
+		   (setf /// //
+			 // /
+			 / vals-list
+			 *** **
+			 ** *
+			 * (car vals-list))
+		   (when show-vals
+		     (lish-print vals)))
+		 nil))
+	 ;; Got an intterrupt, so stop reading this multi-line expression.
+	 (format t ">>>> Control-C <<<<~%")
+	 (set pre-str nil))))))
 
 (defun confirm-quit ()
   (if (lish-jobs *shell*)
@@ -1908,13 +1912,15 @@ suspend itself."
 	(confirm "quit the shell"))
       t))
 
-(defmacro with-error-handling ((#|state|#) &body body)
+(defmacro with-error-handling ((state) &body body)
   `(handler-bind
        (#+sbcl (sb-ext::step-condition 'repple-stepper)
 	#+sbcl
 	;; So we can do something on ^C
 	(sb-sys:interactive-interrupt
 	 #'(lambda (c)
+	     ;; Stop reading this multi-line expression
+	     (setf (read-state-prefix-string ,state) nil)
 	     (if (lish-debug *shell*)
 		 (invoke-debugger c)
 		 (progn
@@ -2021,7 +2027,7 @@ Arguments:
 	     :end
 	     :do
 	     (restart-case
-	       (with-error-handling (#|state|#)
+	       (with-error-handling (state)
 		 (check-all-job-status sh)
 		 (setf expr (lish-read sh state))
 		 (when (and (eq expr *real-eof-symbol*) (confirm-quit))
