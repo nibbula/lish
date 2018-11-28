@@ -209,12 +209,22 @@ the primary result printed as a string."
 
 (defun themify-shell-word-in-fat-string (word string theme-item)
   "Apply the THEME-ITEM, which should be a style, to the WORD in the fat
-string STRING."
-  (let ((fcs string #| (fat-string-string string) |#)
-	(style (oelt (style:themed-string theme-item '("x")) 0)))
-    (dbugf :recolor "style ~s~%item ~s~%" style theme-item)
-    (loop :for i :from (shell-word-start word) :below (shell-word-end word)
-       :do (copy-fatchar-effects style (aref fcs i)))))
+string STRING. Don't do anything if theme-item isn't found or is nil."
+  (when (theme:theme-value theme:*theme* theme-item)
+    (let* ((fcs string #| (fat-string-string string) |#)
+	   (style (oelt (style:themed-string theme-item '("x")) 0)))
+      ;; (dbugf :recolor "word ~s~%style ~s~%item ~s~%" word style theme-item)
+      (loop :for i :from (shell-word-start word) :below (shell-word-end word)
+	 :do (copy-fatchar-effects style (aref fcs i))))))
+
+(defun remove-effects (fc)
+  (setf (fatchar-fg fc) nil
+	(fatchar-bg fc) nil
+	(fatchar-attrs fc) nil))
+
+(defun unthemify-shell-word-in-fat-string (word string)
+  (loop :for i :from (shell-word-start word) :below (shell-word-end word)
+     :do (remove-effects (aref string i))))
 
 (defun colorize-expr (expr fat-str)
   "Colorize a shell expression."
@@ -229,19 +239,26 @@ string STRING."
 	((and (listp first-word) (keywordp (first first-word)))
 	 ;; colorize the sub-expression of a compound expression
 	 (colorize-expr (second first-word) fat-str))
-	(t
+	((shell-expr-p expr)
 	 (when (and first-word (stringp (word-word first-word)))
 	   ;; @@@ stupid hack to not turn lisp red
 	   (when (not (is-probably-a-lisp-expr-p (word-word first-word)))
 	     (setf type (command-type *shell* (word-word first-word)))
-	     (dbugf :recolor "command-type ~s~%" type)
+	     ;; (dbugf :recolor "command-type ~s~%" type)
 	     (case type
 	       ((:external-command :builtin-command :shell-command :command
 	         :alias :global-alias :function)
 		(theme-it `(:command ,type :style) first-word))
 	       (:file (theme-it '(:command :system-command :style) first-word))
 	       (otherwise (theme-it '(:command :not-found :style) first-word)))
-	     t)))))))
+	     t))
+	 (loop :for w :in (rest (shell-expr-words expr))
+	    :do
+	      (cond
+		((nos:file-exists (glob:expand-tilde (word-word w)))
+		 (theme-it '(:command-arg :existing-path :style) w))
+		(t
+		 (unthemify-shell-word-in-fat-string w fat-str)))))))))
 
 (defun colorize (e)
   "Colorize the editor buffer."
@@ -251,6 +268,7 @@ string STRING."
 			    :partial t)))
       (when (shell-expr-p expr)
 	(colorize-expr expr (rl::buf e))
-	(dbugf :recolor "fat-str ~s~%" (rl::buf e))))))
+	;; (dbugf :recolor "fat-str ~s~%" (rl::buf e))
+	))))
 
 ;; EOF
