@@ -255,11 +255,12 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	       (otherwise (theme-it '(:command :not-found :style) first-word)))))
 	 (loop :for w :in (rest (shell-expr-words expr))
 	    :do
-	      (cond
-		((nos:file-exists (glob:expand-tilde (word-word w)))
-		 (theme-it '(:command-arg :existing-path :style) w))
-		(t
-		 (unthemify-shell-word-in-fat-string w fat-str)))))))))
+	      (when (stringp (word-word w))
+		(cond
+		  ((nos:file-exists (glob:expand-tilde (word-word w)))
+		   (theme-it '(:command-arg :existing-path :style) w))
+		  (t
+		   (unthemify-shell-word-in-fat-string w fat-str))))))))))
 
 (defun colorize (e)
   "Colorize the editor buffer."
