@@ -229,7 +229,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 		(return-from shell-read
 		  (values *continue-symbol* `(string ,str ,i))))
 	      (setf word-start i)
-	      (incf i (+ 2 ink))
+	      (incf i (+ (if cont 1 2) ink))
 	      (push (make-shell-word :word str
 				     :start word-start
 				     :end i

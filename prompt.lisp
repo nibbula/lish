@@ -213,9 +213,11 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
   (when (theme:theme-value theme:*theme* theme-item)
     (let* ((fcs string #| (fat-string-string string) |#)
 	   (style (oelt (style:themed-string theme-item '("x")) 0)))
-      ;; (dbugf :recolor "word ~s~%style ~s~%item ~s~%" word style theme-item)
-      (loop :for i :from (shell-word-start word) :below (shell-word-end word)
-	 :do (copy-fatchar-effects style (aref fcs i))))))
+      ;; (dbugf :recolor "word ~s~%style ~s~%item ~s~%string ~s~%"
+      ;; 	     word style theme-item string)
+      (when (not (zerop (length (word-word word))))
+	(loop :for i :from (shell-word-start word) :below (shell-word-end word)
+	   :do (copy-fatchar-effects style (aref fcs i)))))))
 
 (defun remove-effects (fc)
   (setf (fatchar-fg fc) nil
@@ -250,8 +252,7 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	         :alias :global-alias :function)
 		(theme-it `(:command ,type :style) first-word))
 	       (:file (theme-it '(:command :system-command :style) first-word))
-	       (otherwise (theme-it '(:command :not-found :style) first-word)))
-	     t))
+	       (otherwise (theme-it '(:command :not-found :style) first-word)))))
 	 (loop :for w :in (rest (shell-expr-words expr))
 	    :do
 	      (cond
