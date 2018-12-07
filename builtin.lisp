@@ -658,28 +658,6 @@ variables explicitly set in arguments are passed to the commands."
   ;;   (terminal-window-columns tty))
   (or (and *terminal* (tt-width)) 80))
 
-;; We do a simple fake out for signals on OS's that don't really support them.
-
-(defparameter *siggy*
-  #+windows
-  '(("TERM" 15 terminate-process)
-    ("STOP" 17 suspend-process)
-    ("CONT" 19 resume-process))
-  #+unix
-  (loop :for i :from 1 :below os-unix:*signal-count*
-     :collect (list (os-unix:signal-name i) i))
-  "Fake windows signals.")
-
-(defparameter *signal-names*
-  #+unix (make-array
-	  (list os-unix:*signal-count*)
-	  :initial-contents
-	  (cons ""
-		(loop :for i :from 1 :below os-unix:*signal-count*
-		   :collect (os-unix:signal-name i))))
-  #+windows (mapcar #'car *siggy*)
-  "Names of the signals.")
-
 (define-builtin-arg-type signal (arg-integer)
   "A system signal."
   ()

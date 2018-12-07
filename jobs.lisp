@@ -107,7 +107,7 @@
 
 (defmethod kill-job ((job system-job) &key signal)
   #+unix (os-unix:kill (job-pid job) (or signal uos:+SIGTERM+))
-  #+windows (funcall (caddr (find signal *siggy* :key #'second)) (job-pid p))
+  #+windows (funcall (caddr (find signal *siggy* :key #'second)) (job-pid job))
   )
 
 (defmethod list-all-jobs ((type (eql 'system-job)))

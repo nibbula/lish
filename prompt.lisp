@@ -219,11 +219,6 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	(loop :for i :from (shell-word-start word) :below (shell-word-end word)
 	   :do (copy-fatchar-effects style (aref fcs i)))))))
 
-(defun remove-effects (fc)
-  (setf (fatchar-fg fc) nil
-	(fatchar-bg fc) nil
-	(fatchar-attrs fc) nil))
-
 (defun unthemify-shell-word-in-fat-string (word string)
   (loop :for i :from (shell-word-start word) :below (shell-word-end word)
      :do (remove-effects (aref string i))))
@@ -257,7 +252,10 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	    :do
 	      (when (stringp (word-word w))
 		(cond
-		  ((nos:file-exists (glob:expand-tilde (word-word w)))
+		  ((handler-case
+		       (nos:file-exists (glob:expand-tilde (word-word w)))
+		     (opsys-error (c)
+		       (declare (ignore c))))
 		   (theme-it '(:command-arg :existing-path :style) w))
 		  (t
 		   (unthemify-shell-word-in-fat-string w fat-str))))))))))

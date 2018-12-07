@@ -1913,6 +1913,7 @@ suspend itself."
       t))
 
 (defmacro with-error-handling ((state) &body body)
+  #-sbcl (declare (ignore state))
   `(handler-bind
        (#+sbcl (sb-ext::step-condition 'repple-stepper)
 	#+sbcl
