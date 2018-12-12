@@ -91,6 +91,7 @@ without any particular knowledge of it's Lisp programming features.
    #:set-alias #:unset-alias #:get-alias
    #:command-paths
    #:pipe
+   #:in-bg
    #:append-file #:append-files
    #:run-with-output-to
    #:run-with-input-from

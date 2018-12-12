@@ -212,6 +212,18 @@ string as an argument."
 	(sub (cdr commands) (car commands))
 	(sub commands))))
 
+(defun in-bg (expr)
+  "Evaluate EXPR in the background. If it's a string, evaluate it as shell
+command in the background. If it's something else, evaluate it as a lisp
+expression in a separagte thread, if threads are supported."
+  (typecase expr
+    (string
+     (shell-eval (shell-read expr)
+		 :context (modified-context *context* :background t)))
+    (t
+     (shell-eval `(progn ,expr)
+		 :context (modified-context *context* :background t)))))
+
 ;; (defun spread (command &rest commands)
 ;;   "Send output from a command to multiple commands in parallel."
 ;;   )

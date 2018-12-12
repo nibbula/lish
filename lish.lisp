@@ -67,7 +67,8 @@
 			   (out-pipe nil out-pipe-p)
 			   (environment nil environment-p)
 			   (flipped-io nil flipped-io-p)
-			   (pipe-plus nil pipe-plus-p))
+			   (pipe-plus nil pipe-plus-p)
+			   (background nil background-p))
   "Return a new context based on CONTEXT, with the given slots."
   (if (not context)
       (make-context 
@@ -75,13 +76,15 @@
        :out-pipe out-pipe
        :environment environment
        :flipped-io flipped-io
-       :pipe-plus pipe-plus)
+       :pipe-plus pipe-plus
+       :background background)
       (let ((c (copy-structure context)))
 	(when in-pipe-p     (setf (context-in-pipe     c) in-pipe))
 	(when out-pipe-p    (setf (context-out-pipe    c) out-pipe))
 	(when environment-p (setf (context-environment c) environment))
 	(when flipped-io-p  (setf (context-flipped-io  c) flipped-io))
 	(when pipe-plus-p   (setf (context-pipe-plus   c) pipe-plus))
+	(when background-p  (setf (context-background  c) background))
 	c)))
 
 ;; (defstruct lisp-expression
@@ -1496,7 +1499,8 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			 *context*)
 		     :no-expansions no-expansions))))))
 	;; unpack an eval-able lisp expr
-	(when (and (= (length (shell-expr-words expr)) 1)
+	(when (and (shell-expr-p expr)
+		   (= (length (shell-expr-words expr)) 1)
 		   (shell-word-eval (first (shell-expr-words expr))))
 	  (setf expr (shell-word-word (first (shell-expr-words expr)))))
 	;; @@@ But what if there's multiple eval-able lisp exprs?
