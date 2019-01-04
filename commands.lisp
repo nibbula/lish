@@ -305,11 +305,11 @@ where initargs are initializing keyword arguments for calling make-instance
 of ARG-<type>.
 BODY is the body of the function it calls.
 BODY recognizes some special keywords:
-  :ACCEPTS followed by a single indicator or list of indicators that can be
-           types or special keywords to indicate what kind of things the
-           command accepts from a pipeline.
-  :KEYS-AS followed by a symbol which will be a list of the keywords and values
-           given to the command function."
+  :ACCEPTS  followed by a single indicator or list of indicators that can be
+            types or keywords to indicate what the command accepts from a shell
+            pipeline.
+  :KEYS-AS  followed by a symbol which will be a list of the keywords and values
+            given to the command function."
   `(%defcommand ,name shell-command t (,@arglist) ,@body))
 
 (defclass builtin-command (internal-command)
