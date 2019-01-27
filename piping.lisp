@@ -279,22 +279,48 @@ like $(command) in bash."
   (shell-words-to-list (lish::shell-expr-words (shell-read (!- command)))))
 
 ;; @@@ What about something like:
-(defmacro !q (&rest args)
-  `(!@ ,@(loop :for a :in args :collect
-	    (typecase a
-	      (symbol (string-downcase a))
-	      (string (s+ #\" a #\"))
-	      (t a)))))
+;; (defmacro !q (&rest args)
+;;   `(!@ ,@(loop :for a :in args :collect
+;; 	    (typecase a
+;; 	      (symbol (string-downcase a))
+;; 	      (string (s+ #\" a #\"))
+;; 	      (t a)))))
 
-;; @@@ or even
-(defmacro !qq (&rest args)
-  `(!@ ,@(loop :for a :in args :collect
-	    (typecase a
-	      (symbol (if (boundp a)
-			  (symbol-value a)
-			  (string-downcase a)))
-	      (string (s+ #\" a #\"))
-	      (t a)))))
+;; ;; @@@ or even
+;; (defmacro !qq (&rest args)
+;;   `(!@ ,@(loop :for a :in args :collect
+;; 	    (typecase a
+;; 	      (symbol (if (boundp a)
+;; 			  (symbol-value a)
+;; 			  (string-downcase a)))
+;; 	      (string (s+ #\" a #\"))
+;; 	      (t a)))))
+
+;; @@@ How about this?
+;; Consider how something like this could be integrated into all the other
+;; normal macros? This doesn't have all the return value options.
+(defmacro !q (&rest args)
+  "Simpler shell quotation. Make a shell command out of the separate words of
+the downcased symbols. If a symbol starts with a ‘@’ character, than it will
+probably be evaluated. Lists or anything else, get passed as is.
+For example, you can say:
+
+   (loop for f in (glob \"*.cl\")
+     do (!q mv -i @f (s+ (remove-suffix f \".cl\") \".lisp\")))
+
+instead of having to deal with string quoting, like:
+
+   (loop for f in (glob \"*.cl\")
+     do (! \"mv -i \\\"\" f \"\\\" \" (s+ (remove-suffix f \".cl\") \".lisp\")))
+"
+  `(!= ,@(loop :for a :in args
+	    :collect (typecase a
+		       (symbol (if (and (> (length (symbol-name a)) 1)
+					(char= #\@ (char (symbol-name a) 0)))
+				   (symbolify (subseq (symbol-name a) 1))
+				   (string-downcase a)))
+		       (string (s+ #\" a #\"))
+		       (t a)))))
 
 (defun !_ (&rest command)
   "Return a list of the lines of output from the command."
