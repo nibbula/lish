@@ -52,7 +52,8 @@ from stack."
 
 (defbuiltin dirs ()
   "Show the directory stack."
-  (format t "~w~%" (lish-dir-list *shell*)))
+  (format t "~{~a~%~}" (lish-dir-list *shell*))
+  (setf *output* (lish-dir-list *shell*)))
 
 (defbuiltin suspend ()
   "Suspend the shell."
