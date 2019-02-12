@@ -35,12 +35,12 @@ without any particular knowledge of it's Lisp programming features.
    #:*output*
    #:*input*
    #:*lishrc*
-   ;; hooks
+   ;; hooks @@@ maybe should be made into options?
    #:*pre-command-hook*
    #:*post-command-hook*
    #:*enter-shell-hook*
    #:*exit-shell-hook*
-   ;; (installation)
+   ;; installation
    #:make-standalone
    ;; shell options
    #:lish-prompt
@@ -92,6 +92,8 @@ without any particular knowledge of it's Lisp programming features.
    #:command-paths
    #:pipe
    #:in-bg
+   #:in-pipe-p
+   #:out-pipe-p
    #:append-file #:append-files
    #:run-with-output-to
    #:run-with-input-from

@@ -224,6 +224,16 @@ expression in a separagte thread, if threads are supported."
      (shell-eval `(progn ,expr)
 		 :context (modified-context *context* :background t)))))
 
+(defun in-pipe-p ()
+  "Return true if we have a pipeline as input."
+  (when (and *shell* *context*)
+    (and (context-in-pipe *context*) t)))
+
+(defun out-pipe-p ()
+  "Return true if we have a pipeline as output."
+  (when (and *shell* *context*)
+    (and (context-out-pipe *context*) t)))
+
 ;; (defun spread (command &rest commands)
 ;;   "Send output from a command to multiple commands in parallel."
 ;;   )
