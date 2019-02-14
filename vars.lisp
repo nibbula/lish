@@ -109,7 +109,7 @@ means every dumped executable.")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-user-package ()
-    (or *lish-user-package*
+    (or (and (boundp '*lish-user-package*) *lish-user-package*)
 	(find-package "LISH-USER")
 	(make-package "LISH-USER" :use '(:cl :lish
 					 #+use-regex :regex
