@@ -1973,15 +1973,27 @@ Arguments:
 	 ! ;-) !
 	 (saved-sigs (job-control-signals)))
     (setf (lish-debug *shell*) debug)	; @@@ the arg to make-instance doesn't
+
+    ;; Make the user package if it doesn't exist.
+    (when (not (find-package :lish-user))
+      (setf *lish-user-package* (make-user-package)))
+
     ;; Don't do the wacky package updating in other packages.
     (when (eq *lish-user-package* (find-package :lish-user))
       (update-user-package))
+
+    ;; Set the recursion level for system processes.
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
+
+    ;; Load the startup file.
     (load-rc-file init-file)
+
+    ;; Make sure a theme is set.
     (when (not theme:*theme*)
       (setf theme:*theme* (theme:default-theme)))
 
+    ;; Perhaps do a single command and exit.
     (when command
       (let (result)
 	(catch 'interactive-interrupt
@@ -1993,6 +2005,8 @@ Arguments:
 	(return-from lish (if (lish-exit-values sh)
 			      (values-list (lish-exit-values sh))
 			      result))))
+
+    ;; Figure out the terminal type.
     (setf terminal-type (or terminal-type
 			    (and *terminal*
 				 (find-terminal-type-for-class

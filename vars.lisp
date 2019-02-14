@@ -104,13 +104,18 @@ means every dumped executable.")
 (defvar *shell* nil
   "The current shell instance.")
 
-(defvar *lish-user-package*
-  (make-package "LISH-USER" :use '(:cl :lish
-				   #+use-regex :regex
-				   #-use-regex :cl-ppcre
-				   :glob)
-		:nicknames '("LU"))
+(defparameter *lish-user-package* (make-user-package)
   "Package for lish to hang out in. Auto-updates from :cl-user.")
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun make-user-package ()
+    (or *lish-user-package*
+	(find-package "LISH-USER")
+	(make-package "LISH-USER" :use '(:cl :lish
+					 #+use-regex :regex
+					 #-use-regex :cl-ppcre
+					 :glob)
+		      :nicknames '("LU")))))
 
 (defvar *junk-package*
   (progn
