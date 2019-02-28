@@ -1370,7 +1370,8 @@ probably fail, but perhaps in similar way to other shells."
 	((and alias (not no-alias))
 	 (dbugf :lish-eval "Expanding alias~%")
 	 ;; re-read and re-eval the line with the alias expanded
-	 (shell-eval (expand-alias alias expanded-expr) :context context
+	 (shell-eval (do-expansions (expand-alias alias expanded-expr))
+		     :context context
 		     :no-expansions t))
 	;; Lish command
 	((typep command 'internal-command)
