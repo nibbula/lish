@@ -81,4 +81,3 @@ something stable and tested, I recommend not using it yet!
 *** Job Control
 ** Quick tutorial examples
    Take a look at `doc/lish-examples.md`.
-   It might be all you need to get started.

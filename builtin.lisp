@@ -763,6 +763,8 @@ variables explicitly set in arguments are passed to the commands."
       (read-line nil nil)))
 |#
 
+;; @@@ Maybe this should get the times of subprocesses too, but I think that
+;; would necessitate forking and waiting, which I'm not sure is a good idea.
 (defbuiltin time ((command string :repeating t :help "Command to time."))
   "Shows some time statistics resulting from the execution of COMMNAD."
   (time (shell-eval (expr-from-args command))))

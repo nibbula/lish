@@ -283,6 +283,13 @@
   (declare (ignore arg quoted))
   value)
 
+(defclass arg-list (arg-object) () (:documentation "A list."))
+(defmethod convert-arg ((arg arg-list) (value list) &optional quoted)
+  (declare (ignore arg quoted))
+  ;; @@@ We could probably do better here.
+  ;; Maybe?: (let (result) (omap (_ (push _ result)) value) result)
+  (coerce value 'list))
+
 (defclass arg-function (arg-symbol) () (:documentation "A function name."))
 ;; (defmethod convert-arg ((arg arg-function) (value string) &optional quoted)
 ;;   (declare (ignore arg quoted))
