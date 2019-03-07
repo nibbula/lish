@@ -7,12 +7,12 @@
 		     "view-html")
        :do (asdf:load-system s :verbose nil))
   (loop :for s
-     :in (mapcar (lambda (_)
+     :in (mapcar (dlib:_
 		   (dlib:remove-prefix
-		    (dlib:remove-suffix _ ".asd") "../los/"))
-		 (remove-if (lambda (_)
-			      (not (equal (nos:path-to-absolute _)
-					  (namestring (truename _)))))
+		    (dlib:remove-suffix dlib:_ ".asd") "../los/"))
+		 (remove-if (dlib:_
+			      (not (equal (nos:path-to-absolute dlib:_)
+					  (namestring (truename dlib:_)))))
 			    (glob:glob "../los/*.asd")))
        :do (asdf:load-system s :verbose nil)))
 
