@@ -1673,7 +1673,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
   
 (defun load-rc-file (init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
-  (when init-file
+  (when (and init-file (nos:file-exists init-file))
     (let ((*lish-user-package* (find-package :lish-user)))
       (load-file init-file))))
 
@@ -2157,10 +2157,15 @@ by spaces."
     (nos:exit-lisp)))
 
 (defun make-standalone (&optional (name "lish"))
-  "FUFKFUFUFUFUFF"
+  "Make a lish executable."
   ;; (update-version)
-  #+sbcl (setf *saved-default-external-format*
-	       sb-impl::*default-external-format*)
+  #+sbcl
+  (progn
+    ;; So that the saved image can start with a fresh external format.
+    (setf *saved-default-external-format*
+	  sb-impl::*default-external-format*)
+    ;; In case we were built with the debugger turned off.
+    (sb-ext:enable-debugger))
   (save-image-and-exit name #'lish:shell-toplevel))
 
 ;; So we can conditionalize adding of lish commands in other packages.
