@@ -103,6 +103,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	       (vector-push-extend c w)
 	       (incf i))
 	     (read-lisp-expr ()
+	       (when lisp-quote
+		 (decf i))
 	       (handler-bind
 		   ((end-of-file
 		     (_ (declare (ignore _))
@@ -241,7 +243,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 	    (finish-word)
 	    (read-lisp-expr)
 	    (setf lisp-quote nil))
-	   ((and (eql c #\') (eql (next-char) #\())
+	   ((and (or (eql c #\') (eql c #\`)) (eql (next-char) #\())
 	    (finish-word)
 	    (setf lisp-quote t)
 	    (incf i))
