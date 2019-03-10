@@ -65,9 +65,9 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 
 (defparameter *lisp-plain-flags*
   (cond
-    ((impl "sbcl") "--no-userinit")
-    ((impl "ccl")  "--no-init")
-    ((impl "clisp") "-norc")
+    ((impl "sbcl") `("--no-userinit"))
+    ((impl "ccl")  `("--no-init"))
+    ((impl "clisp") `("-norc"))
     (t ""))
   "Command line arguments to pass to the lisp for.")
 
@@ -121,7 +121,8 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
                 (setf asdf:*central-registry* ~
                  (delete \"../\" asdf:*central-registry* :test #'equal)) ~
                 (lish:make-standalone)"))
-    (run-with-input-from stream `(,*lisp* ,@*lisp-plain-flags* "--" "-norl"))))
+    (run-with-input-from stream `(,*lisp* ,@*lisp-flags*
+					  ,@*lisp-plain-flags* "--" "-norl"))))
 
 #|
 (defun install-one (file)
