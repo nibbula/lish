@@ -5,7 +5,8 @@
 (let ((*load-verbose* nil))
   (loop :for s :in '("pager" "puca" "char-picker" "pick-list" "tree-viewer"
 		     "view-html")
-       :do (asdf:load-system s :verbose nil))
+       ;; :do (asdf:load-system s :verbose nil))
+     :do (ql:quickload s :verbose nil))
   (loop :for s
      :in (mapcar (dlib:_
 		   (dlib:remove-prefix
@@ -14,6 +15,7 @@
 			      (not (equal (nos:path-to-absolute dlib:_)
 					  (namestring (truename dlib:_)))))
 			    (glob:glob "../los/*.asd")))
-       :do (asdf:load-system s :verbose nil)))
+     ;; :do (asdf:load-system s :verbose nil)))
+     :do (ql:quickload s :verbose nil)))
 
 ;; EOF

@@ -82,11 +82,17 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
   (msg "[Build target ~s]" target)
   (with-input-from-string
       (stream
+       ;; (format nil
+       ;; 	       "(load \"build/build-init.lisp\" :verbose nil) ~
+       ;; 		(asdf:load-system :tiny-repl :verbose nil) ~
+       ;; 		(asdf:load-system :deblarg :verbose nil) ~
+       ;; 		(asdf:load-system :lish :verbose nil) ~
+       ;; 		(lish:make-standalone)"))
        (format nil
 	       "(load \"build/build-init.lisp\" :verbose nil) ~
-		(asdf:load-system :tiny-repl :verbose nil) ~
-		(asdf:load-system :deblarg :verbose nil) ~
-		(asdf:load-system :lish :verbose nil) ~
+		(ql:quickload :tiny-repl :verbose nil) ~
+		(ql:quickload :deblarg :verbose nil) ~
+		(ql:quickload :lish :verbose nil) ~
 		(lish:make-standalone)"))
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
@@ -94,11 +100,18 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
   (msg "[Build target ~s]" target)
   (with-input-from-string
       (stream
+       ;; (format nil
+       ;; 	       "(load \"build/build-init.lisp\" :verbose nil) ~
+       ;; 		(asdf:load-system :tiny-repl :verbose nil) ~
+       ;; 		(asdf:load-system :deblarg :verbose nil) ~
+       ;; 		(asdf:load-system :lish :verbose nil) ~
+       ;; 		(load \"build/fully-loaded.lisp\" :verbose nil) ~
+       ;; 		(lish:make-standalone)"))
        (format nil
 	       "(load \"build/build-init.lisp\" :verbose nil) ~
-		(asdf:load-system :tiny-repl :verbose nil) ~
-		(asdf:load-system :deblarg :verbose nil) ~
-		(asdf:load-system :lish :verbose nil) ~
+		(ql:quickload :tiny-repl :verbose nil) ~
+		(ql:quickload :deblarg :verbose nil) ~
+		(ql:quickload :lish :verbose nil) ~
 		(load \"build/fully-loaded.lisp\" :verbose nil) ~
 		(lish:make-standalone)"))
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
@@ -109,18 +122,30 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
   (msg "[Build target ~s]" target)
   (with-input-from-string
       (stream
+       ;; (format nil
+       ;; 	       "(load \"build/build-init.lisp\") ~
+       ;;          (push \"../\" asdf:*central-registry*) ~
+       ;;          (push \"../opsys/\" asdf:*central-registry*) ~
+       ;;          (push \"../rl/\" asdf:*central-registry*) ~
+       ;;          (push \"./\" asdf:*central-registry*) ~
+       ;;          (asdf:load-system :lish :verbose nil) ~
+       ;;          (setf asdf:*central-registry* ~
+       ;;           (delete \"./\" asdf:*central-registry* :test #'equal)) ~
+       ;;          (setf asdf:*central-registry* ~
+       ;;           (delete \"../\" asdf:*central-registry* :test #'equal)) ~
+       ;;          (lish:make-standalone)"))
        (format nil
 	       "(load \"build/build-init.lisp\") ~
-                (push \"../\" asdf:*central-registry*) ~
-                (push \"../opsys/\" asdf:*central-registry*) ~
-                (push \"../rl/\" asdf:*central-registry*) ~
-                (push \"./\" asdf:*central-registry*) ~
-                (asdf:load-system :lish :verbose nil) ~
-                (setf asdf:*central-registry* ~
-                 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
-                (setf asdf:*central-registry* ~
-                 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
-                (lish:make-standalone)"))
+		(push \"../\" asdf:*central-registry*) ~
+		(push \"../opsys/\" asdf:*central-registry*) ~
+		(push \"../rl/\" asdf:*central-registry*) ~
+		(push \"./\" asdf:*central-registry*) ~
+		(ql:quickload :lish :verbose nil) ~
+		(setf asdf:*central-registry* ~
+		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
+		(setf asdf:*central-registry* ~
+		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
+		(lish:make-standalone)"))
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags*
 					  ,@*lisp-plain-flags* "--" "-norl"))))
 
