@@ -47,6 +47,6 @@ variable LISH_QUICKLISP to the directory where it's installed.
 			  40 #\- #\-)
 		  (return nil))))
 	    (progn
-	      (format t "QuickLisp was not found at ~s.~%~s" quicklisp-init
+	      (format t "QuickLisp was not found at ~s.~%~a" quicklisp-init
 		      *not-strictly-necessary*)
 	      (install-quicklisp))))))
