@@ -988,7 +988,7 @@ spaces. This of course loses some data in the words."
       (t w))))
 
 (defun resolve-command (command &optional seen)
-  "Figure some crap out, okay."
+  "Try to figure out what the command really is, for testing accepts."
   (let ((alias (gethash command (lish-aliases *shell*)))
 	word)
     (if alias
@@ -1092,7 +1092,7 @@ expansion in the alias expansion."
 (defun expand-alias (alias expr)
   "Take an alias and a shell-expr and return a shell-expr with the alias
 expanded."
-  (let ((new-words (append (shell-expr-words (shell-read alias))
+  (let ((new-words (append (shell-expr-words (do-expansions (shell-read alias)))
 			   (cdr (shell-expr-words expr)))))
     (make-shell-expr
      :words new-words
@@ -1370,7 +1370,7 @@ probably fail, but perhaps in similar way to other shells."
 	((and alias (not no-alias))
 	 (dbugf :lish-eval "Expanding alias~%")
 	 ;; re-read and re-eval the line with the alias expanded
-	 (shell-eval (do-expansions (expand-alias alias expanded-expr))
+	 (shell-eval (expand-alias alias expanded-expr)
 		     :context context
 		     :no-expansions t))
 	;; Lish command
@@ -1440,7 +1440,19 @@ probably fail, but perhaps in similar way to other shells."
 	 ;; 	  ;;(with-first-value-to-output
 	 ;; 	  (call-thing (car cmd) (cdr cmd) context))
 	 ;; 	 nil t)
-	 (call-thing cmd nil context)
+	 ;; The first word was probably a Lisp expression, evaluating or not.
+	 ;; Just treat the rest of the words as potentially Lisp expressions.
+	 (let ((first-word (elt (shell-expr-words expr) 0)))
+	   (if (and (shell-word-p first-word)
+		    (shell-word-eval first-word))
+	       (call-thing cmd nil context)
+	       (values (list (eval cmd)) nil t)))
+	 ;; @@@ How can we evaluate the words after the first and return all
+	 ;; their possibly multiple values?
+	 ;; (loop :for w :in (shell-expr-words expr)
+	 ;;      (when (shell-word-eval w)
+	 ;; 	(call-thing (word-word w) nil context)
+	 ;; 	;; @@@@@
 	 )))))
 
 ;; This does normal expansions, sets up piping and redirections and
@@ -2062,8 +2074,18 @@ Arguments:
 				 (if (confirm-quit)
 				     (return-from pippy expr)
 				     (setf eof-count 0))))
-			   (format t "Type 'exit' to exit the shell.~%")))
-		     (lish-eval sh expr state))
+			   (let ((remain
+				  (1+ (- (lish-ignore-eof sh) eof-count))))
+			     (format t "Type 'exit'~:[ or ~a ~d more time~p~
+                                        ~;~^~] to exit the shell.~%"
+				     (zerop eof-count)
+				     (char-util:nice-char
+				      (rl::last-event (lish-editor sh))
+				      :caret t)
+				     remain remain))))
+		     (progn
+		       (setf eof-count 0)
+		       (lish-eval sh expr state)))
 		 ;; (setf (read-state-error-count state) 0)
 		 )
 	       (abort ()
@@ -2101,22 +2123,27 @@ Arguments:
       (throw :lish-quick-exit :lish-quick-exit)))
 
 (defcommand lish
-  ((command   string   :short-arg #\c :help "Command to execute.")
+  ((command string :short-arg #\c :help "Command to execute.")
    (init-file pathname :short-arg #\i
     :default *default-lishrc* :use-supplied-flag t
     :help "File to execute on startup.")
    (no-init-file boolean :short-arg #\n :help "Don't load any startup file.")
-   (greeting  boolean  :short-arg #\g :default t
+   (greeting boolean :short-arg #\g :default t
     :help "True to print a greeting.")
-   (debug     boolean  :short-arg #\d :help "True to turn on debugging."))
+   (terminal-type choice :short-arg #\t
+    :choice-func (lambda () (mapcar #'string-downcase (terminal-types)))
+    :help "Terminal type.")
+   (debug boolean :short-arg #\d :help "True to turn on debugging."))
+  :keys-as args
   "Lisp Shell"
   (when (and greeting (not command))
     (format t "Welcome to ~a ~a~%" *shell-name* *version*))
+  (remf args :greeting)
   (when (not init-file-supplied-p)
     (setf init-file (when (not no-init-file) (pick-an-rc-file))))
-  ;;(format t "init-file = ~s~%" init-file)
-  ;;(format t "command = ~s~%" command) (finish-output)
-  (lish :command command :init-file init-file :debug debug))
+  (when (getf args :no-init-file)
+    (remf args :no-init-file))
+  (apply #'lish args))
 
 (defun wordify-list (word-list)
   "Return a list of shell words that is like the strings in word-list separated
@@ -2147,13 +2174,14 @@ by spaces."
     ;; whatever it is on Windows or whatever O/S.
     #+sbcl (setf sb-impl::*default-external-format*
 		 (or *saved-default-external-format* :utf-8))
-    (with-new-terminal ()
+    ;; (with-new-terminal ()
       (if (cdr (nos:lisp-args))
 	  (apply #'!lish
 		 `(,@(posix-to-lisp-args (get-command "lish")
 					 (wordify-list (cdr (nos:lisp-args))))
-		     :greeting t))
-	  (!lish :greeting t)))
+		     :greeting t :terminal-type :crunch))
+	  (!lish :greeting t :terminal-type :crunch))
+      ;; )
     (nos:exit-lisp)))
 
 (defun make-standalone (&optional (name "lish"))

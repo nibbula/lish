@@ -7,7 +7,18 @@ https://www.quicklisp.org/beta/")
 
 (defparameter *not-strictly-necessary*
   "QuickLisp is not strictly necessary, but if you don't have it, you will have
-to make sure all the dependencies are availible to be loaded by ASDF.")
+to make sure all the dependencies are availible to be loaded by ASDF.
+
+Since you don't have a QuickLisp installation in ~a,
+we are taking the liberty of installing one for you. I'm sorry.
+
+If you want to build with a custom QuckLisp installation, set the environment
+variable LISH_QUICKLISP to the directory where it's installed.
+")
+
+(defun install-quicklisp ()
+  (load "build/quicklisp.lisp")
+  (quicklisp-quickstart:install))
 
 (when (not (find-package :quicklisp))
   (if (sf-getenv "LISH_QUICKLISP")
@@ -35,5 +46,7 @@ to make sure all the dependencies are availible to be loaded by ASDF.")
 			  *not-strictly-necessary*
 			  40 #\- #\-)
 		  (return nil))))
-	    (format t "QuickLisp was not found at ~s.~%~s" quicklisp-init
-		    *not-strictly-necessary*)))))
+	    (progn
+	      (format t "QuickLisp was not found at ~s.~%~s" quicklisp-init
+		      *not-strictly-necessary*)
+	      (install-quicklisp))))))

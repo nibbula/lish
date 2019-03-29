@@ -469,6 +469,13 @@ NAME is replaced by EXPANSION before any other evaluation."
     (setf (lish-exit-values *shell*) (loop :for v :in values :collect v)))
   (setf (lish-exit-flag *shell*) t))
 
+;; Override an implementations quit function, so that we only exit one level
+;; of the shell, not the whole Lisp system.
+(defbuiltin quit (("values" string :repeating t :help "Values to return."))
+  :keys-as args
+  "Exit from the shell. Optionally return values."
+  (apply #'!exit args))
+
 (defbuiltin source (("filename" pathname :optional nil
  		     :help "Filename to read."))
   "Evalute lish commands in the given file."

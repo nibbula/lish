@@ -1,11 +1,13 @@
 `lish` may someday be a LIsp SHell
 
+An exercise in repeating the mistakes of the past.
+
 NOTA BENE! / WARNING
 
-Lish is full of bugs! Don't use it near any data that you don't want to risk
-losing! Since it's a shell, it's very good at recursively wreaking havoc upon
-files and commands. You may quite regularly use software highly dubious
-quality, but a shell is perhaps far more dangerous than most software. Lish
-is also very incomplete. It will certainly change in incompatible ways. Unless
-you intrepidly want to experiment, or are interested in helping turn it into
-something stable and tested, I recommend not using it yet!
+Hopefully you are aware how dangerous and unforgiving a Unix shell can be.
+Lish in no way remedies this, and instead adds complexity, many bugs, and
+untested features that are likely to malfunction. It doesn't work like other
+shells and will likely wreak havoc and destruction. Lish is also incomplete.
+It is scheduled change in incompatible ways. Unless you have some good reason
+and want to experiment in a an environment which is disposable, I recommend
+you don't use it yet.
