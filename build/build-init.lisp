@@ -30,6 +30,7 @@
 (push "../opsys/"    asdf:*central-registry*)
 (push "../terminal/" asdf:*central-registry*)
 (push "../rl/"       asdf:*central-registry*)
+(push "../deblarg/"  asdf:*central-registry*)
 (push "./"           asdf:*central-registry*)
 
 ;; Suppress the fucking ASDF warnings.
