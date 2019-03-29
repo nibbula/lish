@@ -18,7 +18,7 @@ variable LISH_QUICKLISP to the directory where it's installed.
 
 (defun install-quicklisp ()
   (load "build/quicklisp.lisp")
-  (quicklisp-quickstart:install))
+  (funcall (find-symbol "INSTALL" :quicklisp-quickstart)))
 
 (when (not (find-package :quicklisp))
   (if (sf-getenv "LISH_QUICKLISP")
