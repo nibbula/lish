@@ -252,10 +252,12 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	    :do
 	      (when (stringp (word-word w))
 		(cond
-		  ((handler-case
-		       (nos:file-exists (glob:expand-tilde (word-word w)))
-		     (opsys-error (c)
-		       (declare (ignore c))))
+		  ;; ((handler-case
+		  ;;      (nos:file-exists (glob:expand-tilde (word-word w)))
+		  ;;    (opsys-error (c)
+		  ;;      (declare (ignore c))))
+		  ((ignore-errors
+		     (nos:file-exists (glob:expand-tilde (word-word w))))
 		   (theme-it '(:command-arg :existing-path :style) w))
 		  (t
 		   (unthemify-shell-word-in-fat-string w fat-str))))))))))
