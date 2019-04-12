@@ -173,6 +173,10 @@ number ignore it that many times before exiting."
   :help "True to colorize the command line."
   :default t)
 
+(defoption auto-cd boolean
+  :help "True to treat a directroy as a command to change to that directory."
+  :default t)
+
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.
 (defvar *shell-path* '()

@@ -1113,6 +1113,7 @@ expanded."
       ((gethash command (lish-aliases sh))        :alias)
       ((gethash command (lish-global-aliases sh)) :global-alias)
       ((get-command-path command)		  :file)
+      ((and (lish-auto-cd sh) (directory-p command)) :directory)
       ((and (fboundp (symbolify command)))	  :function)
       (t nil))))
 
@@ -1324,7 +1325,9 @@ read from."
 If the first word is an alias, expand the alias and re-evaluate.
 If the first word is a system that can be loaded, load it and try to call it
 as a lish command. This is vaugely like autoload.
-If the first word is lish command, call it.
+If the first word is a lish command, call it.
+If the first word is an existing directory and the auto-cd option is set, try
+to change to it.
 If the first word is an executable file in the system path, try to execute it.
 If the first word is a symbol bound to a function, call it with the arguments,
 which are read like lisp code. This is like a ‘parenless’ function call.
@@ -1413,9 +1416,15 @@ probably fail, but perhaps in similar way to other shells."
 	((stringp cmd)
 	 (dbugf :lish-eval "String command~%")
 	 ;; If we can find a command in the path, try it first.
-	 (if (get-command-path cmd)
-	     (sys-cmd)
-	     ;; Otherwise try a parenless Lisp line.
+	 (cond
+	   ((and (lish-auto-cd sh) (directory-p cmd))
+	    (when (> (length (shell-expr-words expr)) 1)
+	      (cerror "Ignore the rest of the line."
+		      "Arguments aren't allowed after the auto-cd directory."))
+	    (change-directory cmd))
+	   ((get-command-path cmd)
+	    (sys-cmd))
+	   (t ;; Otherwise try a parenless Lisp line.
 	     (multiple-value-bind (symb pos)
 		 (read-from-string (shell-expr-line expr) nil nil)
 	       (declare (ignore pos))
@@ -1432,7 +1441,7 @@ probably fail, but perhaps in similar way to other shells."
 				(rest-of-the-line expr)
 				))
 		   ;; Just try a system command anyway, which will likely fail.
-		   (sys-cmd)))))
+		   (sys-cmd))))))
 	(t ;; Some other type, just return it, like it's self evaluating.
 	 ;;(values (multiple-value-list (eval cmd)) nil t))))))
 	 (dbugf :lish-eval "Self evaluating ~s ~s~%" cmd context)
@@ -1621,7 +1630,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (unless no-expansions
 	     (do-expansions expr))
 	   (dbug "~w~%" expr)
-	   ;; this is stupid
+	   ;; A stupid way to do backgrounding:
 	   (when (equal (word-word (car (last (shell-expr-words expr)))) "&")
 	     (dbugf :lish-eval "simple command in the BG.~%")
 	     (setf background t

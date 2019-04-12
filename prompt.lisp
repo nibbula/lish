@@ -247,6 +247,7 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	         :alias :global-alias :function)
 		(theme-it `(:command ,type :style) first-word))
 	       (:file (theme-it '(:command :system-command :style) first-word))
+	       (:directory (theme-it '(:command :directory :style) first-word))
 	       (otherwise (theme-it '(:command :not-found :style) first-word)))))
 	 (loop :for w :in (rest (shell-expr-words expr))
 	    :do
