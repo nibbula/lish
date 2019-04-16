@@ -502,7 +502,7 @@ Otherwise, return words which will evaluate a lisp expression."
       :do
       (dbugf :lish-eval "Expanding eval of ~s~%" (shell-word-word w))
       (setf results (eval (shell-word-word w)))
-      :and :if (listp results)
+      :and :if (and (listp results) (not (shell-word-quoted w)))
 	;; Spread list results into separate args
         :append (mapcar #'(lambda (x) (make-shell-word :word x))
 			results)

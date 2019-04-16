@@ -133,9 +133,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 		   (setf word-start i
 		        i pos)
 		   (push (make-shell-word :word obj
-					  ;; :eval t
-					  :eval (not lisp-quote)
-					  :quoted nil
+					  :eval lisp-quote
+					  :quoted t
 					  :start word-start
 					  :end i)
 			 args)
