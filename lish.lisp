@@ -1113,7 +1113,8 @@ expanded."
       ((gethash command (lish-aliases sh))        :alias)
       ((gethash command (lish-global-aliases sh)) :global-alias)
       ((get-command-path command)		  :file)
-      ((and (lish-auto-cd sh) (directory-p command)) :directory)
+      ((and (lish-auto-cd sh)
+	    (directory-p (expand-tilde command))) :directory)
       ((and (fboundp (symbolify command)))	  :function)
       (t nil))))
 
