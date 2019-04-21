@@ -272,6 +272,7 @@ literally in shell syntax."
        str
        :trailing-spaces nil
        :print-titles nil :max-width (term-cols)))
+    (setf result (trim result))
     ;; Get rid of the final newline
     (when (and (> (length result) 0)
 	       (char= #\newline (aref result (- (length result) 1))))
@@ -305,6 +306,7 @@ literally in shell syntax."
        :column-names '(("Arg" :overflow) ("desc" :wrap)))
        (make-instance 'text-table-renderer) str
        :trailing-spaces nil :print-titles nil :max-width (term-cols)))
+    (setf result (trim result))
     ;; Get rid of the final newline
     (when (and (> (length result) 0)
 	       (char= #\newline (aref result (- (length result) 1))))
