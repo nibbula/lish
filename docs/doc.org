@@ -1,0 +1,167 @@
+Lish Documentation                                        -*- org -*-
+
+[Preliminary place for documentation until I figure out a better format.]
+
+* Introduction
+  Lish is a relatively boring combination of a Unix shell and Common Lisp
+  REPL. As you might expect, it allows you to both type Unix commands and
+  evaluate Lisp expressions. It tries to do so in way that would not be
+  too annoying to someone familiar with either one.
+
+  Lish does most of the things a normal shell does, but that being said, Lish
+  is **NOT** a POSIX shell! 
+
+** Design philosphy
+*** Development story
+*** Command interface vs. programming interface
+*** Unix philosophy, Lisp philosophy, and a mixture thereof
+* Using Lish
+** Installation
+*** Loading from source
+**** Install quicklisp from https://quicklisp.org
+     This nearly goes without saying for anything related to Lisp.
+
+**** Install lish & dependencies into local-projects
+#+BEGIN_SRC shell
+   cd ~/quicklisp/local-projects
+   git clone https://github.com/nibbula/rl
+   git clone https://github.com/nibbula/opsys
+   git clone https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name
+   git clone https://github.com/nibbula/lish
+#+END_SRC shell
+
+**** In your Lisp, use quicklisp to load Lish:
+#+BEGIN_SRC lisp
+   (ql:quickload :lish)
+#+END_SRC
+
+*** Building an executable
+#+BEGIN_SRC lisp
+  (lish:make-standlone)
+#+END_SRC
+
+    This should make an executable named "lish" in your current directory.
+    Put it wherever you'd like.
+
+**** Executables with pre-loaded commands
+*** Implementation specific
+*** Customized executable
+** Quick start
+   see [[Syntax Summary]]
+   see [[Differences from POSIX shells]]
+   see  (from "help editor")
+** Start up
+*** Invocation
+#+BEGIN_SRC lisp
+  (lish:lish)
+#+END_SRC
+*** Initialization file
+    Lish attempts to read commands from a file when it starts up.
+    The files it tries are, in order:
+    1. :init-file keyword to LISH:LISH
+    2. *lishrc* variable. This can be set dynamically so nested shells will
+       use this.
+    3. A operating system specific personal configuration file based on the
+       value of (opsys:config-dir "lish"). This is probably the prefered
+       location.
+    4. The value of lish:*default-lishrc*.
+       This is probably something like "$HOME/.lishrc". This is provided so
+       that the default place can be customized system or site, as well as
+       having a traditional style fallback.
+** Typing commands
+*** Basic syntax
+**** Summary
+     @@@ Should come from "help syntax"
+**** Connecting commands
+***** Input & Output
+***** Stream pipes
+***** Object pipes
+***** Conditional execution
+**** Exapansions
+***** Lisp expression expansion
+***** History expansion
+***** Brace expansion, a.k.a. sequence expansion
+***** User name expansion, a.k.a. twiddle or tilde expansion
+***** Environemnt variable expansion
+***** File name expansion, a.k.a globbing
+***** Backslash removal
+*** Editing
+**** Summary
+**** Lish specific editor commands
+**** Lish specific keymap
+**** [[RL documentation]]
+*** History
+**** see [[history expansion]]
+**** see [[RL history]]
+*** Completion
+**** Lish specific completion
+**** Argument completion functions
+**** [[see documentation for COMPLETION package.]]
+*** Job control
+**** Types of jobs
+***** System processes
+***** Threads
+***** Shell commands
+**** Examining jobs
+***** The jobs list
+**** Operating on jobs
+***** Foreground & background
+***** Pausing
+***** Continuing
+***** Stopping
+** Customization
+*** Prompts
+**** Prompt string
+***** Prompt string formatting
+      @@ docstring from symbolic-prompt-to-string @@
+***** Prompt string format directives
+      @@ docstring from format-prompt @@
+**** Prompt function
+*** Themes
+     @@ Documentation from :THEME package @@
+**** Styles
+     @@ Documentation from :STYLE package @@
+**** Syntax styles
+     @@ Documentation from :SYNTAX package @@
+*** Aliases
+*** Options
+    @@ output of "help options" @@
+* Programming
+** Defining commands
+** Defining argument types
+** Object pipelines and accepts?
+* Reference
+** Syntax
+**** detailed syntax BNF?
+**** Expansions?
+** Built in commands
+*** @@@@
+    This should be automatically generated from the builtin commands
+    and their docstrings.
+** Argument types
+*** @@@@
+    This should be automatically generated from the arg-* classes
+    and their docstrings.
+** Options
+*** @@@@
+    This should be automatically generated from the option docstrings.
+* Differences from POSIX shells
+  Some of the the many differences from other shells.
+** Summary
+*** Syntax differnce
+*** Missing features
+*** Incompatible features
+*** Additional features
+** Syntax
+*** Lisp evaluation
+*** Expansion
+** Shell Commands
+** Programming
+** Completion
+** Prompting
+** Command Pipelines
+** Job Control
+* COMMENT MeTaDaTa
+creation date: [2018-05-10 16:28:30]
+creator: "Nibby Nebbulous" <nibbula@gmail.com>
+tags: lish manual documentation
