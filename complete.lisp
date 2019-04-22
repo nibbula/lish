@@ -272,7 +272,7 @@ literally in shell syntax."
        str
        :trailing-spaces nil
        :print-titles nil :max-width (term-cols)))
-    (setf result (trim result))
+    (setf result (rtrim result))
     ;; Get rid of the final newline
     (when (and (> (length result) 0)
 	       (char= #\newline (aref result (- (length result) 1))))
