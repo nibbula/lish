@@ -13,7 +13,7 @@ something stable and tested, I recommend not using it yet!
 *** Install a binary
 **** pick one from the binary release page
 *** Build from source
-**** git clone --recurse-submodules https://github.com/nibbula/<SHORT-NAME?>.git
+**** git clone --recurse-submodules https://github.com/nibbula/yew.git
 **** sh build.sh
 *** Loading
     For adding lish to your already running Lisp image:
