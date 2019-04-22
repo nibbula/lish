@@ -327,30 +327,39 @@ Commands can be:
 ;; This has to make sure to be able to operate without a current shell or even,
 ;; current terminal, since it's called by the documentation method.
 (defun print-command-help (cmd &optional (stream *standard-output*))
-  "Print documentation for a command."
+  "Print documentation for a command. Return a table."
   (format stream "~a~%" (documentation cmd 'function))
-  (when (and (command-arglist cmd)
-	     (not (zerop (length (command-arglist cmd)))))
-    (format stream "Arguments:~%")
-    (nice-print-table
-     (loop :for a :in (command-arglist cmd)
-	:when (not (arg-hidden a))
-	:collect
-	(list (if (arg-short-arg a) (s+ "  -" (arg-short-arg a)) "  ")
-	      (if (arg-long-arg a)  (s+ "--" (arg-long-arg a))
-		  (if (arg-short-arg a) "" (arg-name a)))
-	      #| (or (arg-default a) "") |#
-	      (string-downcase (arg-type a))
-	      (or (and (slot-boundp a 'help) (arg-help a))
-		  (arg-name a))))
-     '("short" "long" #| "default" |# "type" ("help" :wrap))
-     :long-titles nil :print-titles nil :max-width (get-cols)
-     :trailing-spaces nil :stream stream))
-  (when (and (command-accepts cmd)
-	     (not (eq (command-accepts cmd) :unspecified)))
-    (format stream "Accepts: ~a~%" (command-accepts cmd)))
-  (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
-    (format stream "Loaded from: ~a~%" (command-loaded-from cmd))))
+  (let (table)
+    (when (and (command-arglist cmd)
+	       (not (zerop (length (command-arglist cmd)))))
+      (format stream "Arguments:~%")
+      ;; (nice-print-table
+      (output-table
+       (setf table
+	     (make-table-from
+	      (loop :for a :in (command-arglist cmd)
+		 :when (not (arg-hidden a))
+		 :collect
+		 (list (if (arg-short-arg a) (s+ "  -" (arg-short-arg a)) "  ")
+		       (if (arg-long-arg a)  (s+ "--" (arg-long-arg a))
+			   (if (arg-short-arg a) "" (arg-name a)))
+		       #| (or (arg-default a) "") |#
+		       (string-downcase (arg-type a))
+		       (or (and (slot-boundp a 'help)
+				(substitute #\space #\newline (arg-help a)))
+			   (arg-name a))))
+	      :column-names
+	      '("Short" "Long" #| "default" |# "Type" ("Help" :wrap))))
+       (make-instance 'text-table-renderer)
+       stream
+       :long-titles nil :print-titles nil :max-width (get-cols)
+       :trailing-spaces nil))
+    (when (and (command-accepts cmd)
+	       (not (eq (command-accepts cmd) :unspecified)))
+      (format stream "~&Accepts: ~a~%" (command-accepts cmd)))
+    (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
+      (format stream "Loaded from: ~a~%" (command-loaded-from cmd)))
+    table))
 
 ;; For use by other things. Like my "doc" command.
 (defmethod documentation ((symbol symbol) (type (eql :command)))
@@ -396,7 +405,7 @@ Shell options:~%")
 			(documentation (symbol-function symb) 'function))))
 ;	   (print-values* (subject cmd symb doc fdoc))
 	   (cond
-	     (doc  (print-command-help cmd))
+	     (doc  (setf *output* (print-command-help cmd)))
 	     (fdoc (format t "Lisp function:~%~a~%" fdoc))
 	     (cmd  (format t "Sorry, there's no help for \"~a\".~%" subject))
 	     (t    (format t "I don't know about the subject \"~a\"~%"
