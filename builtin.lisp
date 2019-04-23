@@ -851,9 +851,114 @@ symbolic format, otherwise output in octal."
 	    (error err))
 	  (os-unix:umask real-mask)))))
 
-(defbuiltin ulimit ()
+(defparameter *limits*
+  (loop :for l :in
+   '(:SBSIZE
+    :CORE
+    :DATA
+    :NICE
+    :FSIZE
+    :SIGPENDING
+    :KQUEUE
+    :MEMLOCK
+    :RSS
+    :NOFILE
+    :MSGQUEUE
+    :RTPRIO
+    :STACK
+    :CPU
+    :NPROC
+    :AS		; or maybe _VIRTMEM or _VMEM
+    :SWAP	; or maybe we need a getter?
+    :LOCKS
+    :NTHR	; _PTHREAD or _NTHR
+    ;; :PIPE not settable? uos:get-pipe-size
+    ;; :PTYS not settable? pseudo terminals?
+     )
+     :when (uos:rlimit-number l nil)
+     :collect l)
+  "List of limits for ulimit command.")
+
+(defbuiltin ulimit
+  ((print-all boolean :short-arg #\a
+    :help "True to print all limits.")
+   (soft-limit boolean :short-arg #\S
+    :help "True to operate on the soft limit.")
+   (hard-limit boolean :short-arg #\H
+    :help "True to operate on the hard limit.")
+   (limit choice :choices *limits*
+    :choice-test
+    (lambda (x y) (or (eql x y) (eq (keywordify x) (keywordify y))))
+    :help "Limit to print or set.")
+   (value object :help "New value for the limit."))
   "Examine or set process resource limits."
-  (values))
+  #-unix (declare (ignore print-all soft-limit hard-limit))
+  #-unix (values)
+  #| #+unix (declare (ignore soft-limit)) |#
+  #+unix
+  (flet ((value->string (value)
+	   (if (equal value uos:+RLIMIT-INFINITY+)
+	       "unlimited"
+	       value))
+	 (string->value (value)
+	   (if (and (or (stringp value) (symbolp value))
+		    (equalp (string value) "unlimited"))
+	       uos:+RLIMIT-INFINITY+
+	       value))
+	 (result->value (result)
+	   (if hard-limit
+	       (uos:rlimit-maximum result)
+	       (uos:rlimit-current result))))
+    (cond
+      (print-all
+       (let ((table (make-table-from
+		     (loop :with val
+			:for l :in *limits*
+			:when (uos:rlimit-number l nil)
+			:do
+			(setf val (uos:getrlimit l))
+			:and
+			:collect (list (string-downcase l)
+				       (value->string (uos:rlimit-current val))
+				       (value->string (uos:rlimit-maximum val))
+				       (documentation
+					(symbolify (s+ "+RLIMIT-" l "+")
+						   :package :uos)
+					'variable)))
+		     :columns
+		     '((:name "Name")
+		       (:name "Soft Value")
+		       (:name "Hard Value")
+		       (:name ("Description" :wrap))))))
+	 (print-table table :max-width (get-cols))
+	 (terpri)
+	 (setf *output* table)))
+      (limit
+       (let ((limit-number (uos:rlimit-number limit nil))
+	     lim)
+	 (if limit-number
+	     (progn
+	       (setf lim (uos:getrlimit limit-number))
+	       (if value
+		   (progn
+		     (cond
+		       ((and hard-limit soft-limit)
+			(setf (uos:rlimit-maximum lim) (string->value value))
+			      (uos:rlimit-current lim) (string->value value))
+		       (hard-limit
+			(setf (uos:rlimit-maximum lim) (string->value value)))
+		       (t
+			(setf (uos:rlimit-current lim) (string->value value))))
+		     (uos:setrlimit limit-number lim))
+		   (progn
+		     (setf *output* (result->value lim))
+		     (format t "~a~%"
+			     (value->string *output*)))))
+	     (error "Unknown limit ~s" limit))))
+      (t
+       (format t "~a~%"
+	       (value->string
+		(result->value (uos:getrlimit :fsize))))))))
 
 (defbuiltin wait ()
   "Wait for commands to terminate."
