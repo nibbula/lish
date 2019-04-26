@@ -1846,7 +1846,7 @@ suspend itself."
 		   str (rl
 			:eof-value *real-eof-symbol*
 			:quit-value *quit-symbol*
-			:context :lish
+			:history-context :lish
 			:editor (lish-editor sh)
 			:prompt
 			(if pre-str
@@ -2044,7 +2044,7 @@ Arguments:
 	    (make-instance 'rl:line-editor
 			   :non-word-chars *shell-non-word-chars*
 			   :completion-func #'shell-complete
-			   :context *history-context*
+			   :history-context *history-context*
 			   :terminal-device-name terminal-name
 			   :local-keymap (lish-keymap sh)
 			   :prompt-func nil
