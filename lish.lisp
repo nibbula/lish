@@ -942,9 +942,10 @@ spaces. This of course loses some data in the words."
 		  *shell*
 		  (do-expansions
 		      (lisp-exp-eval (shell-read buf)))))))
-    (rl:replace-buffer
-     editor
-     (shell-words-to-string words))))
+    (rl::use-first-context (editor)
+      (rl:replace-buffer
+       editor
+       (shell-words-to-string words)))))
 #|
     (with-output-to-string (str)
        (labels ((write-thing (w)
