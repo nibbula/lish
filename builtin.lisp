@@ -852,7 +852,7 @@ symbolic format, otherwise output in octal."
 	  (os-unix:umask real-mask)))))
 
 (defparameter *limits*
-  (loop :for l :in
+  #+unix (loop :for l :in
    '(:SBSIZE
     :CORE
     :DATA
@@ -876,7 +876,8 @@ symbolic format, otherwise output in octal."
     ;; :PTYS not settable? pseudo terminals?
      )
      :when (uos:rlimit-number l nil)
-     :collect l)
+	    :collect l)
+  #-unix ()
   "List of limits for ulimit command.")
 
 (defbuiltin ulimit
@@ -1175,7 +1176,8 @@ better just to use Lisp syntax.
 		   *command-cache*)))))
 
 ;; Since this is based on phonetics, we would need phonetic dictionaries to do
-;; this right.
+;; this right. Also, it's specific to language, so it should be in a language
+;; package.
 (defun indefinite (str)
   (declare (type string str))
   "Return an approximately appropriate indefinite article for the given ~
@@ -1304,5 +1306,27 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	  (loop :for o :in (lish-options *shell*)
 	     :collect (list (arg-name o) (format nil "~s" (arg-value o))))
 	  :de-lispify nil :right-justify t)))))
-      
+#|
+(defbuiltin lpath
+  ((command sub-command :default :list :help "What to do with the lpath."
+    :commands
+    ((show ()
+      "Show the Lisp path."
+      (format t "~s)
+     (append ((directory directory :help "The directory to append."))
+      "Append an element to the end of path."
+      (setf asdf:*central-registry* (append asdf:*central-registry*
+					    (list directory))))
+     (prepend ((directory directory :help "The directory to prepend."))
+      "Prepend and element to the front of the path."
+      (setf asdf:*central-registry*
+	    (cons directory asdf:*central-registry*)))
+     (set ((value list :help "The value to set the Lisp path to."))
+      "Set the Lisp path to VALUE, which should be a list of directories."
+      (setf asdf:*central-registry* value))))
+   (command-args object :repeating t :help "Arguments to sub-commands."))
+  "Manipulate the Lisp path."
+  (setf *output* (call-command command command-args)))
+|#
+
 ;; EOF
