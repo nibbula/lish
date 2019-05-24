@@ -1707,9 +1707,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 
 (defun find-directory-in-ring (reg)
   (let ((res (find reg *directory-ring* :test #'cl-ppcre:scan)))
-    (if res
-	res
-	(nos:current-directory))))
+    (or res (nos:current-directory))))
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
