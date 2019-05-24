@@ -23,6 +23,9 @@
   "Change the current directory to DIRECTORY."
   (when (equal directory "-")
     (setf directory (lish-old-pwd *shell*)))
+  (when (uiop:string-prefix-p "=" directory)
+    (setf directory (find-directory-in-ring (subseq directory 1))))
+  (push-directory-ring (nos:current-directory))
   (setf (lish-old-pwd *shell*) (nos:current-directory))
   (nos:change-directory (or directory (nos:environment-variable "HOME")))
   ;; Update $PWD like traditional Unix shells.

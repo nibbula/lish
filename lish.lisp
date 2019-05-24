@@ -1700,6 +1700,17 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
     (let ((*lish-user-package* (find-package :lish-user)))
       (load-file init-file))))
 
+(defun push-directory-ring (dir)
+  (if (> (length *directory-ring*) 32)
+      (pop *directory-ring*))
+  (setf *directory-ring* (append *directory-ring* (list dir))))
+
+(defun find-directory-in-ring (reg)
+  (let ((res (find reg *directory-ring* :test #'cl-ppcre:scan)))
+    (if res
+	res
+	(nos:current-directory))))
+
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
   (loop :for i = 1 :then (1+ i)
