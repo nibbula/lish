@@ -139,11 +139,14 @@ the primary result printed as a string."
    (lambda (x) ; eval is magic
      (cond
        ((and (listp x) (symbolp (car x)) (fboundp (car x)))
-	(apply (car x) (cdr x)))
+	;; (apply (car x) (cdr x))
+	;; Actually we need a full eval here.
+	(values (eval x) t)
+	)
        ((symbolp x)
 	(when (boundp x)
-	  (symbol-value x)))
-       (t (princ-to-string x))))))
+	  (values (symbol-value x) nil)))
+       (t (values (princ-to-string x) nil))))))
 
 #|
 (defun fill-prompt ()
@@ -183,13 +186,22 @@ the primary result printed as a string."
 ;; This isn't even "safe".
 (defun safety-prompt (sh)
   "Return a prompt, in a manner unlikely to fail."
-  (or (and (lish-prompt-function sh)
-	   (or (ignore-errors (funcall (lish-prompt-function sh) sh))
-	       (format t "Your prompt function failed.~%")))
-      (or (ignore-errors (make-prompt sh))
-	  (progn
-	    (format t "Your prompt is broken.~%")
-	    *fallback-prompt*))))
+  (let (prompt-error)
+    (macrolet ((handle-it (&body body)
+		 `(catch 'problems
+		    (handler-case
+			(progn ,@body)
+		      (error (c)
+			(setf prompt-error c)
+			(throw 'problems nil))))))
+      (or (and (lish-prompt-function sh)
+	       (or (handle-it (funcall (lish-prompt-function sh) sh))
+		   (format t "Your prompt function failed: ~s.~%"
+			   prompt-error)))
+	  (or (handle-it (make-prompt sh))
+	      (progn
+		(format t "Your prompt is broken: ~s~%" prompt-error)
+		*fallback-prompt*))))))
 
 (defun is-lisp-expr-p (expr)
   "Return true if the the shell expr is likely just a wrapped Lisp expr."
