@@ -212,6 +212,8 @@ string as an argument."
 	(sub (cdr commands) (car commands))
 	(sub commands))))
 
+;; @@@ This doesn't really work the way I'd like because backgrounding of
+;; compound commands needs some redesign. Or more like a total re-write.
 (defun in-bg (expr)
   "Evaluate EXPR in the background. If it's a string, evaluate it as shell
 command in the background. If it's something else, evaluate it as a lisp
