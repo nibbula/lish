@@ -279,11 +279,17 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
   "Colorize the editor buffer."
   (when (lish-colorize *shell*)
     ;;(format t "buf = ~s ~s~%" (type-of (rl::buf e)) (rl::buf e))
-    (let ((expr (shell-read (char-util:simplify-string (rl::buf e))
-			    :partial t)))
-      (when (shell-expr-p expr)
-	(colorize-expr expr (rl::buf e))
-	;; (dbugf :recolor "fat-str ~s~%" (rl::buf e))
-	))))
+    (catch 'whatever
+      (handler-case
+	  (progn
+	    (let ((expr (shell-read (char-util:simplify-string (rl::buf e))
+				    :partial t)))
+	      (when (shell-expr-p expr)
+		(colorize-expr expr (rl::buf e))
+		;; (dbugf :recolor "fat-str ~s~%" (rl::buf e))
+		)))
+	(error ()
+	  ;; Errors are particularly useless and annoying here. 
+	  (throw 'whatever nil))))))
 
 ;; EOF
