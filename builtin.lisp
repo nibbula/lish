@@ -624,12 +624,16 @@ But instead we have to to a kludgey version:
 ;; that for what I think is good reason, so I'm not sure I want to change it.
 
 (defbuiltin env
-    ((ignore-environment boolean :short-arg #\i
-      :help "Ignore the environment.")
-     (arguments string :rest t
-      :help "Variable assignments, commands and command arguments."))
+  ((ignore-environment boolean :short-arg #\i
+    :help "Ignore the environment.")
+   (arguments string :rest t
+    :help "Variable assignments, command and command arguments.
+Any number of leading words with equal signs '=' are taken to be environment
+variable assignments. The rest of the arguments are taken to be a command with
+and it's arguments. The environment variable assignments are only in effect for
+the command."))
   "Modify the command environment. If ignore-environment is true, only
-variables explicitly set in arguments are passed to the commands."
+variables explicitly set in arguments are passed to the command."
   (if arguments
       ;; Set variables and execute command
       (let (env new-env cmd (a arguments) args)
