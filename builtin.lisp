@@ -900,7 +900,7 @@ symbolic format, otherwise output in octal."
     :help "Limit to print or set.")
    (value object :help "New value for the limit."))
   "Examine or set process resource limits."
-  #-unix (declare (ignore print-all soft-limit hard-limit))
+  #-unix (declare (ignore print-all soft-limit hard-limit limit value))
   #-unix (values)
   #| #+unix (declare (ignore soft-limit)) |#
   #+unix
@@ -1124,20 +1124,23 @@ better just to use Lisp syntax.
 	(error "I don't know how to undefine a command of type ~a."
 	       (type-of command)))))))
 
+;; @@@ resolve vs. nos:command-pathname
 (defun command-paths (cmd)
   "Return all possible command paths. Don't cache the results."
   (loop :with r = nil
-     :for dir :in (split-sequence *path-separator*
-				  (nos:environment-variable "PATH"))
+     :for dir :in (command-path-list)
+     ;; (split-sequence *path-separator*
+     ;; 		     (nos:environment-variable "PATH"))
      :do
      (setf r (when (probe-directory dir)
 	       (loop :with full = nil
 		  :for f :in (read-directory :dir dir)
-		  :when (and (equal f cmd)
+		  :when (and (command-test #'equal cmd f)
 			     (is-executable
-			      (setf full
-				    (format nil "~a~c~a"
-					    dir *directory-separator* cmd))))
+			      ;; (setf full
+			      ;; 	    (s+ dir *directory-separator* cmd))
+			      (setf full (s+ dir *directory-separator* f))
+			      :regular t))
 		  :return full)))
      :if r
      :collect r))
