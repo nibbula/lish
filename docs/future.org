@@ -9,27 +9,20 @@ you intrepidly want to experiment, or are interested in helping turn it into
 something stable and tested, I recommend not using it yet!
 
 * Installing
-** new way
-*** Install a binary
-**** pick one from the binary release page
-*** Build from source
-**** git clone --recurse-submodules https://github.com/nibbula/yew.git
-**** sh build.sh
+** Install a binary
+*** Pick one from the binary release page. [LINK NEEDED]
+*** Put it somewhere in your path.
+** Build from source
+   : git clone --recurse-submodules https://github.com/nibbula/yew.git
+   : cd yew/lish
+   : sh build.sh
+** Loading without the build script
 *** Loading
-    For adding lish to your already running Lisp image:
-** old way
-*** Loading
-**** Install quicklisp from https://quicklisp.org
-     This nearly goes without saying for anything related to Lisp.
-
+**** Install quicklisp from https://quicklisp.org if you don't already have it.
 **** Install lish & dependencies into local-projects
 #+BEGIN_SRC shell
    cd ~/quicklisp/local-projects
-   git clone https://github.com/nibbula/rl
-   git clone https://github.com/nibbula/opsys
-   git clone https://github.com/nibbula/terminal
-   git clone https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name
-   git clone https://github.com/nibbula/lish
+   git clone --recurse-submodules https://github.com/nibbula/yew.git
 #+END_SRC shell
 
 **** In your Lisp, use quicklisp to load Lish:
@@ -38,17 +31,76 @@ something stable and tested, I recommend not using it yet!
 #+END_SRC
 
 **** Dependencies
-     The dependencies, aside from the above, which should hopefully all be
-     loaded from quicklisp, are probably:
-
-    - cl-ppcre
-    - trivial-gray-streams
-    - cffi
+***** A Common Lisp implementation:
+****** sbcl (recommended)
+****** ccl
+****** ecl
+****** cmucl
+****** clisp
+***** Quicklisp
+***** Lisp software not in quicklisp:
+****** https://github.com/nibbula/yew.git
+******* dlib
+******* stretchy
+******* char-util
+******* tiny-repl
+******* keymap
+******* collections
+******* ochar
+******* ostring
+******* color
+******* fatchar
+******* fatchar-io
+******* glob
+******* table
+******* table-print
+******* dlib-misc
+******* dl-list
+******* reader-ext
+******* syntax
+******* syntax-lisp
+******* theme
+******* style
+******* terminal-table
+******* grout
+******* completion
+******* unipose
+******* inator
+******* fui
+******* terminal-inator
+******* dlib-interactive
+******* magic
+****** https://github.com/nibbula/opsys.git
+******* opsys
+******* opsys-base
+******* opsys-<system>
+****** https://github.com/nibbula/terminal.git
+******* terminal
+******* terminal-crunch
+******* terminal-ansi
+******* terminal-dumb
+****** https://github.com/nibbula/deblarg.git
+******* deblarg
+****** https://github.com/nibbula/rl.git
+******* rl
+****** https://github.com/nibbula/lish.git
+******* lish
+***** Lisp packages in quicklisp, are probably:
+      - asdf
       - uiop
-      - alexandria
       - trivial-features
       - babel
-    - chipz
+      - alexandria
+      - cffi
+      - trivial-gray-streams
+      - cl-ppcre
+      - eclector
+      - closer-mop
+      - acclimation
+      - cl-unicode
+      - flexi-streams
+      - chipz
+      - bordeaux-threads
 *** Building an executable
 
 #+BEGIN_SRC lisp
@@ -67,6 +119,9 @@ something stable and tested, I recommend not using it yet!
   `(asdf:apply-output-translations "lish")` returns.
 
 * Running
+#+BEGIN_SRC shell
+  lish
+#+END_SRC
 #+BEGIN_SRC lisp
   (lish:lish)
 #+END_SRC
@@ -77,17 +132,136 @@ something stable and tested, I recommend not using it yet!
   evaluate Lisp expressions. It tries to do so in way that would not be
   too annoying to someone familiar with either one.
 
-  Lish does most of the things a normal shell does, but that being said, Lish
-  is **NOT** a POSIX shell! 
-
 ** Differences from a POSIX shells
 *** Syntax
+    Lish is *NOT* a POSIX shell, or even close! But it should hopefully not
+    cause too much annoyance to people accustomed to POSIX shells. Since
+    POSIX shell syntax is quite complex, and Lish syntax is fairly simple,
+    it's easier to explain what syntax it does have, instead of what syntax is
+    missing.
+
+    Lish has two syntax "modes". Shell command syntax and Common Lisp syntax.
+    The shell command syntax is fairly simple and is described here.
+    Common Lisp syntax is also relatively simple, but does have many subtle
+    details. It's not described here, but it's fully described in the Common
+    Lisp specification, and many books.
+
+    Common Lisp syntax is usually found inside parentheses, in the shell
+    command syntax. For example:
+
+    : ▶ shell-command -z -e (some 'common "lisp" #(code)) | pager -z -b
+    :   ^                 ^ ^                           ^ ^           ^
+    :   |___shell syntax__| |____Common Lisp syntax_____| |___shell___|
+
+**** Shell syntax
+***** Basic command syntax
+      The most basic syntax is:
+
+      : command argument ...
+
+      This runs the command, with any number of arguments. The command can be
+      a number of different things:
+
+	- An executable file in your system path
+
+	  For example, on a Unix system files in /usr/bin.
+	  This is the normal thing a shell does.
+
+	- A Lish shell command
+
+	  This is something defined by =defcommand=, or a similar commands
+          built in to Lish. Note that you can redefine any or all of the built
+          in commands, which are essentially the same as user defined commands.
+
+	  A Lish command is just a Lisp function with some extra information
+	  about how to parse arguemnts for the shell. You can call any Lish
+          command as a Lisp function, and vice versa.
+
+	- a package loadable by ASDF, which contains a command with the same
+          name.
+
+	  This is like an autoloading mechanism.
+
+	- a Lisp function
+
+	  This is almost exactly like a normal Lisp function call, but the
+          arguemnts are read more like a Lish command than pure Lisp syntax.
+	  So, for example, environment environment variables such as $HOME
+	  are expanded.
+
+          : ▶ prin1 $HOME
+          The variable /HOME/SAUCE is unbound.
+
+          : ▶ (prin1 $HOME)
+          The variable $HOME is unbound.
+
+	- an alias
+
+	  This translates one command into another. For example if you had
+	  defined an alias like:
+
+	  : alias ll "/bin/ls -l"
+
+	  Then when you type:
+
+	  : ll
+
+	  It will run the system command "/bin/ls" with the argument "-l",
+          like: 
+
+	  : /bin/ls -l
+
+***** Strings
+
+      Strings in Lish are like Lisp strings, delimited with the double quote
+      character ("). If you want a double quote in a string, you can preface
+      it with a backslash (\).
+
+      Unlike POSIX shells, single quotes don't delimit strings, because they
+      are used in standard Lisp code to quote forms. Also backquote (`) is not
+      used for process substitution, since backquote is used for
+      quasi-quotating in standard Lisp.
+
+***** Quotes
+***** Lisp forms
+****** Function call
+       ()
+****** Values
+       !
+****** Quotes
+       ' `
+***** Globbing
+***** Ranges and alteration
+***** Stream redirection
+***** Pipes
+***** Whole Lisp lines
+**** Summary
+     ; comment
+     command [arg...]
+     command "string" !*lisp-object* (lisp-code) $ENV_VAR
+     command *.glob ?ooba[rz]
+     command range{0..10} alternate.{asd,lisp,txt}
+     command word\ with\ spaces "string \" with a double quote"
+     command | command | ...
+     command < file-name
+     command > file-name
+     ([lisp expressions...])
 *** Expansion
+**** Environment variables: $
+**** History : !
+**** Expression : !
 *** Shell Commands
+    Shell commands are defined with the =defcommand= macro.
+    Arguments to shell command are classes.
 *** Programming
 *** Completion
+**** Shell commands
+**** System commands
+**** Other things
 *** Prompting
+    The prompt is set with the =prompt= shell option or the =prompt-function=.
 *** Pipelines
+    Pipelines send the output of one process to the input of another.
 *** Job Control
 ** Quick tutorial examples
-   Take a look at `doc/lish-examples.md`.
+   See `docs/lish-examples.md`.

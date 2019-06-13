@@ -3,49 +3,132 @@ Lish Documentation                                        -*- org -*-
 [Preliminary place for documentation until I figure out a better format.]
 
 * Introduction
-  Lish is a relatively boring combination of a Unix shell and Common Lisp
-  REPL. As you might expect, it allows you to both type Unix commands and
-  evaluate Lisp expressions. It tries to do so in way that would not be
-  too annoying to someone familiar with either one.
+  Lish is a combination of a Unix shell and Common Lisp REPL. As you might
+  expect, it allows you to both type Unix commands and evaluate Lisp
+  expressions. It tries to do so in way that would not be too annoying to
+  someone familiar with either one.
 
-  Lish does most of the things a normal shell does, but that being said, Lish
-  is **NOT** a POSIX shell! 
+  Lish does many of the things a normal shell does, but, Lish is **NOT** a
+  POSIX shell!
 
 ** Design philosphy
-*** Development story
+*** Motivation
+    Of course Emacs has facilities for that, but that doesn't help if you
+    don't want to run Emacs, or want to run programs that require terminal
+    emulation, which Emacs is historically not very good at.
 *** Command interface vs. programming interface
 *** Unix philosophy, Lisp philosophy, and a mixture thereof
 * Using Lish
 ** Installation
-*** Loading from source
-**** Install quicklisp from https://quicklisp.org
-     This nearly goes without saying for anything related to Lisp.
+*** Install a binary
+    You can download an already compiled executable and run it.
+**** Pick one from the binary release page. [LINK NEEDED]
+**** Put it somewhere in your path.
+*** Building an executable from source
+    : git clone --recurse-submodules https://github.com/nibbula/yew.git
+    : cd yew/lish
+    : sh build.sh
 
+    If all goes well you will have an executable program called =lish=.
+    You should put it somewhere in your PATH.
+**** Customizing your executable
+***** Executables with pre-loaded commands
+** Loading without the build script
+   When you want to compile and load lish from the Common Lisp REPL.
+*** Loading
+**** Install quicklisp from https://quicklisp.org if you don't already have it.
 **** Install lish & dependencies into local-projects
 #+BEGIN_SRC shell
    cd ~/quicklisp/local-projects
-   git clone https://github.com/nibbula/rl
-   git clone https://github.com/nibbula/opsys
-   git clone https://github.com/nibbula/useless-pile-of-junk-with-a-catchy-name
-   git clone https://github.com/nibbula/lish
+   git clone --recurse-submodules https://github.com/nibbula/yew.git
 #+END_SRC shell
-
 **** In your Lisp, use quicklisp to load Lish:
 #+BEGIN_SRC lisp
    (ql:quickload :lish)
 #+END_SRC
-
+**** Dependencies
+***** A Common Lisp implementation:
+****** sbcl (recommended)
+****** ccl
+****** ecl
+****** cmucl
+****** clisp
+***** Quicklisp
+***** Lisp software not in quicklisp:
+****** https://github.com/nibbula/yew.git
+******* dlib
+******* stretchy
+******* char-util
+******* tiny-repl
+******* keymap
+******* collections
+******* ochar
+******* ostring
+******* color
+******* fatchar
+******* fatchar-io
+******* glob
+******* table
+******* table-print
+******* dlib-misc
+******* dl-list
+******* reader-ext
+******* syntax
+******* syntax-lisp
+******* theme
+******* style
+******* terminal-table
+******* grout
+******* completion
+******* unipose
+******* inator
+******* fui
+******* terminal-inator
+******* dlib-interactive
+******* magic
+****** https://github.com/nibbula/opsys.git
+******* opsys
+******* opsys-base
+******* opsys-<system>
+****** https://github.com/nibbula/terminal.git
+******* terminal
+******* terminal-crunch
+******* terminal-ansi
+******* terminal-dumb
+****** https://github.com/nibbula/deblarg.git
+******* deblarg
+****** https://github.com/nibbula/rl.git
+******* rl
+****** https://github.com/nibbula/lish.git
+******* lish
+***** Lisp packages in quicklisp, are probably:
+      - asdf
+      - uiop
+      - trivial-features
+      - babel
+      - alexandria
+      - cffi
+      - trivial-gray-streams
+      - cl-ppcre
+      - eclector
+      - closer-mop
+      - acclimation
+      - cl-unicode
+      - flexi-streams
+      - chipz
+      - bordeaux-threads
 *** Building an executable
+    Once =lish= is loaded you can, say
 #+BEGIN_SRC lisp
   (lish:make-standlone)
 #+END_SRC
 
-    This should make an executable named "lish" in your current directory.
-    Put it wherever you'd like.
-
-**** Executables with pre-loaded commands
-*** Implementation specific
-*** Customized executable
+    Alternatively, you should be able to use:
+#+BEGIN_SRC lisp
+  (asdf:operate 'asdf:program-op :lish)
+#+END_SRC
+    More specificially, it will likely put an executable in whatever
+    =(asdf:apply-output-translations "lish")= returns.
 ** Quick start
    see [[Syntax Summary]]
    see [[Differences from POSIX shells]]
@@ -55,6 +138,7 @@ Lish Documentation                                        -*- org -*-
 #+BEGIN_SRC lisp
   (lish:lish)
 #+END_SRC
+    Or just run the executable from the operating system.
 *** Initialization file
     Lish attempts to read commands from a file when it starts up.
     The files it tries are, in order:
@@ -72,11 +156,140 @@ Lish Documentation                                        -*- org -*-
 *** Basic syntax
 **** Summary
      @@@ Should come from "help syntax"
+     ; comment
+     command [arg...]
+     command "string" !*lisp-object* (lisp-code) $ENV_VAR
+     command *.glob ?ooba[rz]
+     command range{0..10} alternate.{asd,lisp,txt}
+     command word\ with\ spaces "string \" with a double quote"
+     command | command | ...
+     command < file-name
+     command > file-name
+     ([lisp expressions...])
+**** Shell syntax
+***** Basic command syntax
+      The most basic syntax is:
+
+      : command argument ...
+
+      This runs the command, with any number of arguments. The command can be
+      a number of different things:
+
+	- An executable file in your system path
+
+	  For example, on a Unix system files in /usr/bin.
+	  This is the normal thing a shell does.
+
+	- A Lish shell command
+
+	  This is something defined by =defcommand=, or a similar commands
+          built in to Lish. Note that you can redefine any or all of the built
+          in commands, which are essentially the same as user defined commands.
+
+	  A Lish command is just a Lisp function with some extra information
+	  about how to parse arguemnts for the shell. You can call any Lish
+          command as a Lisp function, and vice versa.
+
+	- a package loadable by ASDF, which contains a command with the same
+          name.
+
+	- a Lisp function
+
+	  This is almost exactly like a normal Lisp function call, but the
+          arguemnts are read more like a Lish command than pure Lisp syntax.
+	  So, for example, environment environment variables such as $HOME
+	  are expanded.
+
+          : ▶ prin1 $HOME
+          The variable /HOME/SAUCE is unbound.
+
+          : ▶ (prin1 $HOME)
+          The variable $HOME is unbound.
+
+	- an alias
+
+	  This translates one command into another. For example if you had
+	  defined an alias like:
+
+	  : alias ll "/bin/ls -l"
+
+	  Then when you type:
+
+	  : ll
+
+	  It will run the system command "/bin/ls" with the argument "-l",
+          like:
+
+	  : /bin/ls -l
+
+***** Strings
+      Strings in Lish are like Lisp strings, delimited with the double quote
+      character ("). If you want a double quote in a string, you can preface
+      it with a backslash (\).
+
+      Unlike POSIX shells, single quotes don't delimit strings, because they
+      are used in standard Lisp code to quote forms. Also backquote (`) is not
+      used for process substitution, since backquote is used for
+      quasi-quotating in standard Lisp.
+***** Quotes
+***** Lisp forms
+****** Function call
+       ()
+****** Values
+       !
+****** Quotes
+       ' `
+***** Globbing
+      Expanding file names from wild card symbols is done by the =glob=
+      package. It provides something similar to the traditional Unix wild card
+      file "globbing".
+
+      |---------+------------------------------------------------------------|
+      | *       | matches any number of characters                           |
+      | ?       | matches any single character                               |
+      | [c1-c2] | matches a range of characters .eg. [A-Z] or [0-9] or [abc] |
+      |         | and the other constructs like:                             |
+      |         | [=a=] [:space:] [.lambda.] [!a-z] [^a-z]                   |
+      | **      | recursive directory traversal, aka. globstar.              |
+      |---------+------------------------------------------------------------|
+
+      For further information, see the documentation[*should be a link]
+      for the =glob= package.
+***** Ranges and alteration
+***** Stream redirection
+***** Pipes
+***** Whole Lisp lines
 **** Connecting commands
 ***** Input & Output
+      Both input and output to and from a command can be redirected to file.
+      You can use the traditional redirection syntax:
+      : command > file
+      or
+      : command < file
+      or both
+      : command < input-file > output-file
+
+      Lish can redirect from the Unix error stream, but when using Lish
+      commands, or Lisp functions, it's better to signal errors, since that
+      Lisp has at even more standard stream, like:
+      =*debug-io*=, =*error-output*=, =*query-io*=, =*standard-input*=,
+      =*standard-output*=, =*trace-output*=
+      These can all easily be redirected with Lisp code, but the shell does
+      not currently provide a short syntax for doing that.
 ***** Stream pipes
+      Like in POSIX shells, the output of one command can be used as the input
+      of the next command. Pipelines send the output of one process to the
+      input of another.
 ***** Object pipes
+      Lish commands can set a value as the output value.
+      Lisp functions return values.
+      Either of these can be considered as input for the next command,
+      if it is also a.
+      Lish commands can specifiy what type of input they accept, which can
+      allow a .
 ***** Conditional execution
+      foo && bar
+      for || bar
 **** Exapansions
 ***** Lisp expression expansion
 ***** History expansion
@@ -111,6 +324,7 @@ Lish Documentation                                        -*- org -*-
 ***** Stopping
 ** Customization
 *** Prompts
+    The prompt is set with the =prompt= shell option or the =prompt-function=.
 **** Prompt string
 ***** Prompt string formatting
       @@ docstring from symbolic-prompt-to-string @@
@@ -126,14 +340,32 @@ Lish Documentation                                        -*- org -*-
 *** Aliases
 *** Options
     @@ output of "help options" @@
+** Examples
+   See `doc/lish-examples.md`.
 * Programming
 ** Defining commands
+    Shell commands are defined with the =defcommand= macro.
+    Arguments to shell command are classes.
+    @@@ docstring of defcommand
 ** Defining argument types
+   Argument types should be defined with the =defargtype= macro.
+   @@@ docstring of defargtype
 ** Object pipelines and accepts?
+** Completion
+**** Shell commands
+**** System commands
+**** Other things
 * Reference
 ** Syntax
-**** detailed syntax BNF?
 **** Expansions?
+***** Lisp expression expansion
+***** History expansion
+***** Brace expansion, a.k.a. sequence expansion
+***** User name expansion, a.k.a. twiddle or tilde expansion
+***** Environemnt variable expansion
+***** File name expansion, a.k.a globbing
+***** Backslash removal
+**** detailed syntax BNF?
 ** Built in commands
 *** @@@@
     This should be automatically generated from the builtin commands

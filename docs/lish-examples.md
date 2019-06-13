@@ -1,32 +1,28 @@
 Lish examples
 =============
 
-Some examples of Lish use, probably misguided or incorrect.
-Any good parts were probably adapted from the [Fish tutorial](https://fishshell.com/docs/current/tutorial.html)
-and docs 
-
-Some features of Lisp should be familiar from POSIX shells, including use of
-`|` for pipes between processes:
+Many features of Lisp should be familiar from POSIX shells. You can use `|` for
+pipes between processes:
 ```
-$ echo hello world | wc
+Lish> echo hello world | wc
  1  2 12
 ```
 
 A dollar sign in a shell command performs variable substitution
 ```
-$ echo My home directory is $HOME
-My home directory is /home/testuser
+Lish> echo My home directory is $HOME
+My home directory is /home/user
 ```
 
 Lish is built on Common Lisp, and evaluates s-expressions:
 ```
-$ (+ 1 2 3)
+Lish> (+ 1 2 3)
 6
 ```
 
 The results of expressions can be passed as inputs to shell commands
 ```
-$ echo (loop for i from 0 below 10 collecting i)
+Lish> echo (loop for i from 0 below 10 collect i)
 0 1 2 3 4 5 6 7 8 9
 ```
 
@@ -35,32 +31,36 @@ Environment variables
 
 Variables are set with `export`, with or without an `=` between the name and the value:
 ```
-$ export name "Mister Noodle"
-$ echo $name
+Lish> export name "Mister Noodle"
+Lish> echo $name
 Mister Noodle
 ```
 
 **Note**: Using single quotes results in:
 ```
-$ export name 'Mister Noodle'
+Lish> export name 'Mister Noodle'
 WARNING: Extra arguments: (Noodle')
-$ echo $name
+Lish> echo $name
 'Mister
 ```
 
-Single quotes are instead used in the typical Lisp way of preventing evaluation
-of expressions, but only just before and inside parentheses. The un-specialness
-of single quotes otherwise, can help in avoiding getting tripped up by English
-contractions:
+In Common Lisp, single quotes are used as a prefix to prevent evaluation of
+expressions, but only just before and inside parentheses. To avoid confusion
+between syntaxes, Lish only uses single quote in the Lisp way. The
+un-specialness of single quotes otherwise, can help in avoiding getting tripped
+up by English contractions:
 
 ```
 echo If'n '(+ 2 3) weren't indeed (+ 2 3), 'twould be broke'd.
 ```
 
+Here the single quote is used in the Lisp way to prevent evaluation of (+ 2 3),
+but otherwise use verbatim in commands.
+
 Variables are not split after substitution:
 ```
-$ mkdir $name
-$ ls
+Lish> mkdir $name
+Lish> ls
 Mister Noodle
 ```
 A single directory was created rather than two, which `bash` would have created unless `$name` were quoted.
@@ -69,23 +69,26 @@ As in `bash` and many other shells, the `PATH` environment variable is
 a string containing a `:` separated list of paths.
 These paths are searched from first to last for executables:
 ```
-$ echo $PATH
+Lish> echo $PATH
 /home/testuser/local/bin:/usr/local/bin:/usr/bin:/bin
 ```
 
 Environment variables can be accessed inside Lisp expressions using
-`nos:environment-variable`, which returns a string. This string can be split
-using the split function.
+`nos:env`, which returns a string. For exmaple this string can be split using
+the split function.
 
 ```
-$ (split #\: (nos:environment-variable "PATH"))
-("/home/testuser/local/bin" "/usr/local/bin" "/usr/bin" "/bin"
+Lish> (split #\: (nos:env "PATH"))
+("/home/user/local/bin" "/usr/local/bin" "/usr/bin" "/bin"
  "/usr/local/games" "/usr/games")
 ```
 
+But note that for this purpose it's probably best to use (nos:command-path-list)
+since the layout of the PATH variable differs between operating systems.
+
 A loop over all the entries in `PATH`:
 ```
-$ (loop for entry in (split #\: (nos:environment-variable "PATH")) do
+Lish> (loop for entry in (nos:command-path-list) do
 - (format t "entry: ~a~%" entry))
 
 entry: /home/testuser/local/bin
@@ -99,8 +102,8 @@ NIL
 
 The environment variable locations are also setf'able:
 ```
-$ (setf (nos:environment-variable "TEST") "some string")
-$ echo $TEST
+Lish> (setf (nos:environment-variable "TEST") "some string")
+Lish> echo $TEST
 some string
 ```
 The value must be a string or `nil`, so setting an environment
@@ -112,13 +115,13 @@ Command substitution
 basically like `$(command)` or backticks in POSIX shells.
 
 ```
-$ echo In (!$ 'pwd), running (!$ 'uname)
+Lish> echo In (!$ 'pwd), running (!$ 'uname)
 In /home/testuser , running Linux
 ```
 
 ```
-$ export os (!$ 'uname)
-$ echo $os
+Lish> export os (!$ 'uname)
+Lish> echo $os
 Linux
 ```
 
@@ -152,13 +155,14 @@ Lish uses lisp style comments, which begin with `;`.
 The usual way to separate commands therefore doesn't work:
 
 ```
-$ echo hello; echo world
+Lish> echo hello; echo world
 hello
 ```
-Instead you can use `^`:
+Instead you can use `^`, which was chosen since it's mostly unused in other
+shells:
 
 ```
-$ echo hello ^ echo world
+Lish> echo hello ^ echo world
 hello
 world
 ```
@@ -167,22 +171,29 @@ Loops
 -----
 
 ```
-$ (dotimes (i 5)
+Lish> (dotimes (i 5)
 - (! "touch file_"  i ".txt")))
 NIL
 
-$ ls
+Lish> ls
 file_0.txt  file_1.txt  file_2.txt
 file_3.txt  file_4.txt
+```
+
+But Lish, like some other shells, supports brace expansion. So a simpler way
+to do this is:
+
+```
+Lish> touch file_{0..5}.txt
 ```
 
 The `glob` function can be used to get lists of files
 and directories:
 
 ```
-$ (loop for file in (glob "*.txt") do
+Lish> (loop for file in (glob "*.txt") do
 -   (! "cp " file " " file ".bak"))
-$ ls
+Lish> ls
 file_0.txt      file_2.txt.bak
 file_0.txt.bak  file_3.txt
 file_1.txt      file_3.txt.bak
@@ -196,33 +207,34 @@ Prompt
 The default prompt is configured using a bash-style prompt string.
 Like other user-configurable Lish options, it can be set using the
 `opt` built-in command. See `help opt` for a list.
+
 ```
-$ opt prompt "[%u@%h %W]\$ "
-[testuser@lisa testuser]$ 
+Lish> opt prompt "[%u@%h %W]\$ "
+[user@lisa user]$ 
 ```
 
 The prompt can also be generated using a function, which takes a shell
 as its first argument (but can safely ignore it). Setting
 `prompt-function` to `nil` reverts to the default behaviour.
 ```
-$ opt prompt-function (lambda (sh) (declare (ignorable sh)) "My prompt> ")
+Lish> opt prompt-function (lambda (sh) (declare (ignorable sh)) "My prompt> ")
 My prompt> 
 
 My prompt> opt prompt-function nil
-$ 
+Lish> 
 ```
 
 Colors, styles, and evaluated pieces can be put in the `prompt-string`.
 For example, here's a fancy prompt showing many features of prompt formatting:
 
 ```
-opt prompt '((:fg-cyan "%h") ":" (:fg-magenta "%i") ":"
-              (:fg-white (:underline "%w")) " "
-	      (:fg-red (make-string (1+ *lish-level*) :initial-element #\@))
+opt prompt '((:cyan "%h") ":" (:magenta "%i") ":"
+              (:white (:underline "%w")) " "
+	      (:red (make-string (1+ *lish-level*) :initial-element #\@))
 	      #\space)
 ```
 
-For the details on this one can look at the documentation for `format-prompt`
+For the details on thism one can look at the documentation for `format-prompt`
 and `symbolic-prompt-to-string` which can usually be dredged up by the standard
 Lisp functions `describe` or `documentation`, e.g.:
 
@@ -264,7 +276,7 @@ sleep is /bin/sleep
 sleep is the function #<FUNCTION SLEEP>
 ```
 
-One quirky feature of Lish is that Lisp functions and Lish commmands can return
+One feature of Lish is that Lisp functions and Lish commmands can return
 objects, and those objects are passed to subsequent functions in a pipeline.
 If that command happens to be a Lisp function with at least one less argument
 than it expects, that argument is taken from the result of the previous command
@@ -287,3 +299,14 @@ Lish> (expt 2 (sin pi)) ; Same as the last line, but in s-exp style.
 1.0d0
 Lish> glob "/bin/d*" | mapcar 'reverse | mapcar 'string-capitalize
 ```
+
+These examples utilize "parenless" function calls, which take the pipe output
+as the last argument. If the argument you want to pass isn't in the last
+position, you can use the variable *input*.
+
+```
+Lish> list 9 3 29 24 23 7 | (sort *input* #'<)
+```
+
+Note: The corresponding variable *output*, works in shell commands, but not in
+normal functions, since *output* always gets set to the return value.
