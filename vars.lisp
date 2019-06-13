@@ -74,6 +74,8 @@
   (write-version (1+ (read-version))))
 |#
 
+;; @@@ Deprecated for yet another way
+#|
 ;; We should almost always provide backwards compatibility as an option, but
 ;; releases with the same major version number should always be compatible
 ;; in the default configuration.
@@ -94,6 +96,27 @@ means every dumped executable.")
 
 (defparameter *version*
   (format nil "~d.~d.~d" *major-version* *minor-version* *build-version*))
+|#
+
+;; Yet another version of versions where presumably the new "improved" build
+;; script will increment it.
+
+(defparameter *version* #.(uiop:read-file-form
+			   (asdf:system-relative-pathname
+			    :lish "version.lisp")))
+
+(let ((split-version (mapcar (_ (parse-integer _ :junk-allowed t))
+			     (split-sequence #\. *version*))))
+  (defparameter *major-version* (first split-version)
+    "Major version number. Releases with the same major version number should be
+compatible in the default configuration.")
+
+  (defparameter *minor-version* (second split-version)
+    "Minor version number. This should change at least for every release.")
+
+  (defparameter *build-version* (third split-version)
+    "Build version number. This should increase for every build, which probably
+means every dumped executable."))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Misc

@@ -35,8 +35,8 @@
 
 ;; also horrible, but not in horrible becase we need uiop
 (defun run-with-input-from (stream command)
-  "Run commands with input from a file or stream. COMMANDS can be a SHELL-EXPR,
-or a list to be converted by LISP-ARGS-TO-COMMAND."
+  "Run commands with input from a file or stream. COMMAND should be a list of
+strings."
   (multiple-value-bind (stupid stupider exit-code)
       (uiop:run-program command :input stream :output t :error-output t
 			:ignore-error-status t)
@@ -47,11 +47,45 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 		"Failed"))
     (setf *exit-code* exit-code)))
 
+;; Very low-budget, unfancy, and brittle.
+(defun increment-build-version (file)
+  "Increment the last component of the dotted version string in FILE."
+  (flet ((split (string c)
+	   (let ((start 0) end result)
+	     (loop :while (and (< start (length string))
+			       (setf end (position c string :start start)))
+		:do
+		(push (subseq string start end) result)
+		(setf start (1+ end)))
+	     (push (subseq string start) result)
+	     (nreverse result))))
+    (format t "increment-build-version ~s~%" file)
+    (let* ((vers (uiop:read-file-form file))
+	   (vers-nums (mapcar (lambda (x)
+				(parse-integer x :junk-allowed t))
+			      (split vers #\.)))
+	   (new-vers (format nil "~a.~a.~a" (first vers-nums)
+			     (second vers-nums)
+			     (1+ (third vers-nums)))))
+      (when (not (every #'integerp vers-nums))
+	(cerror "Ok, whatever. Don't increment the version then."
+		"The version number incrementing seems to have failed.")
+	(return-from increment-build-version nil))
+      (with-open-file (stream file :direction :output :if-exists :overwrite)
+	(write new-vers :stream stream)
+	(terpri stream)))))
+
+;; So, ideally we would increment the build version number only if the build
+;; succeeds, but that seems like a pain, since we would have to pass the new
+;; version nubmer to both ASDF and the code being built, without setting it
+;; in the version.lisp file. Perhaps in the future we can work that out.
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Build Lishes of various kinds.
 
 (defparameter *default-target* 'lish)
 (defparameter *targets* '("lish"))
+(defparameter *version-file* "version.lisp")
 (defparameter *install-dir* (merge-pathnames "bin" *home*))
 (defparameter *lisp* (or (sf-getenv "LISP") "sbcl"))
 (defun impl (i)
@@ -90,30 +124,27 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
        ;; 		(lish:make-standalone)"))
        (format nil
 	       "(load \"build/build-init.lisp\" :verbose nil) ~
+		(ql:quickload :dlib :verbose nil) ~
 		(ql:quickload :tiny-repl :verbose nil) ~
 		(ql:quickload :deblarg :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
 		(lish:make-standalone)"))
+    (increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
 (defmethod build ((target (eql 'lishfu)))
   (msg "[Build target ~s]" target)
   (with-input-from-string
       (stream
-       ;; (format nil
-       ;; 	       "(load \"build/build-init.lisp\" :verbose nil) ~
-       ;; 		(asdf:load-system :tiny-repl :verbose nil) ~
-       ;; 		(asdf:load-system :deblarg :verbose nil) ~
-       ;; 		(asdf:load-system :lish :verbose nil) ~
-       ;; 		(load \"build/fully-loaded.lisp\" :verbose nil) ~
-       ;; 		(lish:make-standalone)"))
        (format nil
 	       "(load \"build/build-init.lisp\" :verbose nil) ~
+		(ql:quickload :dlib :verbose nil) ~
 		(ql:quickload :tiny-repl :verbose nil) ~
 		(ql:quickload :deblarg :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
 		(load \"build/fully-loaded.lisp\" :verbose nil) ~
 		(lish:make-standalone)"))
+    (increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
 ;; Plain, aka without my (or your) startup
@@ -122,30 +153,20 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
   (msg "[Build target ~s]" target)
   (with-input-from-string
       (stream
-       ;; (format nil
-       ;; 	       "(load \"build/build-init.lisp\") ~
-       ;;          (push \"../\" asdf:*central-registry*) ~
-       ;;          (push \"../opsys/\" asdf:*central-registry*) ~
-       ;;          (push \"../rl/\" asdf:*central-registry*) ~
-       ;;          (push \"./\" asdf:*central-registry*) ~
-       ;;          (asdf:load-system :lish :verbose nil) ~
-       ;;          (setf asdf:*central-registry* ~
-       ;;           (delete \"./\" asdf:*central-registry* :test #'equal)) ~
-       ;;          (setf asdf:*central-registry* ~
-       ;;           (delete \"../\" asdf:*central-registry* :test #'equal)) ~
-       ;;          (lish:make-standalone)"))
        (format nil
 	       "(load \"build/build-init.lisp\") ~
 		(push \"../\" asdf:*central-registry*) ~
 		(push \"../opsys/\" asdf:*central-registry*) ~
 		(push \"../rl/\" asdf:*central-registry*) ~
 		(push \"./\" asdf:*central-registry*) ~
+		(ql:quickload :dlib :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
 		(lish:make-standalone)"))
+    (increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags*
 					  ,@*lisp-plain-flags* "--" "-norl"))))
 
