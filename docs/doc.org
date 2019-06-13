@@ -13,9 +13,7 @@ Lish Documentation                                        -*- org -*-
 
 ** Design philosphy
 *** Motivation
-    Of course Emacs has facilities for that, but that doesn't help if you
-    don't want to run Emacs, or want to run programs that require terminal
-    emulation, which Emacs is historically not very good at.
+    @@@ philosophy.org
 *** Command interface vs. programming interface
 *** Unix philosophy, Lisp philosophy, and a mixture thereof
 * Using Lish
