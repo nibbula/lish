@@ -116,12 +116,6 @@ strings."
   (msg "[Build target ~s]" target)
   (with-input-from-string
       (stream
-       ;; (format nil
-       ;; 	       "(load \"build/build-init.lisp\" :verbose nil) ~
-       ;; 		(asdf:load-system :tiny-repl :verbose nil) ~
-       ;; 		(asdf:load-system :deblarg :verbose nil) ~
-       ;; 		(asdf:load-system :lish :verbose nil) ~
-       ;; 		(lish:make-standalone)"))
        (format nil
 	       "(load \"build/build-init.lisp\" :verbose nil) ~
 		(ql:quickload :dlib :verbose nil) ~
@@ -155,10 +149,10 @@ strings."
       (stream
        (format nil
 	       "(load \"build/build-init.lisp\") ~
-		(push \"../\" asdf:*central-registry*) ~
-		(push \"../opsys/\" asdf:*central-registry*) ~
-		(push \"../rl/\" asdf:*central-registry*) ~
-		(push \"./\" asdf:*central-registry*) ~
+		(push (truename \"../\") asdf:*central-registry*) ~
+		(push (truename \"../opsys/\") asdf:*central-registry*) ~
+		(push (truename \"../rl/\") asdf:*central-registry*) ~
+		(push (truename \"./\") asdf:*central-registry*) ~
 		(ql:quickload :dlib :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
 		(setf asdf:*central-registry* ~
