@@ -5,8 +5,8 @@
 (defsystem lish
     :name               "lish"
     :description        "Lispy system command shell."
-    :version            "0.1.0"
-    ;;:version		(:read-file-form "version.lisp")
+    ;;:version            "0.1.0"
+    :version		(:read-file-form "version.lisp")
     :author             "Nibby Nebbulous <nibbula -(. @ .)- gmail.com>"
     :licence            "GPLv3 or something."
     :source-control	:git
@@ -15,7 +15,8 @@
     :depends-on (:dlib :opsys :dlib-misc :stretchy :char-util :glob
 		 :table :table-print :reader-ext :dlib-interactive :completion
 		 :keymap :terminal :terminal-ansi :rl
-		 :fatchar :magic :theme :style :collections :ostring :ochar
+		 :fatchar :fatchar-io :magic :theme :style :collections
+		 :ostring :ochar
 		 #+use-re :re
 		 #-use-re :cl-ppcre
 		 :chipz :bordeaux-threads)
