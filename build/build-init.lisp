@@ -26,12 +26,12 @@
 
 (load "build/load-quicklisp.lisp" :verbose nil)
 
-(push "../"          asdf:*central-registry*)
-(push "../opsys/"    asdf:*central-registry*)
-(push "../terminal/" asdf:*central-registry*)
-(push "../rl/"       asdf:*central-registry*)
-(push "../deblarg/"  asdf:*central-registry*)
-(push "./"           asdf:*central-registry*)
+(push (truename "../")          asdf:*central-registry*)
+(push (truename "../opsys/")    asdf:*central-registry*)
+(push (truename "../terminal/") asdf:*central-registry*)
+(push (truename "../rl/")       asdf:*central-registry*)
+(push (truename "../deblarg/")  asdf:*central-registry*)
+(push (truename "./")           asdf:*central-registry*)
 
 ;; Suppress the fucking ASDF warnings.
 (let ((bitch (find-symbol "*SUPPRESS-DEFINITION-WARNINGS*" :asdf))
