@@ -1,7 +1,7 @@
 How the build works.
 
 0 - ../build.sh
-    Bootstrap script.
+    Bootstrap POSIX shell script.
     Picks a Lisp to run and runs it loading "build-lish.lisp".
 
 1 - build-lish.lisp
