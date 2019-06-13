@@ -8,15 +8,20 @@
 		     "view-html")
        ;; :do (asdf:load-system s :verbose nil))
      :do (ql:quickload s :verbose nil))
-  (loop :for s
-     :in (mapcar (dlib:_
+
+  (let ((systems
+	 (mapcar (dlib:_
+		  (dlib:keywordify
 		   (dlib:remove-prefix
-		    (dlib:remove-suffix dlib:_ ".asd") "../los/"))
+		    (dlib:remove-suffix dlib:_ ".asd") "../los/")))
 		 (remove-if (dlib:_
 			      (not (equal (nos:path-to-absolute dlib:_)
 					  (namestring (truename dlib:_)))))
-			    (glob:glob "../los/*.asd")))
-     ;; :do (asdf:load-system s :verbose nil)))
-     :do (ql:quickload s :verbose nil)))
+			    (glob:glob "../los/*.asd")))))
+    ;; @@@ stupid work around
+    (setf systems (delete :unzip systems))
+    (loop :for s :in systems
+       ;; :do (asdf:load-system s :verbose nil)))
+       :do (ql:quickload s :verbose nil))))
 
 ;; EOF
