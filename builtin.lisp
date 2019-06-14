@@ -1379,7 +1379,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 (define-builtin-arg-type quicklisp-system-designator (arg-keyword)
   "A system designator for QUICKLOAD, either a keyword or a string."
   ()
-  :convert arg-object
+  :convert string
   (if (and (stringp value) (char= (char value 0) #\:))
       (intern (string-upcase (subseq value 1)) (find-package :keyword))
       value))
