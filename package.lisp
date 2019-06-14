@@ -76,6 +76,7 @@ without any particular knowledge of it's Lisp programming features.
    ;; argument types for builtins
    #:arg-job-descriptor #:arg-help-subject #:arg-boolean-toggle #:arg-signal
    #:arg-pid-or-job #:arg-function #:arg-key-sequence #:arg-command
+   #:arg-system-designator #:arg-quicklisp-system-designator
    ;; argument generics
    #:convert-arg #:argument-choices
    #:defargtype

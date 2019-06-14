@@ -1339,4 +1339,59 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
   (setf *output* (call-command command command-args)))
 |#
 
+(defun loadable-system-list ()
+  (dlib-misc:loadable-packages :as-strings t))
+
+(define-builtin-arg-type system-designator (arg-keyword)
+  "A system designator, either a keyword or an ASDF/SYSTEM:SYSTEM"
+  ()
+  :convert string
+  (if (and (stringp value) (char= (char value 0) #\:))
+      (intern (string-upcase (subseq value 1)) (find-package :keyword))
+      value))
+
+(defmethod argument-choices ((arg arg-system-designator))
+  (declare (ignore arg))
+  (dlib-misc:loadable-packages :as-strings t))
+
+(defun asdf-load (system)
+  "Load "
+  (let ((symbol
+	 (if (or (stringp system) (keywordp system))
+	     system
+	     (intern (string-upcase (princ-to-string system)) :keyword))))
+    (asdf:oos 'asdf:load-op symbol)))
+
+(defbuiltin l
+  ((system system-designator :optional nil
+    :help "System designator to load."))
+  "Load a system."
+  (asdf-load system))
+
+(defbuiltin load
+  ((file pathname :default '(pick-file) :help "A file name to load."))
+  "Load a file."
+  (load file))
+
+(defun quicklisp-system-list ()
+  (dlib-misc:quickloadable-systems :as-strings t))
+
+(define-builtin-arg-type quicklisp-system-designator (arg-keyword)
+  "A system designator for QUICKLOAD, either a keyword or a string."
+  ()
+  :convert arg-object
+  (if (and (stringp value) (char= (char value 0) #\:))
+      (intern (string-upcase (subseq value 1)) (find-package :keyword))
+      value))
+
+(defmethod argument-choices ((arg arg-quicklisp-system-designator))
+  (declare (ignore arg))
+  (dlib-misc:quickloadable-systems :as-strings t))
+
+(defbuiltin ql
+  ((system quicklisp-system-designator :optional nil
+    :help "System designator to load."))
+  "QuickLoad a system."
+  (ql:quickload system))
+
 ;; EOF
