@@ -906,28 +906,38 @@ Remove backslash quotes."
     (setf (shell-expr-words expr) (nreverse new-words)))
   expr)
 
+(defun %shell-words-to-string (words stream)
+  "The internal part of shell-words-to-*-string."
+  (labels ((write-thing (w)
+	     (typecase w
+	       (string (princ (quotify w) stream))
+	       (cons (write w :stream stream :readably t :case :downcase))))
+	   ;;(write w :stream str :readably t :case :downcase))
+	   (write-it (w)
+	     (cond
+	       ((and (shell-word-p w) (word-quoted w))
+		(write-char #\" stream)
+		(write-thing (word-word w))
+		(write-char #\" stream))
+	       (t
+		(write-thing (word-word w))))))
+    (when (first words)
+      (write-it (first words)))
+    (loop :for w :in (rest words)
+       :do (write-char #\space stream)
+       (write-it w))))
+
 (defun shell-words-to-string (words)
   "Put a list of shell words, properly quoted, into a string separated by
 spaces. This of course loses some data in the words."
-  (with-output-to-string (str)
-    (labels ((write-thing (w)
-	       (typecase w
-		 (string (princ (quotify w) str))
-		 (cons (write w :stream str :readably t :case :downcase))))
-	     ;;(write w :stream str :readably t :case :downcase))
-	     (write-it (w)
-	       (cond
-		 ((and (shell-word-p w) (word-quoted w))
-		  (write-char #\" str)
-		  (write-thing (word-word w))
-		  (write-char #\" str))
-		 (t
-		  (write-thing (word-word w))))))
-      (when (first words)
-	(write-it (first words)))
-      (loop :for w :in (rest words)
-	 :do (write-char #\space str)
-	 (write-it w)))))
+  (with-output-to-string (stream)
+    (%shell-words-to-string words stream)))
+
+(defun shell-words-to-fat-string (words)
+  "Put a list of shell words, properly quoted, into a fat string separated by
+spaces. This of course loses some data in the words."
+  (with-output-to-fat-string (stream)
+    (%shell-words-to-string words stream)))
 
 (defun shell-words-to-list (words)
   "Return shell words as a list of strings."
@@ -945,7 +955,7 @@ spaces. This of course loses some data in the words."
     (rl::use-first-context (editor)
       (rl:replace-buffer
        editor
-       (shell-words-to-string words)))))
+       (shell-words-to-fat-string words)))))
 #|
     (with-output-to-string (str)
        (labels ((write-thing (w)
@@ -1949,6 +1959,11 @@ suspend itself."
 	(confirm "quit the shell"))
       t))
 
+(defun ensure-theme ()
+  "Make sure a theme is set."
+  (when (not theme:*theme*)
+    (setf theme:*theme* (theme:default-theme))))
+
 (defmacro with-error-handling ((state) &body body)
   #-sbcl (declare (ignore state))
   `(handler-bind
@@ -2022,14 +2037,11 @@ Arguments:
     ;; Load the startup file.
     (load-rc-file init-file)
 
-    ;; Make sure a theme is set.
-    (when (not theme:*theme*)
-      (setf theme:*theme* (theme:default-theme)))
-
     ;; Perhaps do a single command and exit.
     (when command
       (let (result)
 	(catch 'interactive-interrupt
+	  (ensure-theme)
 	  (start-job-control)
 	  (run-hooks *enter-shell-hook*)
 	  (setf result (lish-eval sh (shell-read command) (make-read-state)))
@@ -2048,6 +2060,8 @@ Arguments:
     (with-terminal (terminal-type *terminal* :device-name terminal-name
 				  :start-at-current-line t)
       (setf (tt-input-mode) :line)
+
+      (ensure-theme)
 
       ;; Make a customized line editor
       (setf (lish-editor sh)
