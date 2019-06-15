@@ -177,6 +177,17 @@ number ignore it that many times before exiting."
   :help "True to treat a directroy as a command to change to that directory."
   :default t)
 
+(defoption history-style choice
+  :help "Style of history to use. Simple stores just text lines. Fancy stores
+more information, such as the date."
+  :choices ("simple" "fancy")
+  :default :fancy)
+
+(defoption history-format choice
+  :help "Style of history to use."
+  :choices ("datbase" "text-file")
+  :default :database)
+
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.
 (defvar *shell-path* '()
