@@ -187,7 +187,8 @@ from stack."
     (terpri)))
 
 (defparameter *help-subjects*
-  '("commands" "builtins" "external" "editor" "keys" "options" "syntax")
+  '("commands" "builtins" "external" "editor" "keys" "options" "syntax"
+    "startup")
   "Subjects we have help about.")
 
 (defun help-choices ()
@@ -199,14 +200,6 @@ from stack."
 		   (and (stringp x) x)
 		   x))
 	   *command-list*)))
-
-;; (defclass arg-help-subject (arg-choice)
-;;   ()
-;;   (:default-initargs
-;;    :choice-func
-;;       #+clisp 'help-choices		; I'm not sure why.
-;;       #-clisp #'help-choices)
-;;   (:documentation "Something which we can get help on."))
 
 (define-builtin-arg-type help-subject (arg-choice)
   "Something which we can get help on."
@@ -231,6 +224,7 @@ Subjects:
   help keys           Show help on key bindings.
   help options	      Show help on shell options.
   help syntax         Show help on shell syntax.
+  help startup        Show help on what happens when the shell starts.
   help <command>      Show help for the command.
 ")
 
@@ -279,6 +273,26 @@ Commands can be:
     command with the same name as the system, which is then invoked.
   - Lisp functions or methods
 ")
+
+(defparameter *startup-help*
+  "Here's what the shell does when starting:
+
+  - Increment the *lish-level* and LISH_LEVEL.
+  - Update the LISH-USER package with symbols from CL-USER.
+  - Load the startup commands file, which comes from one of:
+      - The value passed to the shell with the :init-file keyword
+      - The value of *lishrc*
+      - The standard place for configuration files:
+        (opsys:path-append (opsys:config-dir \"lish\") \"lishrc\")
+        which is: ~s
+      - The value of *default-lishrc*,
+        which is: ~s
+    The current value is: ~s
+  - Make sure *theme* is set, using the (default-theme) if necessary.
+  - Make a new line editor, which might make a new *terminal*. See the
+    documentation for RL for details.
+  - Evaluate the *enter-shell-hook* functions.
+    The current value is: ~a.~%~%")
 
 (defun print-columnar-help (rows)
   ;; (with-input-from-string
@@ -378,41 +392,51 @@ available."
       (progn
 	(format t *basic-help* *version*))
       ;; topics
-      (cond
-	((equalp subject "builtins")
-	 (format t "Built-in commands:~%")
-	 (print-multiple-command-help (command-list 'builtin-command)))
-	((equalp subject "commands")
-	 (format t "Defined commands:~%")
-	 (print-multiple-command-help (command-list 'shell-command)))
-	((equalp subject "external")
-	 (format t "Defined external commands:~%")
-	 (print-multiple-command-help (command-list 'external-command)))
-	((or (equalp subject "editor"))	 (format t *editor-help*))
-	((or (equalp subject "syntax"))	 (format t *syntax-help*))
-	((or (equalp subject "options"))
-	 (format t "~
+      (let ((subject-kw (keywordify subject)))
+	(cond
+	  ((eq subject-kw :builtins)
+	   (format t "Built-in commands:~%")
+	   (print-multiple-command-help (command-list 'builtin-command)))
+	  ((eq subject-kw :commands)
+	   (format t "Defined commands:~%")
+	   (print-multiple-command-help (command-list 'shell-command)))
+	  ((eq subject-kw :external)
+	   (format t "Defined external commands:~%")
+	   (print-multiple-command-help (command-list 'external-command)))
+	  ((eq subject-kw :editor)
+	   (format t *editor-help*))
+	  ((eq subject-kw :syntax)
+	   (format t *syntax-help*))
+	  ((eq subject-kw :options)
+	   (format t "~
 Options can be examined and changed with the ‘opt’ command.~%~
 Shell options:~%")
-	 (print-columnar-help 
-	  (loop :for o :in (lish-options *shell*) :collect
-	     `(,(arg-name o) ,(substitute #\space #\newline (arg-help o))))))
-	((or (equalp subject "keys"))
-	 (format t "Here are the keys active in the editor:~%")
-	 (!bind :print-bindings t))
-	(t ;; Try a specific command
-	 (let* ((cmd  (get-command subject))
-		(symb (intern (string-upcase subject) :lish))
-		(doc  (when cmd (documentation cmd 'function)))
-		(fdoc (when (fboundp symb)
-			(documentation (symbol-function symb) 'function))))
-;	   (print-values* (subject cmd symb doc fdoc))
-	   (cond
-	     (doc  (setf *output* (print-command-help cmd)))
-	     (fdoc (format t "Lisp function:~%~a~%" fdoc))
-	     (cmd  (format t "Sorry, there's no help for \"~a\".~%" subject))
-	     (t    (format t "I don't know about the subject \"~a\"~%"
-			   subject))))))))
+	   (print-columnar-help
+	    (loop :for o :in (lish-options *shell*) :collect
+	       `(,(arg-name o)
+		  ,(substitute #\space #\newline (arg-help o))))))
+	  ((eq subject-kw :keys)
+	   (format t "Here are the keys active in the editor:~%")
+	   (!bind :print-bindings t))
+	  ((eq subject-kw :startup)
+	   (format t *startup-help*
+		   (opsys:path-append (opsys:config-dir "lish") "lishrc")
+		   *default-lishrc*
+		   *lishrc*
+		   *enter-shell-hook*))
+	  (t ;; Try a specific command
+	   (let* ((cmd  (get-command subject))
+		  (symb (intern (string-upcase subject) :lish))
+		  (doc  (when cmd (documentation cmd 'function)))
+		  (fdoc (when (fboundp symb)
+			  (documentation (symbol-function symb) 'function))))
+	     ;; (print-values* (subject cmd symb doc fdoc))
+	     (cond
+	       (doc  (setf *output* (print-command-help cmd)))
+	       (fdoc (format t "Lisp function:~%~a~%" fdoc))
+	       (cmd  (format t "Sorry, there's no help for \"~a\".~%" subject))
+	       (t    (format t "I don't know about the subject \"~a\"~%"
+			     subject)))))))))
 
 (defmethod documentation ((b command) (doctype (eql 'function)))
   "Return the documentation string for the given shell command."
