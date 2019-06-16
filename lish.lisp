@@ -1964,6 +1964,33 @@ suspend itself."
   (when (not theme:*theme*)
     (setf theme:*theme* (theme:default-theme))))
 
+(defun save-history (sh &key update)
+  "Save the history."
+  (history-store-save (lish-history-store sh) (history-style sh)
+		      :update update))
+
+(defun load-history (sh &key update)
+  (history-store-load (lish-history-store sh) (history-style sh)
+		      :update update))
+
+(defun init-history (sh)
+  "Create the history store and load the history from it."
+  (rl::history-init)
+  (setf (lish-history-store sh)
+	(make-instance (ecase (history-format sh)
+			 (:text-file 'text-history-store)
+			 (:database 'db-history-store))))
+  (history-store-start (lish-history-store sh) (history-style sh)))
+
+(defun start-history (sh)
+  (init-history sh)
+  (load-history sh))
+
+(defun finish-history (sh)
+  "Save the history finish using the history store."
+  (save-history sh)
+  (history-store-done (lish-history-store sh) (history-style sh)))
+
 (defmacro with-error-handling ((state) &body body)
   #-sbcl (declare (ignore state))
   `(handler-bind
@@ -2074,6 +2101,8 @@ Arguments:
 			   :prompt-func nil
 			   :filter-hook `(colorize)))
 
+      (start-history sh)
+
       (unwind-protect
 	(progn
 	  (start-job-control)
@@ -2132,6 +2161,9 @@ Arguments:
 	(stop-job-control saved-sigs))
       ;;(save-command-stats)
       (run-hooks *exit-shell-hook*))
+
+    (finish-history sh)
+
     (when (lish-exit-flag sh)
       (return-from lish (when (lish-exit-values sh)
 			  (values-list (lish-exit-values sh)))))

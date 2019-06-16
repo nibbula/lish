@@ -151,7 +151,9 @@ from stack."
    (show-times boolean :short-arg #\t
     :help "Show history times.")
    (delete integer :short-arg #\d
-    :help "Delete the numbered history entry."))
+    :help "Delete the numbered history entry.")
+   (table boolean :short-arg #\T
+    :help "True to return a table of the history."))
   "Show a list of the previously entered commands."
   ;; Check argument conflicts
   (cond ;; @@@ Could this kind of thing be done automatically?
@@ -168,9 +170,18 @@ from stack."
   (cond
     (clear
      (rl:history-clear :lish))
-    ;; @@@ TODO: finish this when history saving in rl is done.
-    (t
-     (rl:show-history :lish))))
+    ;; @@@ It might be nice if we could say what happend, like how many
+    ;; history items were saved or loaded.
+    (write         (save-history *shell*))
+    (read          (load-history *shell*))
+    (append        (save-history *shell* :update t))
+    (read-not-read (load-history *shell* :update t))
+    (filename
+     (setf (history-store-file-name (lish-history-store *shell*))
+	   filename))
+    (delete (format t "Sorry, delete is not implemented yet.~%"))
+    (table (setf *output* (rl:history-table :context :lish)))
+    (t (rl:show-history :context :lish :show-time show-times))))
 
 ;; This seems stupid and unnecessary. 
 ;; (defbuiltin #:|:| (("args" t :repeating t))
@@ -884,31 +895,31 @@ symbolic format, otherwise output in octal."
 
 (defparameter *limits*
   #+unix (loop :for l :in
-   '(:SBSIZE
-    :CORE
-    :DATA
-    :NICE
-    :FSIZE
-    :SIGPENDING
-    :KQUEUE
-    :MEMLOCK
-    :RSS
-    :NOFILE
-    :MSGQUEUE
-    :RTPRIO
-    :STACK
-    :CPU
-    :NPROC
-    :AS		; or maybe _VIRTMEM or _VMEM
-    :SWAP	; or maybe we need a getter?
-    :LOCKS
-    :NTHR	; _PTHREAD or _NTHR
-    ;; :PIPE not settable? uos:get-pipe-size
-    ;; :PTYS not settable? pseudo terminals?
-     )
-     :when (uos:rlimit-number l nil)
+	    '(:SBSIZE
+	      :CORE
+	      :DATA
+	      :NICE
+	      :FSIZE
+	      :SIGPENDING
+	      :KQUEUE
+	      :MEMLOCK
+	      :RSS
+	      :NOFILE
+	      :MSGQUEUE
+	      :RTPRIO
+	      :STACK
+	      :CPU
+	      :NPROC
+	      :AS			; or maybe _VIRTMEM or _VMEM
+	      :SWAP			; or maybe we need a getter?
+	      :LOCKS
+	      :NTHR			; _PTHREAD or _NTHR
+	      ;; :PIPE not settable? uos:get-pipe-size
+	      ;; :PTYS not settable? pseudo terminals?
+	      )
+	    :when (uos:rlimit-number l nil)
 	    :collect l)
-  #-unix ()
+  #-unix '()
   "List of limits for ulimit command.")
 
 (defbuiltin ulimit

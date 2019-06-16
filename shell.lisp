@@ -36,6 +36,10 @@
    (editor
     :accessor lish-editor
     :documentation "Line editor instance.")
+   (history-store
+    :initarg :history-store
+    :accessor lish-history-store :initform nil
+    :documentation "Where to save history.")
    (keymap
     :accessor lish-keymap
     :documentation "Keymap for the line editor.")
@@ -183,10 +187,30 @@ more information, such as the date."
   :choices ("simple" "fancy")
   :default :fancy)
 
+(defmethod history-style ((sh shell))
+  (keywordify (get-option sh 'history-style)))
+
+;; When changing the style, save and re-initialize the store.
+(defmethod (setf history-style) (value (sh shell))
+  (when (not (eq value (get-option sh 'history-style)))
+    (finish-history sh)
+    (set-option sh 'history-style value)
+    (init-history sh)))
+
 (defoption history-format choice
   :help "Style of history to use."
   :choices ("datbase" "text-file")
   :default :database)
+
+(defmethod history-format ((sh shell))
+  (keywordify (get-option sh 'history-format)))
+
+;; When changing the format, save and re-initialize the store.
+(defmethod (setf history-format) (value (sh shell))
+  (when (not (eq value (get-option sh 'history-format)))
+    (finish-history sh)
+    (set-option sh 'history-format value)
+    (init-history sh)))
 
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.
