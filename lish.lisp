@@ -883,61 +883,68 @@ really want to keep expanding." i)))
 	 (setf (shell-expr-words expr) words))))
   expr)
 
-(defun old-do-expansions (expr)
-  "Perform shell syntax expansions / subsitutions on the expression.
-Remove backslash quotes."
-  (let ((new-words '()))
-    (loop :with w
-       :for word :in (shell-expr-words expr)
-       :do
-       (setf w (word-word word))
-       (cond
-	 ((not (unquoted-string-p word))
-	  ;; Quoted, so just push it verbatim
-	  (push word new-words))
-	 ((shell-word-p word)
-	  ;; quoted word without anything special to expand
-	  (setf (shell-word-word word) (remove-backslashes w))
-	  (push word new-words))
-	 ((stringp word)
-	  (push (remove-backslashes word) new-words))
-	 (t
-	  (push word new-words))))
-    (setf (shell-expr-words expr) (nreverse new-words)))
-  expr)
-
-(defun %shell-words-to-string (words stream)
+(defun %shell-words-to-string (words stream &key literal-line)
   "The internal part of shell-words-to-*-string."
-  (labels ((write-thing (w)
-	     (typecase w
-	       (string (princ (quotify w) stream))
-	       (cons (write w :stream stream :readably t :case :downcase))))
-	   ;;(write w :stream str :readably t :case :downcase))
-	   (write-it (w)
-	     (cond
-	       ((and (shell-word-p w) (word-quoted w))
-		(write-char #\" stream)
-		(write-thing (word-word w))
-		(write-char #\" stream))
-	       (t
-		(write-thing (word-word w))))))
-    (when (first words)
-      (write-it (first words)))
-    (loop :for w :in (rest words)
-       :do (write-char #\space stream)
-       (write-it w))))
+  (let (start end skip)
+    (labels ((write-thing (w)
+	       (typecase w
+		 (string (princ (quotify w) stream))
+		 (cons (write w :stream stream :readably t :case :downcase))))
+	     (write-it (w &optional space)
+	       (setf skip nil)
+	       (when literal-line
+		 (cond
+		   ((and (shell-word-p w)
+			 (shell-word-start w) (shell-word-end w))
+		    ;; A word with positions, just update start and end
+		    ;; and skip further processing.
+		    (when (not start)
+		      (setf start (shell-word-start w)))
+		    (setf end (shell-word-end w)
+			  skip t))
+		   ((and (shell-word-p w)
+			 (or (not (shell-word-start w))
+			     (not (shell-word-end w)))
+			 start end)
+		    ;; A word without positions, write out what we got, and
+		    ;; clear the start and end.
+		    (when space
+		      (write-char #\space stream))
+		    (write-string (subseq literal-line start end)
+				  stream)
+		    (setf start nil end nil))))
+	       (when (not skip)
+		 (when space
+		   (write-char #\space stream))
+		 (cond
+		   ((and (shell-word-p w) (word-quoted w))
+		    (write-char #\" stream)
+		    (write-thing (word-word w))
+		    (write-char #\" stream))
+		   (t
+		    (write-thing (word-word w)))))))
+      (when (first words)
+	(write-it (first words)))
+      (loop :for w :in (rest words)
+	 :do (write-it w t))
+      (when (and literal-line start end)
+	;; Write out the last piece.
+	(write-char #\space stream)
+	(write-string (subseq literal-line start end) stream)))))
 
-(defun shell-words-to-string (words)
+(defun shell-words-to-string (words &key literal-line)
   "Put a list of shell words, properly quoted, into a string separated by
-spaces. This of course loses some data in the words."
+spaces. This of course loses some data in the words. If LITERAL-LINE is given,
+try to take as much as we can from it as the original line."
   (with-output-to-string (stream)
-    (%shell-words-to-string words stream)))
+    (%shell-words-to-string words stream :literal-line literal-line)))
 
-(defun shell-words-to-fat-string (words)
+(defun shell-words-to-fat-string (words &key literal-line)
   "Put a list of shell words, properly quoted, into a fat string separated by
-spaces. This of course loses some data in the words."
+spaces. This of course loses some data in the words. If LITERAL-LINE is given,
+try to take as much as we can from it as the original line."
   (with-output-to-fat-string (stream)
-    (%shell-words-to-string words stream)))
+    (%shell-words-to-string words stream :literal-line literal-line)))
 
 (defun shell-words-to-list (words)
   "Return shell words as a list of strings."
@@ -1133,6 +1140,7 @@ expanded."
   "Apply the function to the line, and return the proper values. If there are
 not enough arguements supplied, and *INPUT* is set, i.e. it's a recipient of
 a non-I/O pipeline, supply *INPUT* as the missing tail argument."
+  (dbugf :lish-eval "call-parenless ~s ~s~%" func line)
   (let ((parenless-args (read-parenless-args line))
 	(function-args (lambda-list
 			(if (functionp func)
@@ -1371,6 +1379,11 @@ probably fail, but perhaps in similar way to other shells."
 	     (if (> (length (shell-expr-words expr)) 1)
 		 (shell-words-to-string (rest (shell-expr-words expr)))
 		 ""))
+	   (literal-rest-of-the-line (expr)
+	     (if (> (length (shell-expr-words expr)) 1)
+		 (shell-words-to-string (rest (shell-expr-words expr))
+					:literal-line (shell-expr-line expr))
+		 ""))
 	   (run-fun (func line)
 	     "Apply the func to the line, and return the proper values."
 	     (run-hooks *pre-command-hook* cmd :function)
@@ -1448,10 +1461,15 @@ probably fail, but perhaps in similar way to other shells."
 					   (read-parenless-args
 					    (rest-of-the-line expr)))
 				     :context context))
-		       (run-fun (symbol-function symb)
-				;;(subseq (shell-expr-line expr) pos)
-				(rest-of-the-line expr)
-				))
+		       (progn
+			 ;; (dbugf :lish-eval "parenless literal ~s ~s~%"
+			 ;; 	expr
+			 ;; 	(literal-rest-of-the-line expr))
+			 (run-fun (symbol-function symb)
+				  ;;(subseq (shell-expr-line expr) pos)
+				  ;;(rest-of-the-line expr)
+				  (literal-rest-of-the-line expr)
+				  )))
 		   ;; Just try a system command anyway, which will likely fail.
 		   (sys-cmd))))))
 	(t ;; Some other type, just return it, like it's self evaluating.

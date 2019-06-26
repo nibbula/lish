@@ -83,6 +83,16 @@ value, an explaination which consists of (tag-symbol datum...)."
 	       "Finish the current word."
 	       (dbugf 'reader "finish-word ~s ~s~%" w in-word)
 	       (when in-word
+		 (when (and (not sub-expr) (>= (length w) 2)
+			    (char= (aref w 0) #\#) (char= (aref w 1) #\\))
+		   ;; As a special hack for reading lisp characters for
+		   ;; parenless lisp evaluation, treat words starting with #\
+		   ;; as if they were already quoted. Hopefully this will
+		   ;; preserve the \ from elimination. Also we have to get rid
+		   ;; of the one extra backslash put in in the string-quote
+		   ;; case below.
+		   (setf (subseq w 2) (subseq w 3))
+		   (setf did-quote t))
 		 (push (make-shell-word
 			:word (if sub-expr sub-expr (copy-seq w))
 			:eval (and sub-expr t)
