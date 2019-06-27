@@ -1886,10 +1886,15 @@ suspend itself."
 			:quit-value *quit-symbol*
 			:history-context :lish
 			:editor (lish-editor sh)
+			:accept-does-newline nil
+			:re-edit (when pre-str
+				   (setf pre-str nil)
+				   t)
 			:prompt
-			(if pre-str
-			    (lish-sub-prompt sh)
-			    (safety-prompt sh)))))
+			;; (if pre-str
+			;;     (lish-sub-prompt sh)
+			    (safety-prompt sh)
+			    )))
 	(when saved-signals
 	  (restore-signals saved-signals))))
     (cond
@@ -1930,6 +1935,7 @@ suspend itself."
        (dbugf 'lish-repl "DO CONTIUE!!~%"))
       ((eq expr *empty-symbol*)
        ;; do nothing
+       (format t "~%")			; <<<<
        (dbugf 'lish-repl "EMPTY - DO NOTHING!!~%"))
       ((eq expr *error-symbol*)
        ;; do nothing
@@ -1940,6 +1946,7 @@ suspend itself."
        (setf pre-str nil
 	     *input* nil
 	     *output* nil)
+       (format t "~%")			; <<<<
        (force-output)
        (when (catch 'interactive-interrupt
 	       (multiple-value-bind (vals stream show-vals)
@@ -1967,7 +1974,7 @@ suspend itself."
 		     (lish-print vals)))
 		 nil))
 	 ;; Got an intterrupt, so stop reading this multi-line expression.
-	 (format t ">>>> Control-C <<<<~%")
+	 (format t ">>>> Control-C <<<<~%") ;; does this ever happen?
 	 (set pre-str nil))))))
 
 (defun confirm-quit ()
