@@ -1197,12 +1197,12 @@ better just to use Lisp syntax.
 
 ;; Maybe this should be called "cache", and leave a posix compatible hash.
 (defbuiltin hash
-    (("rehash" boolean :short-arg #\r
-      :help "Forget about command locations.")
-     ("packages" boolean :short-arg #\p
-      :help "Forget about cached loadable packages.")
-     ("commands" t :repeating t
-      :help "Command to operate on."))
+  ((rehash boolean :short-arg #\r
+    :help "Forget about command locations.")
+   (packages boolean :short-arg #\p
+    :help "Forget about cached loadable packages.")
+   (commands t :repeating t
+    :help "Command to operate on."))
   "Show or forget remembered full pathnames of commands."
   (labels ((pr-cmd (c) (format t "~a~%" c)))
     (when rehash
@@ -1212,7 +1212,7 @@ better just to use Lisp syntax.
 	  (setf *command-cache* nil
 		*verb-list* nil)))	; @@@ from complete.lisp
     (when packages
-      (clear-loadable-package-cache))
+      (clear-loadable-system-cache))
     (when (and *command-cache* (not (or rehash packages)))
       (if commands
 	  (loop :for c :in commands :do
@@ -1375,7 +1375,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 |#
 
 (defun loadable-system-list ()
-  (dlib-misc:loadable-packages :as-strings t))
+  (dlib-misc:loadable-systems :as-strings t))
 
 (define-builtin-arg-type system-designator (arg-keyword)
   "A system designator, either a keyword or an ASDF/SYSTEM:SYSTEM"
@@ -1387,7 +1387,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 
 (defmethod argument-choices ((arg arg-system-designator))
   (declare (ignore arg))
-  (dlib-misc:loadable-packages :as-strings t))
+  (dlib-misc:loadable-systems :as-strings t))
 
 (defun asdf-load (system)
   "Load "

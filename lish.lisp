@@ -1121,6 +1121,8 @@ expanded."
 (defun command-type (sh command)
   "Return a keyword representing the command type of COMMAND, or NIL."
   (let (cmd)
+    ;; The order here is important and should reflect what actually happens
+    ;; in shell-eval.
     (cond
       ((setf cmd (gethash command (lish-commands)))
        (typecase cmd
@@ -1130,6 +1132,9 @@ expanded."
 	 (t					  :command)))
       ((gethash command (lish-aliases sh))        :alias)
       ((gethash command (lish-global-aliases sh)) :global-alias)
+      ;; @@@ A loadable system isn't really a command, rather a potential
+      ;; command, so maybe it shouldn't be in here?
+      ((loadable-system-p command)		  :loadable-system)
       ((get-command-path command)		  :file)
       ((and (lish-auto-cd sh)
 	    (directory-p (expand-tilde command))) :directory)

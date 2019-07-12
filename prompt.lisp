@@ -256,7 +256,7 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	     ;; (dbugf :recolor "command-type ~s~%" type)
 	     (case type
 	       ((:external-command :builtin-command :shell-command :command
-	         :alias :global-alias :function)
+	         :alias :global-alias :function :loadable-system)
 		(theme-it `(:command ,type :style) first-word))
 	       (:file (theme-it '(:command :system-command :style) first-word))
 	       (:directory (theme-it '(:command :directory :style) first-word))
