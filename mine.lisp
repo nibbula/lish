@@ -216,7 +216,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 		   (equal "x-sharedlib" (magic:content-type-name type)))
 	       (equal "application" (magic:content-type-category type)))
       (with-open-file (stream file :element-type '(unsigned-byte 8))
-	(setf contents (slurp stream)
+	(setf contents (slurp stream :element-type '(unsigned-byte 8))
 	      len (length contents)))
       (labels ((string-it (s) (map 'string #'code-char s))
 	       (read-null-terminated-string ()
