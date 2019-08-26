@@ -2023,34 +2023,51 @@ suspend itself."
 
 (defmacro with-error-handling ((state) &body body)
   #-sbcl (declare (ignore state))
-  `(handler-bind
-       (#+sbcl (sb-ext::step-condition 'repple-stepper)
-	#+sbcl
-	;; So we can do something on ^C
-	(sb-sys:interactive-interrupt
-	 #'(lambda (c)
-	     ;; Stop reading this multi-line expression
-	     (setf (read-state-prefix-string ,state) nil)
-	     (if (lish-debug *shell*)
-		 (invoke-debugger c)
-		 (progn
-		   (format t "~%") (finish-output)
-		   (invoke-restart (find-restart 'abort))))))
-	;; Normal error handling
-	(serious-condition
-	 #'(lambda (c)
-	     (dbugf :lish "Handler bind~%")
-	     ;; This should be the purview of the debugger.
-	     ;; (incf (read-state-error-count ,state))
-	     ;; (when (> (read-state-error-count ,state) 10)
-	     ;;   (format t "Too many errors!~%")
-	     ;;   (break))
-	     (if (lish-debug *shell*)
-		 (invoke-debugger c)
-		 (progn
-		   (format t "~&~a~&" c)
-		   (invoke-restart 'abort))))))
-    ,@body))
+  (with-unique-names (results just-print-the-error condition)
+    `(let* (,condition
+	    (,results
+	     ;; We have to be careful to preserve the values
+	     (multiple-value-list
+	      (catch ',just-print-the-error
+		(handler-bind
+		    (#+sbcl (sb-ext::step-condition 'repple-stepper)
+		     #+sbcl ;; So we can do something on ^C
+		     (sb-sys:interactive-interrupt
+		      #'(lambda (c)
+			  ;; Stop reading this multi-line expression
+			  (setf (read-state-prefix-string ,state) nil)
+			  (if (lish-debug *shell*)
+			      (invoke-debugger c)
+			      (progn
+				(format t "~%") (finish-output)
+				(invoke-restart (find-restart 'abort))))))
+		    ;; Normal error handling
+		    (serious-condition
+		     #'(lambda (c)
+			 (dbugf :lish "Handler bind~%")
+			 ;; This should be the purview of the debugger.
+			 ;; (incf (read-state-error-count ,state))
+			 ;; (when (> (read-state-error-count ,state) 10)
+			 ;;   (format t "Too many errors!~%")
+			 ;;   (break))
+			 (if (lish-debug *shell*)
+			     (invoke-debugger c)
+			     ;; We can't just print the error here because
+			     ;; the terminal could be screwed up, in a way which
+			     ;; can make the conditional newline fail, so we
+			     ;; throw out, so that hopefully the terminal will
+			     ;; be reset by unwind code and then print and abort.
+			     (progn
+			       (setf ,condition c)
+			       (throw ',just-print-the-error
+				 ',just-print-the-error))))))
+		  ,@body)))))
+       (if (eq (car ,results) ',just-print-the-error)
+	   (progn
+	     (format t "~&~a~&" ,condition)
+	     (finish-output)			; semi-dubious
+	     (invoke-restart 'abort))
+	   (values-list ,results)))))
 
 (defun lish (&key debug terminal-name
 	       ;;(terminal-type (pick-a-terminal-type))
