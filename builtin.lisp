@@ -1349,7 +1349,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	(t
 	 (print-properties
 	  (loop :for o :in (lish-options *shell*)
-	     :collect (list (arg-name o) (format nil "~s" (arg-value o))))
+	     :collect (cons (arg-name o) (format nil "~s" (arg-value o))))
 	  :de-lispify nil :right-justify t)))))
 #|
 (defbuiltin lpath
