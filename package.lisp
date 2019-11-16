@@ -118,6 +118,8 @@ without any particular knowledge of it's Lisp programming features.
    #:posix-to-lisp-args
    #:shell-read
    #:shell-eval
+   #:shell-expand
+   #:shell-expand-to-list
    #:format-prompt
    #:symbolic-prompt-to-string
    #:load-file

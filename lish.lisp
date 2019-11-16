@@ -950,6 +950,25 @@ try to take as much as we can from it as the original line."
   "Return shell words as a list of strings."
   (mapcar #'word-word words))
 
+;; This is sort of equivalent to wordexp.
+(defun shell-expand (thing)
+  "Expand THING and return a shell expression. If THING is a string it is turned
+into a shell-expr with shell-read."
+  (possibly-expand-aliases
+   *shell*
+     (do-expansions
+	 (lisp-exp-eval
+	  (etypecase thing
+	    (string (shell-read thing))
+	    (shell-expr thing))))))
+
+;; Maybe we should provide a shorthand for this?
+(defun shell-expand-to-list (thing)
+  "Read and expand THING and return a list of words."
+  (shell-words-to-list
+   (shell-expr-words
+    (shell-expand thing))))
+
 (defun shell-expand-line (editor)
   "A command to expand the current line."
   ;;(format t "editor is a ~a = ~s~%" (type-of editor) editor)
