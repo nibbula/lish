@@ -242,7 +242,11 @@ we want to use it for something in the future."
 ;; @@@ Perhaps we should define commands in the LISH-USER package
 ;; instead, so they can be exported and used by other packages?
 
-(defparameter *special-body-tags* #(:accepts :keys-as)
+;; @@@ :KEYS-AS is the deprecated name for :ARGS-AS. :ARGS-AS makes more sense
+;; now that we don't have any non-keyword arguments.
+;; Someday get rid of :KEYS-AS.
+
+(defparameter *special-body-tags* #(:accepts :keys-as :args-as)
   "Keywords with special meanings appearing first in the command body.")
 
 (defmacro %defcommand (name type do-defun (&rest arglist) &body body)
@@ -260,7 +264,7 @@ we want to use it for something in the future."
 	 (:accepts
 	  (setf accepts (cadr fixed-body)
 		fixed-body (cddr fixed-body)))
-	 (:keys-as
+	 ((:keys-as :args-as)
 	  (setf pass-keys-as (cadr fixed-body)
 		fixed-body (cddr fixed-body)))))
     (setf params (command-to-lisp-args (make-argument-list arglist t)
@@ -308,8 +312,8 @@ BODY recognizes some special keywords:
   :ACCEPTS  followed by a single indicator or list of indicators that can be
             types or keywords to indicate what the command accepts from a shell
             pipeline.
-  :KEYS-AS  followed by a symbol which will be a list of the keywords and values
-            given to the command function."
+  :ARGS-AS  followed by a symbol which will be a list of the keywords and values
+            given to the command function. :KEYS-AS is a deprecated synonym."
   `(%defcommand ,name shell-command t (,@arglist) ,@body))
 
 (defclass builtin-command (internal-command)
