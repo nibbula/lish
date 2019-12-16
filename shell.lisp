@@ -165,6 +165,11 @@ number ignore it that many times before exiting."
   "True to try to load unknown commands from an ASDF system of the same name."
   :default t)
 
+(defoption autoload-quietly boolean
+  :help
+  "True to suppress output from autoloading."
+  :default t)
+
 (defoption history-expansion boolean
   :help "True if !<integer> should expand to a history item."
   :default nil)
@@ -200,7 +205,8 @@ more information, such as the date."
 (defoption history-format choice
   :help "Style of history to use."
   :choices ("datbase" "text-file")
-  :default :database)
+  :default #.(if (getf rl-config::*config* :use-sqlite)
+		 :database :text-file))
 
 (defmethod history-format ((sh shell))
   (keywordify (get-option sh 'history-format)))

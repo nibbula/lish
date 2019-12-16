@@ -29,6 +29,7 @@ How the build works.
 	       If QuickLisp isn't already installed, or a custom one isn't
 	       given in LISP_QUICKLISP, then we install one. This is totally
 	       insecure, and I'm really sorry.
+	       Note that "quicklisp.lisp" is 'vendored' here.
 	   3 - Sets up ASDF to find things.
 	 - Loads whatever pre-requirements, which vary depending on the target.
 	 - Loads lish
