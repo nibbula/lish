@@ -120,18 +120,27 @@ Not implemented yet:
 	     (write-char c str))))
     out))
 
-;; @@@ Docstring is WRONG!
 (defun symbolic-prompt-to-string (sh symbolic-prompt #| &optional ts-in |#)
-  "Take a symbolic prompt and turn it into a string. A symbolic prompt can be
-any printable lisp object, which is converted to a string. If it is a list, it
-translates sublists starting with certain keywords, to terminal codes to do
-text effects to the enclosed objects. The keywords recognized are:
+  "Take a symbolic prompt and turn it into a fat-string. This uses
+span-to-fatchar-string with a filter of format-prompt and with the addition of
+evaluation, so see the documentation of those for more detail,
+
+Briefly, a symbolic prompt can be any printable lisp object, which is converted
+to a fat string. If it is a list, it translates sublists starting with certain
+keywords, to characters with text effects applied to the enclosed objects.
+Some of the keywords recognized are:
   :BOLD :UNDERLINE :INVERSE
 and the colors
   :BLACK :RED :GREEN :YELLOW :BLUE :CYAN :WHITE and :DEFAULT.
 The colors can be prefixed by :FG- or :BG- for the foreground or background.
-Symbols will be replaced by their value. Functions will be evaluated with
-the primary result printed as a string."
+Complex colors are also supported, for example (:fg :color [color]), where
+[color] can be something supported the color package, e.g. #(:RGB 0.1 0.7 0.9).
+
+Evaluation is supported, so symbols will be replaced by their value and
+functions will be evaluated with the primary result printed as a string.
+
+Strings can have '%' directives which are expanded by format-prompt."
+  ;; @@@ This docstring could use improvement?
   (fatchar:span-to-fat-string
    symbolic-prompt
    :filter (_ (format-prompt sh _))
