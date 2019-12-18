@@ -892,6 +892,10 @@ really want to keep expanding." i)))
 		 (cons (write w :stream stream :readably t :case :downcase))))
 	     (write-it (w &optional space)
 	       (setf skip nil)
+	       ;; @@@ This whole literal-line thing is dubious because
+	       ;; the start and end positions in words can be totally messed
+	       ;; up, especially in regard to the line fragment we're passed.
+	       #|
 	       (when literal-line
 		 (cond
 		   ((and (shell-word-p w)
@@ -913,6 +917,7 @@ really want to keep expanding." i)))
 		    (write-string (subseq literal-line start end)
 				  stream)
 		    (setf start nil end nil))))
+	       |#
 	       (when (not skip)
 		 (when space
 		   (write-char #\space stream))
@@ -2015,12 +2020,24 @@ suspend itself."
 
 (defun save-history (sh &key update)
   "Save the history."
-  (history-store-save (lish-history-store sh) (history-style sh)
-		      :update update))
+  (handler-case
+      (history-store-save (lish-history-store sh) (history-style sh)
+			  :update update)
+    (serious-condition (c)
+      (if (lish-debug *shell*)
+	  (invoke-debugger c)
+	  (format t "Saving history failed. Turn on debug if you want.~%~a~%"
+		  c)))))
 
 (defun load-history (sh &key update)
-  (history-store-load (lish-history-store sh) (history-style sh)
-		      :update update))
+  (handler-case
+      (history-store-load (lish-history-store sh) (history-style sh)
+			  :update update)
+    (serious-condition (c)
+      (if (lish-debug *shell*)
+	  (invoke-debugger c)
+	  (format t "Loading history failed. Turn on debug if you want.~%~a~%"
+		  c)))))
 
 (defun init-history (sh)
   "Create the history store and load the history from it."
