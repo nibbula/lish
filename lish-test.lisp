@@ -25,7 +25,8 @@
 	   :unless (sort-of-equal aa bb)
 	   :return t))))
     (symbol
-     (equal (symbol-name a) (symbol-name b)))
+     (and (symbolp b)
+	  (equal (symbol-name a) (symbol-name b))))
     (t
      (equalp a b))))
 
@@ -91,10 +92,10 @@
   (vuvu "unalias" '(&key name))
   (vuvu "exit" 	  '(&key values))
   (vuvu "source"  '(&key filename))
-  (vuvu "debug"   '(&key (state :toggle)))
-  (vuvu "export"  '(&key remove name value))
-  (vuvu "jobs" 	  '(&key long))
-  (vuvu "kill" 	  '(&key list-signals (signal "term") pids))
+  (vuvu "debug"   '(&key (state :toggle state-supplied-p)))
+  (vuvu "export"  '(&key remove edit name value))
+  (vuvu "jobs" 	  '(&key long all))
+  (vuvu "kill" 	  '(&key list-signals interactive (signal "term") pids))
   ;; (vuvu "format"  '(format-string &rest args))
   ;; (vuvu "read" 	  '(&key name prompt timeout editing))
   (vuvu "time" 	  '(&key command))
@@ -183,7 +184,7 @@
   (vivi "bind" "-r foo" '(:remove-key-binding "foo"))
   (vivi "cd" "" '())
   (vivi "cd" "dir" '(:directory "dir"))
-  (vivi "debug" "" '())
+  (vivi "debug" "" '(:state :toggle))
   (vivi "debug" "on" '(:state t))
   (vivi "debug" "off" '(:state nil))
   ;; This is supposed to fail, since pecan isn't a boolean
