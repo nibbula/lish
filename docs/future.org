@@ -119,18 +119,19 @@ something stable and tested, I recommend not using it yet!
   `(asdf:apply-output-translations "lish")` returns.
 
 * Running
+  From another shell:
 #+BEGIN_SRC shell
   lish
 #+END_SRC
+  Or from a Lisp REPL:
 #+BEGIN_SRC lisp
   (lish:lish)
 #+END_SRC
-
 * Using
-  Lish is a relatively boring combination of a Unix shell and Common Lisp
-  REPL. As you might expect, it allows you to both type Unix commands and
-  evaluate Lisp expressions. It tries to do so in way that would not be
-  too annoying to someone familiar with either one.
+  Lish is a combination of a Unix shell and Common Lisp REPL. As you might
+  expect, it allows you to both type Unix commands and evaluate Lisp
+  expressions. It tries to do so in way that would not be too annoying to
+  someone familiar with either one.
 
 ** Differences from a POSIX shells
 *** Syntax
@@ -252,7 +253,7 @@ something stable and tested, I recommend not using it yet!
 **** Expression : !
 *** Shell Commands
     Shell commands are defined with the =defcommand= macro.
-    Arguments to shell command are classes.
+    Arguments to shell commands are classes.
 *** Programming
 *** Completion
 **** Shell commands

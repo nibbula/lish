@@ -885,7 +885,8 @@ really want to keep expanding." i)))
 
 (defun %shell-words-to-string (words stream &key literal-line)
   "The internal part of shell-words-to-*-string."
-  (let (start end skip)
+  (declare (ignore literal-line))
+  (let (#| start end |# skip)
     (labels ((write-thing (w)
 	       (typecase w
 		 (string (princ (quotify w) stream))
@@ -932,10 +933,13 @@ really want to keep expanding." i)))
 	(write-it (first words)))
       (loop :for w :in (rest words)
 	 :do (write-it w t))
+      #|
       (when (and literal-line start end)
 	;; Write out the last piece.
 	(write-char #\space stream)
-	(write-string (subseq literal-line start end) stream)))))
+	(write-string (subseq literal-line start end) stream))
+      |#
+      )))
 
 (defun shell-words-to-string (words &key literal-line)
   "Put a list of shell words, properly quoted, into a string separated by
@@ -1459,7 +1463,8 @@ probably fail, but perhaps in similar way to other shells."
 	;; for things we already know are a system command?
 	((and (lish-autoload-from-asdf sh)
 	      (in-lisp-path cmd)	
-	      (setf command (load-lisp-command cmd)))
+	      (setf command (load-lisp-command
+			     cmd :silent (lish-autoload-quietly sh))))
 	 (dbugf :lish-eval "Trying autoload~%")
 	 ;; now try it as a command
 	 (run-hooks *pre-command-hook* cmd :command)

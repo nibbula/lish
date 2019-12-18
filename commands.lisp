@@ -396,7 +396,25 @@ and the name of the external program. ARGLIST is a shell argument list."
        (ignore-errors (asdf:find-component nil command))))
     (t nil)))
 
-(defun load-lisp-command (command)
+(defmacro stfu (&body body)
+  (let ((nilly (gensym "stfu")))
+    `(let (,nilly)
+       (unwind-protect
+	    (progn
+	      (setf ,nilly (make-broadcast-stream))
+	      (let ((*standard-output*	,nilly)
+		    (*error-output*	,nilly)
+		    ;; (*debug-io*		,nilly)
+		    (*trace-output*	,nilly)
+		    (*load-print*		nil)
+		    (*load-verbose*	nil)
+		    ;;(asdf::*verbose-out*	nil)
+		    )
+		,@body))
+	 (when ,nilly
+	   (close ,nilly))))))
+
+(defun load-lisp-command (command &key silent)
   "Try to load a command in the Lisp path. Return the command on success or
 NIL on failure. The Lisp path is most likely the ASDF path."
   (let* ((pkg (intern (string-upcase command) :keyword))
@@ -406,7 +424,9 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 	(let ((asdf:*compile-file-warnings-behaviour* :ignore)
 	      (asdf:*compile-file-failure-behaviour* :ignore))
 	  ;; :error :warn :ignore
-	  (asdf:oos 'asdf:load-op pkg :verbose nil)
+	  (if silent
+	      (stfu (asdf:oos 'asdf:load-op pkg :verbose nil))
+	      (asdf:oos 'asdf:load-op pkg :verbose nil))
 	  ;; Presumable we succeeded if we didn't get an error.
 	  (setf succeeded t))
       (asdf:system-definition-error (c) (declare (ignore c)))

@@ -507,7 +507,7 @@ Uses the first available of:
   (assert command)			; Don't be calling this with NIL.
   (or (get-command command)
       (and (in-lisp-path command)
-	   (load-lisp-command command)
+	   (load-lisp-command command :silent (lish-autoload-quietly *shell*))
 	   (get-command command))
       ;;(and (load-external-command command) (get-command command))
       (and (mine-command command) (get-command command))))
