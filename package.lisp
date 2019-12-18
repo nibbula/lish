@@ -50,6 +50,15 @@ without any particular knowledge of it's Lisp programming features.
    #:lish-sub-prompt
    #:lish-ignore-eof
    #:lish-debug
+   #:lish-collect-stats
+   #:lish-autoload-from-asdf
+   #:lish-autoload-quietly
+   #:lish-history-expansion
+   #:lish-expand-braces
+   #:lish-colorize
+   #:lish-auto-cd
+   #:lish-history-style
+   #:lish-history-format
    #:make-prompt
    ;; shell object
    #:shell
