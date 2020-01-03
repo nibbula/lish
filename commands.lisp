@@ -397,7 +397,7 @@ and the name of the external program. ARGLIST is a shell argument list."
     (t nil)))
 
 (defmacro stfu (&body body)
-  (let ((nilly (gensym "stfu")))
+  (let ((nilly (gensym)))
     `(let (,nilly)
        (unwind-protect
 	    (progn

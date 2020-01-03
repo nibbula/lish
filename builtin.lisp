@@ -19,15 +19,24 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Command definitions
 
+(defun home-directory ()
+  "Return a namestring of the user's home directory in a particular way."
+  (or (nos:environment-variable "HOME") (nos:user-home)
+      (namestring (user-homedir-pathname))))
+
 (defbuiltin cd ((directory directory :help "Directory to change to."))
-  "Change the current directory to DIRECTORY."
+  "Change the current directory to DIRECTORY. If DIRECTORY isn't specified,
+use *input* if it's a directory or the shell's idea of the user's home
+directory."
   (when (equal directory "-")
     (setf directory (lish-old-pwd *shell*)))
-  (when (uiop:string-prefix-p "=" directory)
+  (when (begins-with "=" directory)
     (setf directory (find-directory-in-ring (subseq directory 1))))
   (push-directory-ring (nos:current-directory))
   (setf (lish-old-pwd *shell*) (nos:current-directory))
-  (nos:change-directory (or directory (nos:environment-variable "HOME")))
+  (nos:change-directory (or directory
+			    (and *input* (nos:directory-p *input*) *input*)
+			    (home-directory)))
   ;; Update $PWD like traditional Unix shells.
   ;; @@@ Maybe someday we can get rid of this.
   (setf (nos:environment-variable "PWD") (nos:current-directory)))
@@ -38,7 +47,7 @@
 
 (defbuiltin pushd
   ((directory directory :help "Directory to push on the stack."))
-  "Change the current directory to DIR and push it on the the front of the
+  "Change the current directory to DIRECTORY and push it on the the front of the
 directory stack."
   (when (not directory)
     (setf directory (pop (lish-dir-list *shell*))))
