@@ -47,6 +47,7 @@ without any particular knowledge of it's Lisp programming features.
    ;; shell options
    #:lish-prompt
    #:lish-prompt-function
+   #:lish-right-prompt
    #:lish-sub-prompt
    #:lish-ignore-eof
    #:lish-debug

@@ -177,14 +177,14 @@ Strings can have '%' directives which are expanded by format-prompt."
 (defvar *fallback-prompt* "Lish> "
   "Prompt to use as a last resort.")
 
-(defgeneric make-prompt (shell)
+(defgeneric make-prompt (shell prompt)
   (:documentation "Return a string to prompt with."))
-(defmethod make-prompt ((sh shell))
+(defmethod make-prompt ((sh shell) prompt)
   "Return a string to prompt with."
-  (or (and (lish-prompt sh)
+  (or (and prompt
 	   ;; (format-prompt
 	   ;;  sh (symbolic-prompt-to-string (lish-prompt sh))))
-	   (symbolic-prompt-to-string sh (lish-prompt sh)))
+	   (symbolic-prompt-to-string sh prompt))
       ;; (if (and (lish-prompt-char sh)
       ;; 	       (characterp (lish-prompt-char sh)))
       ;; 	  (format nil "~a "
@@ -193,7 +193,7 @@ Strings can have '%' directives which are expanded by format-prompt."
 	  *fallback-prompt*))
 
 ;; This isn't even "safe".
-(defun safety-prompt (sh)
+(defun safety-prompt (sh &optional side)
   "Return a prompt, in a manner unlikely to fail."
   (let (prompt-error)
     (macrolet ((handle-it (&body body)
@@ -203,14 +203,22 @@ Strings can have '%' directives which are expanded by format-prompt."
 		      (error (c)
 			(setf prompt-error c)
 			(throw 'problems nil))))))
-      (or (and (lish-prompt-function sh)
-	       (or (handle-it (funcall (lish-prompt-function sh) sh))
-		   (format t "Your prompt function failed: ~s.~%"
-			   prompt-error)))
-	  (or (handle-it (make-prompt sh))
-	      (progn
-		(format t "Your prompt is broken: ~s~%" prompt-error)
-		*fallback-prompt*))))))
+      (if (eq side :right)
+	  (or (and (lish-right-prompt sh)
+		   (or
+		    (handle-it (make-prompt sh (lish-right-prompt sh)))
+		    (progn
+		      (format t "Your right prompt is broken: ~s~%" prompt-error)
+		      "")))
+	      "")
+	  (or (and (lish-prompt-function sh)
+		   (or (handle-it (funcall (lish-prompt-function sh) sh))
+		       (format t "Your prompt function failed: ~s.~%"
+			       prompt-error)))
+	      (or (handle-it (make-prompt sh (lish-prompt sh)))
+		  (progn
+		    (format t "Your prompt is broken: ~s~%" prompt-error)
+		    *fallback-prompt*)))))))
 
 (defun is-lisp-expr-p (expr)
   "Return true if the the shell expr is likely just a wrapped Lisp expr."

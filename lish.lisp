@@ -1928,6 +1928,7 @@ suspend itself."
 			;; (if pre-str
 			;;     (lish-sub-prompt sh)
 			    (safety-prompt sh)
+			:right-prompt (safety-prompt sh :right)
 			    )))
 	(when saved-signals
 	  (restore-signals saved-signals))))

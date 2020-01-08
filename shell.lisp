@@ -143,6 +143,12 @@ prompt."
 ;;  :default make-prompt	       ; N.B.: #'make-prompt doesn't work here
   )
 
+(defoption right-prompt object
+  :help "Prompt for the right side of the input line. Output with
+SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
+those functions for more detail about prompt formatting."
+  :default nil)
+
 (defoption sub-prompt string
   :help "String to print when prompting for more input."
   :default "- ")	; @@@ maybe we need sub-prompt-char & sub-prompt-func?
