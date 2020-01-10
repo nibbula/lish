@@ -295,6 +295,26 @@
 ;;   (declare (ignore arg quoted))
 ;;   (symbolify value))
 
+(defclass arg-package (arg-keyword)
+  ()
+  (:documentation
+   "A package designator, either a keyword or a package."))
+
+(defmethod convert-arg ((arg arg-package) value &optional quoted)
+  (declare (ignore arg quoted))
+  (if (stringp value)
+      (intern (string-upcase
+	       (if (char= (char value 0) #\:)
+		   (subseq value 1)
+		   value)) (find-package :keyword))
+      value))
+
+(defmethod argument-choices ((arg arg-package))
+  (declare (ignore arg))
+  (sort-muffled
+   (mapcar (_ (string-downcase (package-name _))) (list-all-packages))
+   #'string<))
+
 (defclass arg-date (argument) () (:documentation "A date."))
 (defmethod convert-arg ((arg arg-date) (value string) &optional quoted)
   (declare (ignore arg quoted))
