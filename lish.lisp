@@ -1146,8 +1146,11 @@ expanded."
 		   (mapcar (_ (or (and (stringp _) _)
 				  (shell-word-word _))) new-words)))))
 
-(defun command-type (sh command)
-  "Return a keyword representing the command type of COMMAND, or NIL."
+(defun command-type (sh command &key already-known)
+  "Return a keyword representing the command type of COMMAND, or NIL.
+If ALREADY-KNOWN is true, only check for already cached commands, don't bother
+consulting the file system."
+  ;;(declare (ignore already-known)) ;; @@@
   (let (cmd)
     ;; The order here is important and should reflect what actually happens
     ;; in shell-eval.
@@ -1163,7 +1166,8 @@ expanded."
       ;; @@@ A loadable system isn't really a command, rather a potential
       ;; command, so maybe it shouldn't be in here?
       ((loadable-system-p command)		  :loadable-system)
-      ((get-command-path command)		  :file)
+      ((get-command-path
+	command :already-known already-known)	  :file)
       ((and (lish-auto-cd sh)
 	    (directory-p (expand-tilde command))) :directory)
       ((and (fboundp (symbolify command)))	  :function)

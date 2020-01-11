@@ -269,7 +269,8 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	 (when (and first-word (stringp (word-word first-word)))
 	   ;; @@@ stupid hack to not turn lisp red
 	   (when (not (is-probably-a-lisp-expr-p (word-word first-word)))
-	     (setf type (command-type *shell* (word-word first-word)))
+	     (setf type (command-type *shell* (word-word first-word)
+				      :already-known t))
 	     ;; (dbugf :recolor "command-type ~s~%" type)
 	     (case type
 	       ((:external-command :builtin-command :shell-command :command

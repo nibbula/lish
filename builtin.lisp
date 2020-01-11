@@ -696,7 +696,8 @@ variables explicitly set in arguments are passed to the command."
 	(setf cmd (car a)
 	      args (cdr a))
 	(when (not ignore-environment)
-	  (setf new-env (environment)))
+	  (setf new-env (or (context-environment *context*)
+			    (environment))))
 	;; Set the variables
 	;; (format t "cmd = ~s~%args = ~s~%env = ~s~%" cmd args env)
 	;; (finish-output)
@@ -713,9 +714,13 @@ variables explicitly set in arguments are passed to the command."
 	;; Run the command
 	;; @@@ This should respect piping!!!
 	(when cmd
-	  (funcall #'do-system-command
-		   (make-shell-expr :words `(,cmd ,@args))
-		   (modified-context *context* :environment new-env))))
+	  ;; (funcall #'do-system-command
+	  ;; 	   (make-shell-expr :words `(,cmd ,@args))
+	  ;; 	   (modified-context *context* :environment new-env))))
+	  (funcall #'shell-eval
+		   ;; (make-shell-expr :words `(,cmd ,@args))
+		   (shell-read (join-by-string (append (list cmd) args) " "))
+		   :context (modified-context *context* :environment new-env))))
       ;; Just print the variables
       (loop :for e :in (environment)
 	 :do (format t "~a=~a~%" (car e) (cdr e)))))
@@ -1189,20 +1194,28 @@ better just to use Lisp syntax.
      :if r
      :collect r))
 
+#|
 (defparameter *command-cache* nil
   "A hashtable which caches the of full names of commands.")
 
-(defun get-command-path (cmd)
-  "Return the possibly cached command path."
+(defun get-command-path (cmd &key already-known)
+  "Return the possibly cached command path. If ALREADY-KNOWN is true, only check
+for already cached commands, don't bother consulting the file system."
   (when (not *command-cache*)
     (setf *command-cache* (make-hash-table :test #'equal)))
   (let ((result (gethash cmd *command-cache*)))
-    (when (not result)
+    (when (and (not result) (not already-known))
       (let ((path (command-pathname cmd)))
 	(when path
 	  (setf (gethash cmd *command-cache*) path
 		result path))))
     result))
+|#
+
+(defun get-command-path (cmd &key already-known)
+  "Return the possibly cached command path. If ALREADY-KNOWN is true, only check
+for already cached commands, don't bother consulting the file system."
+  (command-pathname cmd :cached (if already-known :only :default)))
 
 ;; Maybe this should be called "cache", and leave a posix compatible hash.
 (defbuiltin hash
@@ -1213,21 +1226,29 @@ better just to use Lisp syntax.
    (commands t :repeating t
     :help "Command to operate on."))
   "Show or forget remembered full pathnames of commands."
-  (labels ((pr-cmd (c) (format t "~a~%" c)))
+  (labels ((pr-cmd (dir cmd) (format t "~a~%" (path-append dir cmd))))
     (when rehash
       (if commands
 	  (loop :for c :in commands :do
-	     (remhash c *command-cache*))
-	  (setf *command-cache* nil
-		*verb-list* nil)))	; @@@ from complete.lisp
+	     (opsys:command-pathname-cache-remove c))
+	  (progn
+	    (opsys:command-pathname-cache-clear)
+	    (setf *verb-list* nil))))	; @@@ from complete.lisp
     (when packages
       (clear-loadable-system-cache))
-    (when (and *command-cache* (not (or rehash packages)))
-      (if commands
-	  (loop :for c :in commands :do
-	     (pr-cmd (gethash c *command-cache*)))
-	  (maphash #'(lambda (c p) (declare (ignore c)) (pr-cmd p))
-		   *command-cache*)))))
+    (let ((table (and opsys:*command-pathname-cache*
+		      (opsys::command-cache-table
+		       opsys:*command-pathname-cache*))))
+      (when (and table (not (or rehash packages)))
+	(if commands
+	    (loop :with path
+	       :for c :in commands :do
+	       (setf path (gethash c table))
+	       (if path
+		   (pr-cmd path c)
+		   (format t "~a is not a hashed command~%" c)))
+	    (maphash #'(lambda (c p) (pr-cmd p c))
+		     table))))))
 
 ;; Since this is based on phonetics, we would need phonetic dictionaries to do
 ;; this right. Also, it's specific to language, so it should be in a language
