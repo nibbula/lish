@@ -232,11 +232,16 @@ from stack."
 (defparameter *basic-help*
 "~
 Lish version ~a help:
+  This is Lish, a command line shell with Lisp.
+  A brief summary of what to type:
+
   command [arg*...]   Run a program in your path with the given ARGs.
   ([expressions]...)  Evaluate Lisp expressions.
   help [subject]      Show help on the subject.
   exit                Exit the shell.
-Subjects:
+
+Further help is available on these subjects:
+
   help builtins       Show help on built-in commands.
   help commands       Show help on added commands.
   help external       Show help on external commands.
