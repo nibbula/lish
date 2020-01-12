@@ -512,6 +512,131 @@ Uses the first available of:
       ;;(and (load-external-command command) (get-command command))
       (and (mine-command command) (get-command command))))
 
+(defun get-backward-word-symbol (type string position &key bang-p)
+  "Get a symbol prior to POSITION in STRING. If BANG-P is true, ignore a leading
+exclamation point '!'. Return the TYPE given, the symbol as a string, the
+package, and boolean indicating if the package was with the external notation."
+  (let* ((word-start (completion::scan-over-str
+		      string position :backward
+		      :not-in completion::*lisp-non-word-chars*))
+	 (word (subseq string word-start position))
+	 (package nil)
+	 (external nil))
+    (when (and bang-p (plusp (length word)) (eql #\! (aref word 0)))
+      (setf word (subseq word 1)
+	    word-start (1+ word-start)))
+    (multiple-value-setq (package external)
+      (completion::find-back-pack string word-start))
+    (values type word package external)))
+
+(defun guess-word-before (string position)
+  "Try to guess what the word before POSTION in STRING is.
+First value is a keyword indicating the type, which is one of:
+  :symbol :bang-symbol :string :command :filename :command-or-symbol :unknown
+  :environment-variable :user-name
+Second value is the word as a string.
+Third and fourth values depend on the type.
+Sorry you'll have to figure it out yourself."
+  (let (exp explanation)
+    (multiple-value-setq (exp explanation)
+      (ignore-errors (shell-read (subseq string 0 position) :partial t
+				 :package *junk-package*)))
+      (etypecase exp
+	(keyword
+	 (cond
+	   ;; Couldn't read a whole expression.
+	   ((eq exp *continue-symbol*)
+	    ;; If it's not something we know about, it's probably a bug.
+	    (ecase (car explanation)
+	      (lisp-expr	      ; an incomplete lisp expression
+	       ;; (cdr explanation) should be the expr?
+	       (get-backward-word-symbol :symbol string position))
+	      (bang-expr	      ; an incomplete !lisp expression
+	       ;; (cdr explanation) should be the expr?
+	       (get-backward-word-symbol :bang-symbol string position :bang-p t))
+	      (string	       ; an unclosed string
+	       (let ((word (de-quotify (second explanation)))
+		     (position (third explanation)))
+		 (values :string word position)))
+	      (compound		  ; a compound connector with nothing after it
+	       (case (cadr explanation)
+		 ((:pipe :and :or :sequence)
+		  (values :command ""))
+		 ((:redirect-to :redirect-from :append-to)
+		  (values :filename ""))))))
+	   (t ;; This is probably a bug.
+	    (error "Unknown keyword returned from shell-read."))))
+	(cons
+	 (get-backward-word-symbol :symbol string position))
+	(shell-expr
+	 (let* ((shell-word (shell-word-at exp position))
+		(word (and shell-word (word-word shell-word)))
+		(word-num (word-word (shell-word-num exp position)))
+		(first-word (word-word (first-word-in-expr exp position)))
+		 word-pos)
+	   ;; word is the text of the word
+	   ;; word-pos is the relative position in the word
+	   (when shell-word
+	     (setf word-pos (- position (shell-word-start shell-word))))
+	   (cond
+	     ((or (and (not word) (zerop position))
+		  (start-of-a-compound-p exp position))
+	      ;; no words
+	      (values :command ""))
+	     ((not word)
+	      (if (= 0 (length (shell-expr-words exp)))
+		  ;; probably ()
+		  (progn
+		    (dbugf 'completion "not in a word, empty list : bogo~%")
+		    (get-backward-word-symbol :symbol string position))
+		  ;; a blank spot somewhere in the line
+		  (values :command-or-symbol
+			  first-word
+			  ;; (shell-word-start shell-word)
+			  position
+			  )))
+	     ((symbolp word)
+	      (dbugf 'completion "symbol word : janky~%")
+	      (get-backward-word-symbol :symbol string position))
+	     ((consp word)		; (foo)
+	      (dbugf 'completion "junky~%")
+	      (get-backward-word-symbol :symbol string position))
+	     ((not (stringp word))
+	      ;; We don't know how to complete it.
+	      ;; Of course we could implement completion for random typed
+	      ;; objects, like with a method, but what would that be like?
+	      ;; We could error here, that's probably just annoying.
+	      (dbugf 'completion "word of weird type ~s ~s~%"
+		     word (type-of word))
+	      (values :unknown (type-of word) word))
+	     ((zerop (length word))
+	      (dbugf 'completion "empty word~%")
+	      ;; It's probably !() or something so just list the symbols.
+	      (get-backward-word-symbol :symbol string position))
+	     ((eql (aref word 0) #\()	; (foo
+	      (dbugf 'completion "half baka~%")
+	      (get-backward-word-symbol :symbol string position))
+	     ((eql (aref word 0) #\!)	; !foo
+	      (get-backward-word-symbol :symbol string position :bang-p t))
+	     ((eql (aref word 0) #\$)	; $foo
+	      (values :environment-variable (subseq word 1)
+		      (1+ (shell-word-start shell-word))))
+	     ((and (eql (aref word 0) #\~) ; ~foo
+		   (valid-user-name (subseq word 1)))
+	      (values :user-name (subseq word 1)
+		      (1+ (shell-word-start shell-word))))
+	     ;; first word, when not starting with directory chars
+	     ((and
+	       (in-command-position-p exp word-num)
+	       (not (position (aref word 0) "/.~")))
+	      (dbugf 'completion "first word, non path : jinky~%")
+	      ;; (get-backward-word-symbol :symbol string position))
+	      ;; try commands
+	      (values :command-or-symbol
+		      first-word (shell-word-start shell-word)))
+	     (t
+	      (values :command-or-symbol first-word position))))))))
+
 (defun shell-complete (context pos all)
   (declare (type string context))
   "Analyze the context and try figure out what kind of thing we want to ~
