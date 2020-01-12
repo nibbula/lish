@@ -15,7 +15,8 @@
 
 (defkeymap *lish-default-keymap*
   "Keymap for Lish."
-  `((,(ctrl #\v)	. shell-expand-line)))
+  `((,(ctrl #\v)	. shell-expand-line)
+    (:f1		. shell-help-key)))
 
 ;; @@@ I want to change all the lish-* accessors to shell-*
 (defclass shell ()
