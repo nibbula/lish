@@ -1014,33 +1014,49 @@ into a shell-expr with shell-read."
 |#
 
 (rl:defsingle shell-help-key (editor)
-  (use-first-context (editor)
-     (with-context ()
-       (multiple-value-bind (type word)
-	   (guess-word-before (rl:get-buffer-string editor) inator::point)
-	 (labels ((symbol-help ()
-		    (let ((symbol (symbolify word :no-new t)))
-		      (when (and symbol)
-			(inator:message
-			 editor
-			 "~/fatchar-io:print-string/"
-			 (fatchar-io:with-output-to-fat-string (str)
-			   (doc:%doc symbol :all nil :stream str))))))
-		  (command-help ()
-		    (inator:message
-		     editor
-		     "~/fatchar-io:print-string/"
-		     (fatchar-io:with-output-to-fat-string (stream)
-		      (doc:%doc word :stream stream)))))
-	   (case type
-	     (:symbol (symbol-help))
-	     (:command (command-help))
-	     (:command-or-symbol
-	      (if (get-command word)
-		  (command-help)
-		  (symbol-help)))
-	     (otherwise
-	      (inator:message editor "Sorry. No help for a ~s." type))))))))
+  (handler-case
+      (use-first-context (editor)
+        (with-context ()
+	  (multiple-value-bind (type word)
+	      (guess-word-before (rl:get-buffer-string editor) inator::point)
+	    (labels ((symbol-help ()
+		       (let ((symbol (symbolify word :no-new t)))
+			 (if symbol
+			     (let* (result
+				    (doc
+				     (fatchar-io:with-output-to-fat-string (str)
+				       (setf result
+					     (%doc symbol :all t
+						   :stream str)))))
+			       (inator:message
+				editor
+				"~s ~s~%~/fatchar-io:print-string/"
+				type symbol
+				(or (and result doc)
+				    (and (fboundp symbol)
+					 (function-help symbol 0)))))
+			     (inator:message
+			      editor "FAIL ~s ~s ~s~%" type symbol word))))
+		     (command-help ()
+		       (inator:message
+			editor
+			"~s ~s~%~/fatchar-io:print-string/"
+			type word
+			(fatchar-io:with-output-to-fat-string (stream)
+			  (%doc word :stream stream)))))
+	      (case type
+		(:symbol (symbol-help))
+		(:command (command-help))
+		(:command-or-symbol
+		 (if (get-command word)
+		     (command-help)
+		     (symbol-help)))
+		(otherwise
+		 ;; (inator:message editor "Sorry. No help for a ~s." type)
+		 (error "FUCKALL")
+		 ))))))
+    (condition (x)
+      (inator:message editor "Help got an error: ~s" x))))
 
 (defvar *input* nil
   "The output of the previous command in pipeline.")

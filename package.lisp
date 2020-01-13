@@ -19,7 +19,7 @@ without any particular knowledge of it's Lisp programming features.
   (:use :cl :dlib :opsys :dlib-misc :stretchy :char-util :glob
 	:table :table-print :reader-ext :completion :keymap
 	:terminal :terminal-ansi :rl :fatchar :fatchar-io :collections
-	:ostring :ochar
+	:ostring :ochar :grout
 	#+use-regex :regex #-use-regex :cl-ppcre)
   (:export
    ;; Main entry point(s)
