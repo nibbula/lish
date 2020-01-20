@@ -1013,6 +1013,7 @@ into a shell-expr with shell-read."
 	    (write-it w)))))))
 |#
 
+;; @@@ This is very WIP at moment.
 (rl:defsingle shell-help-key (editor)
   (handler-case
       (use-first-context (editor)
@@ -2184,7 +2185,9 @@ Arguments:
 			   0))
 	 (*lishrc* init-file) ;; So it's inherited by sub-shells.
 	 ! ;-) !
-	 (saved-sigs (job-control-signals)))
+	 (saved-sigs (job-control-signals))
+	 ;; (old-terminal *terminal*)
+	 )
     (setf (lish-debug *shell*) debug)	; @@@ the arg to make-instance doesn't
 
     ;; Make the user package if it doesn't exist.
@@ -2224,81 +2227,82 @@ Arguments:
 			    (pick-a-terminal-type)))
     (with-terminal (terminal-type *terminal* :device-name terminal-name
 				  :start-at-current-line t)
-      (setf (tt-input-mode) :line)
+      (let ((*standard-output* *terminal*))
+	(setf (tt-input-mode) :line)
 
-      (ensure-theme)
+	(ensure-theme)
 
-      ;; Make a customized line editor
-      (setf (lish-editor sh)
-	    (make-instance 'rl:line-editor
-			   :non-word-chars *shell-non-word-chars*
-			   :completion-func #'shell-complete
-			   :history-context *history-context*
-			   :terminal-device-name terminal-name
-			   :local-keymap (lish-keymap sh)
-			   :prompt-func nil
-			   :filter-hook `(colorize)))
+	;; Make a customized line editor
+	(setf (lish-editor sh)
+	      (make-instance 'rl:line-editor
+			     :non-word-chars *shell-non-word-chars*
+			     :completion-func #'shell-complete
+			     :history-context *history-context*
+			     :terminal-device-name terminal-name
+			     :local-keymap (lish-keymap sh)
+			     :prompt-func nil
+			     :filter-hook `(colorize)))
 
-      (start-history sh)
+	(start-history sh)
 
-      (unwind-protect
-	(progn
-	  (start-job-control)
-	  (run-hooks *enter-shell-hook*)
-	  (when (not (eq :lish-quick-exit (catch :lish-quick-exit
-	    (loop
-	     :named pippy
-	     :with expr = nil
-	     :and lvl = *lish-level*
-	     :and eof-count = 0
-	     :if (lish-exit-flag sh)
-	       :if (confirm-quit)
-		 :return (values-list (lish-exit-values sh))
-	       :else
-		 :do (setf (lish-exit-flag sh) nil)
+	(unwind-protect
+	  (progn
+	    (start-job-control)
+	    (run-hooks *enter-shell-hook*)
+	    (when (not (eq :lish-quick-exit (catch :lish-quick-exit
+	      (loop
+	       :named pippy
+	       :with expr = nil
+	       :and lvl = *lish-level*
+	       :and eof-count = 0
+	       :if (lish-exit-flag sh)
+		 :if (confirm-quit)
+		   :return (values-list (lish-exit-values sh))
+		 :else
+		   :do (setf (lish-exit-flag sh) nil)
+		 :end
 	       :end
-	     :end
-	     :do
-	     (restart-case
-	       (with-error-handling (state)
-		 (check-all-job-status sh)
-		 (setf expr (lish-read sh state))
-		 (when (and (eq expr *real-eof-symbol*) (confirm-quit))
-		   (return-from pippy expr))
-		 (if (eq expr *quit-symbol*)
-		     (if (and (not (lish-ignore-eof sh)) (confirm-quit))
-			 (return-from pippy expr)
-			 (progn
-			   (when (numberp (lish-ignore-eof sh))
-			     (if (< eof-count (lish-ignore-eof sh))
-				 (incf eof-count)
-				 (if (confirm-quit)
-				     (return-from pippy expr)
-				     (setf eof-count 0))))
-			   (let ((remain
-				  (1+ (- (lish-ignore-eof sh) eof-count))))
-			     (format t "Type 'exit'~:[ or ~a ~d more time~p~
-                                        ~;~^~] to exit the shell.~%"
-				     (zerop eof-count)
-				     (char-util:nice-char
-				      (rl::last-event (lish-editor sh))
-				      :caret t)
-				     remain remain))))
-		     (progn
-		       (setf eof-count 0)
-		       (lish-eval sh expr state)))
-		 ;; (setf (read-state-error-count state) 0)
-		 )
-	       (abort ()
-		 :report
-		 (lambda (stream)
-		   (format stream
-			   "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
-			   (= lvl 0) (/= lvl 0) lvl))
-		 nil))))))))
-	(stop-job-control saved-sigs))
-      ;;(save-command-stats)
-      (run-hooks *exit-shell-hook*))
+	       :do
+	       (restart-case
+		 (with-error-handling (state)
+		   (check-all-job-status sh)
+		   (setf expr (lish-read sh state))
+		   (when (and (eq expr *real-eof-symbol*) (confirm-quit))
+		     (return-from pippy expr))
+		   (if (eq expr *quit-symbol*)
+		       (if (and (not (lish-ignore-eof sh)) (confirm-quit))
+			   (return-from pippy expr)
+			   (progn
+			     (when (numberp (lish-ignore-eof sh))
+			       (if (< eof-count (lish-ignore-eof sh))
+				   (incf eof-count)
+				   (if (confirm-quit)
+				       (return-from pippy expr)
+				       (setf eof-count 0))))
+			     (let ((remain
+				    (1+ (- (lish-ignore-eof sh) eof-count))))
+			       (format t "Type 'exit'~:[ or ~a ~d more time~p~
+					  ~;~^~] to exit the shell.~%"
+				       (zerop eof-count)
+				       (char-util:nice-char
+					(rl::last-event (lish-editor sh))
+					:caret t)
+				       remain remain))))
+		       (progn
+			 (setf eof-count 0)
+			 (lish-eval sh expr state)))
+		   ;; (setf (read-state-error-count state) 0)
+		   )
+		 (abort ()
+		   :report
+		   (lambda (stream)
+		     (format stream
+			     "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
+			     (= lvl 0) (/= lvl 0) lvl))
+		   nil))))))))
+	  (stop-job-control saved-sigs))
+	;;(save-command-stats)
+	(run-hooks *exit-shell-hook*)))
 
     (finish-history sh)
 
