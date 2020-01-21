@@ -2105,8 +2105,9 @@ suspend itself."
   (history-store-start (lish-history-store sh) (history-style sh)))
 
 (defun start-history (sh)
-  (init-history sh)
-  (load-history sh))
+  (when (not (get-history))
+    (init-history sh)
+    (load-history sh)))
 
 (defun finish-history (sh)
   "Save the history finish using the history store."
@@ -2227,7 +2228,7 @@ Arguments:
 			    (pick-a-terminal-type)))
     (with-terminal (terminal-type *terminal* :device-name terminal-name
 				  :start-at-current-line t)
-      (let ((*standard-output* *terminal*))
+      (let (#|(*standard-output* *terminal*) not ready for this |#)
 	(setf (tt-input-mode) :line)
 
 	(ensure-theme)
