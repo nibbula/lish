@@ -122,7 +122,7 @@ without any particular knowledge of it's Lisp programming features.
    #:!and #:!or #:!bg
    #:!> #:!>> #:!>! #:!>>!
    #:!< #:!!<
-   #:!q
+   #:!q #:!h #:!hh
    ;; internal-ish things that might want to be used
    #:get-command
    #:command-to-lisp-args

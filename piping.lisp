@@ -411,6 +411,20 @@ instead of having to deal with string quoting, like:
 	    (close stream)
 	    nil)))))
 
+(defun !h (n)
+  "Return the N-th history item as a string. If N is positive it counts from
+the beginning of history. If N is negative it counts backward from the most
+recent."
+  (rl:history-entry-line (rl:history-nth n)))
+
+(defun !hh (n)
+  "Return the N-th history item, as a history entry object. If N is positive it
+counts from the beginning of history. If N is negative it counts backward from
+the most recent."
+  (rl:history-nth n))
+
+;; @@@ What about !h as a complex executed command object?
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; literal arg comands (= suffix)
 
