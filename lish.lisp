@@ -2104,15 +2104,23 @@ suspend itself."
 			 (:database 'db-history-store))))
   (history-store-start (lish-history-store sh) (history-style sh)))
 
+;; @@@ Since there's a shared history for all shells in the same image, there
+;; should be a shared history store for the image too, which probably should
+;; be saved at least when a shell exits, but for sure when the last shell
+;; exits.
+;;
+;; For now we don't do any saving for shells other than the first.
+
 (defun start-history (sh)
-  (when (not (get-history))
+  (when (not (get-history)) ;; @@@
     (init-history sh)
     (load-history sh)))
 
 (defun finish-history (sh)
   "Save the history finish using the history store."
-  (save-history sh)
-  (history-store-done (lish-history-store sh) (history-style sh)))
+  (when (lish-history-store sh) ;; @@@ 
+    (save-history sh)
+    (history-store-done (lish-history-store sh) (history-style sh))))
 
 (defmacro with-error-handling ((state) &body body)
   #-sbcl (declare (ignore state))
