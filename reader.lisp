@@ -273,7 +273,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	     (t
 	      (add-to-word))))
 	   ;; a lisp expr
-	   ((eql c #\!)
+	   ;; ((eql c #\!)
+	   ((or (eql c #\!) (eql c #\,))
 	    (dbugf 'reader "sub-expr")
 	    (setf sub-expr nil)
 	    (finish-word)
