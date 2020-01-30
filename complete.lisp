@@ -139,6 +139,7 @@ preceding exclamation point '!' ."
 ;;   quote char:                      \
 ;;   word separation:                 #\space
 ;;   history / variable expansion:    !
+;;   lisp expression expansion:       ,
 ;;   environment variable expansion:  $
 ;;   piping:                          |  (maybe should also '&' and '^' ?)
 ;;   comment char:                    ;
@@ -147,7 +148,7 @@ preceding exclamation point '!' ."
 
 ;; Note that backslash '\' must be first in this list, since otherwise you will
 ;; get doubled backslashes.
-(defparameter *quote-needing-chars* "\\ !$|;[]*?()"
+(defparameter *quote-needing-chars* "\\ !,$|;[]*?()"
   "Characters that may need quoting in shell syntax, like if they are in a file
 name, so they don't get interpreted by the shell.")
 
