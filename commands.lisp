@@ -50,10 +50,6 @@
 			 (unknown-command-error-command-string c)))))
   (:documentation "Tried to execute an unknown command."))
 
-(deftype function-designator ()
-  "Something that denotes a function."
-  `(or function symbol null))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Commands
 
