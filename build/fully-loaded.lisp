@@ -4,6 +4,7 @@
 
 (let ((*load-verbose* nil))
   (push (truename "../los") asdf:*central-registry*)
+  (push (truename "../image/") asdf:*central-registry*)
   (loop :for s :in '("pager" "puca" "char-picker" "pick-list" "tree-viewer"
 		     "view-html")
        ;; :do (asdf:load-system s :verbose nil))
