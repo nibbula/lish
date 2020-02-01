@@ -1424,13 +1424,13 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
   (declare (ignore arg))
   (dlib-misc:loadable-systems :as-strings t))
 
-(defun asdf-load (system &key verbose)
+(defun asdf-load (system &key verbose force)
   "Load a system with ASDF."
   (let ((symbol
 	 (if (or (stringp system) (keywordp system))
 	     system
 	     (intern (string-upcase (princ-to-string system)) :keyword))))
-    (asdf:oos 'asdf:load-op symbol :verbose verbose)))
+    (asdf:oos 'asdf:load-op symbol :verbose verbose :force force)))
 
 (defbuiltin l
   ((system system-designator :optional nil
@@ -1439,24 +1439,30 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
     :help "True to suppress compiler notes on some implementations.")
    (no-warn boolean :short-arg #\w
     :help "True to suppress compiler warnings on some implementations.")
+   (force boolean :short-arg #\f :help "Force reloading systems.")
+   (force-all boolean :short-arg #\F
+    :help "Force reloading all systems, even dependencies.")
    ;; (no-verbose boolean :short-arg #\v
    ;;  :help "Turn off verbosity on some implementations.")
    )
   "Load a system."
   ;; We could theoretically use asdf:*compile-file-warnings-behaviour*
   ;; but it doesn't look like it applies to notes.
-  (if (or no-notes no-warn)
-      (handler-bind ((condition
-		      (lambda (c)
-			#+sbcl
-			(cond
-			  ((and no-notes (typep c 'sb-ext::compiler-note))
-			   (muffle-warning))
-			  ((and no-warn (typep c 'warning))
-			   (muffle-warning))
-			  (t (signal c))))))
-	(asdf-load system #| :verbose (not no-verbose) |#))
-      (asdf-load system #| :verbose (not no-verbose) |#)))
+  (flet ((load-it ()
+	   (asdf-load system #| :verbose (not no-verbose) |#
+		      :force (or force (and force-all :all)))))
+    (if (or no-notes no-warn)
+	(handler-bind ((condition
+			(lambda (c)
+			  #+sbcl
+			  (cond
+			    ((and no-notes (typep c 'sb-ext::compiler-note))
+			     (muffle-warning))
+			    ((and no-warn (typep c 'warning))
+			     (muffle-warning))
+			    (t (signal c))))))
+	  (load-it))
+	(load-it))))
 
 (defbuiltin load
   ((file pathname :default '(pick-file) :help "A file name to load."))
