@@ -72,7 +72,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	(string-quote nil)
 	(lisp-quote nil)
 	(in-compound nil)
-	(did-quote nil))		;
+	(did-quote nil)
+	(brace-depth 0))		;
     (labels ((reset-word ()
 	       "Reset the word to be empty."
 	       (setf (fill-pointer w) 0
@@ -272,9 +273,17 @@ value, an explaination which consists of (tag-symbol datum...)."
 	      (read-lisp-expr))
 	     (t
 	      (add-to-word))))
+	   ;; Hack to not expand , in braces
+	   ((eql c #\{)
+	    (incf brace-depth)
+	    (add-to-word))
+	   ((eql c #\})
+	    (when (plusp brace-depth)
+	      (decf brace-depth))
+	    (add-to-word))
 	   ;; a lisp expr
 	   ;; ((eql c #\!)
-	   ((or (eql c #\!) (eql c #\,))
+	   ((or (eql c #\!) (and (eql c #\,) (zerop brace-depth)))
 	    (dbugf 'reader "sub-expr")
 	    (setf sub-expr nil)
 	    (finish-word)
