@@ -137,6 +137,7 @@ without any particular knowledge of it's Lisp programming features.
    #:suspend-job
    #:accepts
    #:get-accepts
+   #:twiddlify
    ))
 
 ;; EOF
