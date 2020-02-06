@@ -89,7 +89,7 @@
    )
   (:documentation "An operating system job."))
 
-(defmethod job-pib ((job job))
+(defmethod job-pid ((job job))
   "Pretend non-system jobs have a NIL PID."
   nil)
 
