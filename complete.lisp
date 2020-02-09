@@ -513,6 +513,20 @@ Uses the first available of:
       ;;(and (load-external-command command) (get-command command))
       (and (mine-command command) (get-command command))))
 
+(defun first-command-of (word)
+  (cond
+    ((and (consp word)
+	  (member (car word) '(:redirect-from :redirect-to)))
+     (first-command-of (cadr word)))
+    ((typep word 'shell-word)
+     (first-command-of (shell-word-word word)))
+    ((typep word 'shell-expr)
+     (first-command-of (first (shell-expr-words word))))
+    ;; ((stringp word)
+    ;;  word)
+    (t ;; some other thing??
+     word)))
+
 (defun get-backward-word-symbol (type string position &key bang-p)
   "Get a symbol prior to POSITION in STRING. If BANG-P is true, ignore a leading
 exclamation point '!'. Return the TYPE given, the symbol as a string, the
@@ -718,10 +732,12 @@ complete, and call the appropriate completion function."
 		    (shell-complete-symbol context pos all))
 		  ;; a blank spot somewhere in the line
 		  (let ((from-end (- (length context) pos)))
-		    (dbugf 'completion "blank spot : heyba~%")
+		    (dbugf 'completion "blank spot : heyba ~a~%" first-word)
 		    (let ((result
 			   (if (and first-word
-				    (setf cmd (try-command first-word)))
+				    (setf cmd
+					  (try-command
+					   (first-command-of first-word))))
 			       (progn
 				 (dbugf 'completion "in a command : Baaa~%")
 				 (complete-command-arg context cmd exp pos all))
@@ -783,10 +799,13 @@ complete, and call the appropriate completion function."
 			(shell-complete-symbol context pos all)))
 		result))
 	     (t
-	      (dbugf 'completion "nothing special : hello ~a~%" word)
+	      (dbugf 'completion "nothing special : hello ~a ~a~%"
+		     word first-word)
 	      (let* ((from-end (- (length context) pos))
 		     (result
-		      (if (and first-word (setf cmd (try-command first-word)))
+		      (if (and first-word
+			       (setf cmd (try-command
+					  (first-command-of first-word))))
 			  (progn
 			    (dbugf 'completion "command : blurgg~%")
 			    (complete-command-arg
