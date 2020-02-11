@@ -615,9 +615,10 @@ objects, like in the command object."
 	    (:convert
 	     (let ((val-type (cadr form))
 		   (conv-body (copy-list (caddr form))))
-	       ;;(format *debug-io* "before form = ~s~%" form) (finish-output *debug-io*)
-	       (setf form (cdddr form))
-	       ;;(format *debug-io* "after form = ~s~%" form) (finish-output *debug-io*)
+	       ;; (format *trace-output* "before form = ~s~%" form) (finish-output *trace-output*)
+	       ;; Not cdddr because we have to leave one for the loop to eat.
+	       (setf form (cddr form))
+	       ;; (format *trace-output* "after form = ~s~%" form) (finish-output *trace-output*)
 	       (push
 		`(defmethod convert-arg ((arg ,class-name) (value ,val-type)
 					 &optional quoted)
