@@ -2248,6 +2248,7 @@ Arguments:
 			     :completion-func #'shell-complete
 			     :history-context *history-context*
 			     :terminal-device-name terminal-name
+			     :auto-suggest-p (lish-auto-suggest sh)
 			     :local-keymap (lish-keymap sh)
 			     :prompt-func nil
 			     :filter-hook `(colorize)))

@@ -45,21 +45,22 @@ without any particular knowledge of it's Lisp programming features.
    ;; installation
    #:make-standalone
    ;; shell options
-   #:lish-prompt
-   #:lish-prompt-function
-   #:lish-right-prompt
-   #:lish-sub-prompt
-   #:lish-ignore-eof
-   #:lish-debug
-   #:lish-collect-stats
-   #:lish-autoload-from-asdf
-   #:lish-autoload-quietly
-   #:lish-history-expansion
-   #:lish-expand-braces
-   #:lish-colorize
-   #:lish-auto-cd
-   #:lish-history-style
-   #:lish-history-format
+   #:lish-prompt             #:set-lish-prompt
+   #:lish-prompt-function    #:set-lish-prompt-function
+   #:lish-right-prompt       #:set-lish-right-prompt
+   #:lish-sub-prompt         #:set-lish-sub-prompt
+   #:lish-ignore-eof         #:set-lish-ignore-eof
+   #:lish-debug              #:set-lish-debug
+   #:lish-collect-stats      #:set-lish-collect-stats
+   #:lish-autoload-from-asdf #:set-lish-autoload-from-asdf
+   #:lish-autoload-quietly   #:set-lish-autoload-quietly
+   #:lish-history-expansion  #:set-lish-history-expansion
+   #:lish-expand-braces      #:set-lish-expand-braces
+   #:lish-colorize           #:set-lish-colorize
+   #:lish-auto-cd            #:set-lish-auto-cd
+   #:lish-history-style      #:set-lish-history-style
+   #:lish-history-format     #:set-lish-history-format
+   #:lish-auto-suggest       #:set-lish-auto-suggest
    #:make-prompt
    ;; shell object
    #:shell

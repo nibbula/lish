@@ -101,9 +101,11 @@
       (error 'shell-error :format "No such option ~w"
 	     :arguments (list name))))
 
+(defparameter *option-accessor-prefix* "LISH-")
+
 (defun set-option (sh name value)
   "Set the option named NAME, for shell SH, to VALUE."
-  (setf (arg-value (find-option sh name)) value))
+  (funcall (symbolify (s+ "SET-" *option-accessor-prefix* name)) value sh))
 
 (defun get-option (sh name)
   "Get the option named NAME, for shell SH."
@@ -113,17 +115,23 @@
   "Define a shell option named NAME, with the properties in arg. The syntax
 is like Lish arguments, e.g.:
   (defoption \"foo\" type :help \"Make sure to foo.\" :short-arg #\\f)"
-  (let ((sym (symbolify (s+ "LISH-" name)))
-	(name-string (string-downcase name)))
+  (let* ((sym (symbolify (s+ "LISH-" name)))
+	 (setter (symbolify (s+ "SET-" sym)))
+	 (name-string (string-downcase name)))
     `(progn
        ;; Access options as if they were in the shell object.
        (defgeneric ,sym (shell)
 	 (:documentation ,(s+ "Return the value of " name-string ".")))
        (defmethod ,sym ((sh shell)) (get-option sh ,name-string))
+       (defgeneric ,setter (value shell)
+	 (:documentation ,(s+ "Set the value of " name-string ".")))
+       ;; Make a separate setter so it can be easily overridden.
+       (defmethod ,setter (value (sh shell))
+	 (setf (arg-value (find-option sh ',name)) value))
        (defgeneric (setf ,sym) (value shell)
 	 (:documentation ,(s+ "Set the value of " name-string ".")))
        (defmethod (setf ,sym) (value (sh shell))
-	 (set-option sh ,name-string value))
+	 (,setter value sh))
        (push (make-argument ',(cons name-string arg))
 	     *options*))))
 
@@ -224,6 +232,17 @@ more information, such as the date."
     (finish-history sh)
     (set-option sh 'history-format value)
     (init-history sh)))
+
+(defoption command-glob boolean
+  :help "Let Lish commands do their own globbing.")
+
+(defoption auto-suggest boolean
+  :help "True to make suggestions for the rest of the line."
+  :default t)
+
+(defmethod set-lish-auto-suggest (value (sh shell))
+  (setf (arg-value (find-option sh 'auto-suggest)) value
+	(line-editor-auto-suggest-p (lish-editor sh)) value))
 
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.
