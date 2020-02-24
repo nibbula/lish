@@ -104,7 +104,7 @@ facility. Usually it's a universal-time, or an alist of (<thing> . <time>).")
 ;; XXX Uses completion internals.
 (defun complete-bang-symbol (context pos all)
   "Completion function for symbols (preceded by ! in the shell)."
-  (let* ((word-start (completion::scan-over-str
+  (let* ((word-start (scan-over-string
 		      context pos :backward
 		      :not-in completion::*lisp-non-word-chars*))
 	 (word (subseq context word-start pos))
@@ -531,7 +531,7 @@ Uses the first available of:
   "Get a symbol prior to POSITION in STRING. If BANG-P is true, ignore a leading
 exclamation point '!'. Return the TYPE given, the symbol as a string, the
 package, and boolean indicating if the package was with the external notation."
-  (let* ((word-start (completion::scan-over-str
+  (let* ((word-start (scan-over-string
 		      string position :backward
 		      :not-in completion::*lisp-non-word-chars*))
 	 (word (subseq string word-start position))
