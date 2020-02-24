@@ -368,40 +368,41 @@ Commands can be:
 
 ;; This has to make sure to be able to operate without a current shell or even,
 ;; current terminal, since it's called by the documentation method.
-(defun print-command-help (cmd &optional (stream *standard-output*))
+(defun print-command-help (cmd &optional (stream
+					  ;; (or *terminal* *standard-output*)
+					  *standard-output*
+					  ))
   "Print documentation for a command. Return a table."
-  (format stream "~a~%" (documentation cmd 'function))
-  (let (table)
-    (when (and (command-arglist cmd)
-	       (not (zerop (length (command-arglist cmd)))))
-      (format stream "Arguments:~%")
-      ;; (nice-print-table
-      (output-table
-       (setf table
-	     (make-table-from
-	      (loop :for a :in (command-arglist cmd)
-		 :when (not (arg-hidden a))
-		 :collect
-		 (list (if (arg-short-arg a) (s+ "  -" (arg-short-arg a)) "  ")
-		       (if (arg-long-arg a)  (s+ "--" (arg-long-arg a))
-			   (if (arg-short-arg a) "" (arg-name a)))
-		       #| (or (arg-default a) "") |#
-		       (string-downcase (arg-type a))
-		       (or (and (slot-boundp a 'help)
-				(substitute #\space #\newline (arg-help a)))
-			   (arg-name a))))
-	      :column-names
-	      '("Short" "Long" #| "default" |# "Type" ("Help" :wrap))))
-       (make-instance 'text-table-renderer)
-       stream
-       :long-titles nil :print-titles nil :max-width (get-cols)
-       :trailing-spaces nil))
-    (when (and (command-accepts cmd)
-	       (not (eq (command-accepts cmd) :unspecified)))
-      (format stream "~&Accepts: ~a~%" (command-accepts cmd)))
-    (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
-      (format stream "Loaded from: ~a~%" (command-loaded-from cmd)))
-    table))
+  (with-grout (*grout* stream)
+    (grout-format "~a~%" (documentation cmd 'function))
+    (let (table)
+      (when (and (command-arglist cmd)
+		 (not (zerop (length (command-arglist cmd)))))
+	(grout-format "Arguments:~%")
+	(grout-print-table
+	 (setf table
+	       (make-table-from
+		(loop :for a :in (command-arglist cmd)
+		   :when (not (arg-hidden a))
+		   :collect
+		   (list (if (arg-short-arg a) (s+ "  -" (arg-short-arg a)) "  ")
+			 (if (arg-long-arg a)  (s+ "--" (arg-long-arg a))
+			     (if (arg-short-arg a) "" (arg-name a)))
+			 #| (or (arg-default a) "") |#
+			 (string-downcase (arg-type a))
+			 (or (and (slot-boundp a 'help)
+				  (substitute #\space #\newline (arg-help a)))
+			     (arg-name a))))
+		:column-names
+		'("Short" "Long" #| "default" |# "Type" ("Help" :wrap))))
+	 :long-titles nil :print-titles nil #|:max-width (get-cols)|#
+	 :trailing-spaces nil))
+      (when (and (command-accepts cmd)
+		 (not (eq (command-accepts cmd) :unspecified)))
+	(grout-format "~&Accepts: ~a~%" (command-accepts cmd)))
+      (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
+	(grout-format "Loaded from: ~a~%" (command-loaded-from cmd)))
+      table)))
 
 ;; For use by other things. Like my "doc" command.
 (defmethod documentation ((symbol symbol) (type (eql :command)))
