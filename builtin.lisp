@@ -1433,6 +1433,18 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	     (intern (string-upcase (princ-to-string system)) :keyword))))
     (asdf:oos 'asdf:load-op symbol :verbose verbose :force force)))
 
+(defparameter *debug-profile*
+  '((speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0))
+  "Optimization settings for debugging.")
+
+(defparameter *speed-profile*
+  '((speed 3) (safety 2) (debug 0) (space 2) (compilation-speed 0))
+  "Optimization settings for execution speed.")
+
+(defparameter *speed-debug-profile*
+  '((speed 3) (safety 0) (debug 3) (space 0) (compilation-speed 0))
+  "Optimization settings for execution speed and debugging.")
+
 (defbuiltin l
   ((system system-designator :optional nil
     :help "System designator to load.")
@@ -1445,13 +1457,40 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
     :help "Force reloading all systems, even dependencies.")
    ;; (no-verbose boolean :short-arg #\v
    ;;  :help "Turn off verbosity on some implementations.")
-   )
+   (debug boolean :short-arg #\d :help "Use the debugging optimzation profile.")
+   (speed boolean :short-arg #\s :help "Use the speed optimzation profile.")
+   (optimization list :short-arg #\O
+    :help "A list optimize declaration qualities, e.g. '((speed 3) (safety 2))
+Note that this option overrides the -d and -s options."))
   "Load a system."
   ;; We could theoretically use asdf:*compile-file-warnings-behaviour*
   ;; but it doesn't look like it applies to notes.
-  (flet ((load-it ()
-	   (asdf-load system #| :verbose (not no-verbose) |#
-		      :force (or force (and force-all :all)))))
+  (labels ((load-that ()
+	     (asdf-load system #| :verbose (not no-verbose) |#
+			:force (or force (and force-all :all))))
+	   (with-opt (qualities-list)
+	     (uiop/lisp-build:with-optimization-settings (qualities-list)
+	       (load-that)))
+	   ;; (with-opt (qualities-list)
+	   ;;   (do-opt qualities-list system (or force (and force-all :all))))
+	   ;; (do-opt (qualities-list system force)
+	   ;;   ;; @@@ I don't know how else to do it?
+	   ;;   (print `(locally (declare (optimize ,@qualities-list))
+	   ;; 	       (asdf-load ,system :force ,force)))
+	   ;;   (eval `(locally (declare (optimize ,@qualities-list))
+	   ;; 	      (asdf-load ,system :force ,force))))
+	   (load-it ()
+	     (cond
+	       (optimization
+		(with-opt optimization))
+	       ((and speed debug)
+		(with-opt *speed-debug-profile*))
+	       (speed
+		(with-opt *speed-profile*))
+	       (debug
+		(with-opt *debug-profile*))
+	       (t
+		(load-that)))))
     (if (or no-notes no-warn)
 	(handler-bind ((condition
 			(lambda (c)
