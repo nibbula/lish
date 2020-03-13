@@ -1035,7 +1035,8 @@ into a shell-expr with shell-read."
 				type symbol
 				(or (and result doc)
 				    (and (fboundp symbol)
-					 (function-help symbol 0)))))
+					 (function-help symbol 0))))
+			       (setf (rl::keep-message editor) t))
 			     (inator:message
 			      editor "FAIL ~s ~s ~s~%" type symbol word))))
 		     (command-help ()
@@ -1044,7 +1045,8 @@ into a shell-expr with shell-read."
 			"~s ~s~%~/fatchar-io:print-string/"
 			type word
 			(fatchar-io:with-output-to-fat-string (stream)
-			  (%doc word :stream stream)))))
+			  (%doc word :stream stream)))
+		       (setf (rl::keep-message editor) t)))
 	      (case type
 		(:symbol (symbol-help))
 		(:command (command-help))
