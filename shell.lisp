@@ -7,16 +7,12 @@
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 ;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 
-;; (defkeymap *default-lish-esc-keymap*
-;;   "Keymap for Lish."
-;;   `((#\o		. shell-expand-line)))
-
-;; (defkeymap *lish-esc-keymap* nil)
-
 (defkeymap *lish-default-keymap*
   "Keymap for Lish."
-  `((,(ctrl #\v)	. shell-expand-line)
-    (:f1		. shell-help-key)))
+  `((:f1		. shell-help-key)
+    ;(,(ctrl #\v)	. shell-expand-line)
+    (,(meta-char #\o)	. shell-expand-line)
+    ))
 
 ;; @@@ I want to change all the lish-* accessors to shell-*
 (defclass shell ()
@@ -78,7 +74,9 @@
   ;; Set default keymap
   (when (or (not (slot-boundp sh 'keymap)) (not (slot-value sh 'keymap)))
     (setf (slot-value sh 'keymap)
-	  (copy-keymap *lish-default-keymap*)))
+	  (copy-keymap *lish-default-keymap*))
+    (define-key (slot-value sh 'keymap)
+	#\escape (build-escape-map (slot-value sh 'keymap))))
   ;; Copy the objecs from the defined option list, and set the default values.
   (loop :with o :for opt :in *options* :do
      (setf o (shallow-copy-object opt)
