@@ -883,6 +883,21 @@ really want to keep expanding." i)))
 	 (setf (shell-expr-words expr) words))))
   expr)
 
+(defparameter *compound-expr-strings*
+  '(:and           "&&"
+    :or            "||"
+    :sequence      "^"
+    :redirect-to   ">"
+    :append-to     ">>"
+    :redirect-from "<"
+    :pipe          "|"
+    :pipe-plus     "|+")
+  "For reconstructing expression strings.")
+
+(defun compound-tag-string (keyword)
+  "Return the string representation for the compound operator keyword THING."
+  (getf *compound-expr-strings* keyword))
+
 (defun %shell-words-to-string (words stream &key literal-line)
   "The internal part of shell-words-to-*-string."
   (declare (ignore literal-line))
@@ -890,7 +905,16 @@ really want to keep expanding." i)))
     (labels ((write-thing (w)
 	       (typecase w
 		 (string (princ (quotify w) stream))
-		 (cons (write w :stream stream :readably t :case :downcase))))
+		 (cons
+		  (let ((s (compound-tag-string (car w))))
+		    (if (and s (shell-expr-p (second w)))
+			(format stream
+			 "~a ~a~a"
+			 (shell-words-to-string
+			  (shell-expr-words (second w)))
+			 s
+			 (shell-words-to-string (rest w)))
+			(write w :stream stream :readably t :case :downcase))))))
 	     (write-it (w &optional space)
 	       (setf skip nil)
 	       ;; @@@ This whole literal-line thing is dubious because
@@ -985,8 +1009,7 @@ into a shell-expr with shell-read."
 	 (words (shell-expr-words
 		 (possibly-expand-aliases
 		  *shell*
-		  (do-expansions
-		      (lisp-exp-eval (shell-read buf)))))))
+		  (do-expansions (lisp-exp-eval (shell-read buf)))))))
     (rl::use-first-context (editor)
       (rl:replace-buffer
        editor
