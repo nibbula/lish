@@ -1186,13 +1186,14 @@ expansion in the alias expansion."
 (defun expand-alias (alias expr)
   "Take an alias and a shell-expr and return a shell-expr with the alias
 expanded."
-  (let ((new-words (append (shell-expr-words (do-expansions (shell-read alias)))
-			   (cdr (shell-expr-words expr)))))
+  (let* ((expanded-expr (do-expansions (shell-read alias)))
+	 (expanded-line (shell-expr-line expanded-expr))
+	 (expr-tail (cdr (shell-expr-words expr)))
+	 (new-words (append (shell-expr-words expanded-expr) expr-tail))
+	 (new-line (s+ expanded-line #\space (shell-words-to-string expr-tail))))
     (make-shell-expr
      :words new-words
-     :line (format nil "~{~a ~}"
-		   (mapcar (_ (or (and (stringp _) _)
-				  (shell-word-word _))) new-words)))))
+     :line new-line)))
 
 (defun command-type (sh command &key already-known)
   "Return a keyword representing the command type of COMMAND, or NIL.
