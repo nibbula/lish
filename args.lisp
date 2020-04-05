@@ -259,11 +259,16 @@
 (defmethod convert-arg ((arg arg-object) (value string) &optional quoted)
   (if quoted
       value
-      (multiple-value-bind (obj end) (safe-read-from-string value)
-	;; If the whole string wasn't an object, just treat as a string.
-	(if (= end (length value))
-	    obj
-	    value))))
+      (handler-case
+	  (multiple-value-bind (obj end) (safe-read-from-string value)
+	    ;; If the whole string wasn't an object, just treat as a string.
+	    (if (= end (length value))
+		obj
+		value))
+	(error ()
+	  ;; Just return the string value if we have problems reading it.
+	  (warn "Couldn't convert argument ~s into a Lisp object." value)
+	  value))))
 
 (defclass arg-case-preserving-object (argument) ()
   (:documentation "A Lisp object, read with case preserved."))
@@ -271,12 +276,17 @@
 			&optional quoted)
   (if quoted
       value
-      (multiple-value-bind (obj end)
-	  (fancy-read-from-string value :safe t :case :preserve)
-	;; If the whole string wasn't an object, just treat as a string.
-	(if (= end (length value))
-	    obj
-	    value))))
+      (handler-case
+	  (multiple-value-bind (obj end)
+	      (fancy-read-from-string value :safe t :case :preserve)
+	    ;; If the whole string wasn't an object, just treat as a string.
+	    (if (= end (length value))
+		obj
+		value))
+	(error ()
+	  ;; Just return the string value if we have problems reading it.
+	  (warn "Couldn't convert argument ~s into a Lisp object." value)
+	  value))))
 
 (defclass arg-sequence (arg-object) () (:documentation "A sequence."))
 (defmethod convert-arg ((arg arg-sequence) (value sequence) &optional quoted)
