@@ -284,7 +284,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ;; a lisp expr
 	   ;; ((eql c #\!)
 	   ((or (eql c #\!) (and (eql c #\,) (zerop brace-depth)))
-	    (dbugf 'reader "sub-expr")
+	    (dbugf 'reader "sub-expr ")
 	    (setf sub-expr nil)
 	    (finish-word)
 	    (when (not in-word)
@@ -310,6 +310,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 			 *shell* (get-option *shell* 'history-expansion))
 		    (map-into w #'identity (subseq line word-start i))
 		    (setf sub-expr obj))
+		(finish-word)
+		(setf sub-expr nil)
 		)))
 	   ;; quote char
 	   ((eql c #\\)
