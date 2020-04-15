@@ -2277,7 +2277,9 @@ Arguments:
 			     :auto-suggest-p (lish-auto-suggest sh)
 			     :local-keymap (lish-keymap sh)
 			     :prompt-func nil
-			     :filter-hook `(colorize)))
+			     :filter-hook `(colorize)
+			     :partial-line-indicator
+			     (lish-partial-line-indicator *shell*)))
 
 	(start-history sh)
 

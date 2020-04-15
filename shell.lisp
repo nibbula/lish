@@ -242,6 +242,15 @@ more information, such as the date."
   (setf (arg-value (find-option sh 'auto-suggest)) value
 	(line-editor-auto-suggest-p (lish-editor sh)) value))
 
+(defoption partial-line-indicator object
+  :help "A string to put at the end of partial lines before the prompt, or NIL
+not to indicate partial lines."
+  :default "%")
+
+(defmethod set-lish-partial-line-indicator (value (sh shell))
+  (setf (arg-value (find-option sh 'partial-line-indicator)) value
+	(rl::partial-line-indicator (lish-editor sh)) value))
+
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.
 (defvar *shell-path* '()
