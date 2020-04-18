@@ -1676,7 +1676,7 @@ it can't find anything else.")
     (t
      `(progn (format t "Nothing.~%") nil))))
 
-(defcommand doc (("thing" object :required nil))
+(defbuiltin doc (("thing" object :required nil))
   #.*doc-doc-command-doc*
   (if (not thing)
       (format t "~
