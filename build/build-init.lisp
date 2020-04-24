@@ -31,6 +31,8 @@
 (push (truename "../terminal/") asdf:*central-registry*)
 (push (truename "../rl/")       asdf:*central-registry*)
 (push (truename "../deblarg/")  asdf:*central-registry*)
+(push (truename "../unicode/")  asdf:*central-registry*)
+(push (truename "../tools/")    asdf:*central-registry*)
 (push (truename "./")           asdf:*central-registry*)
 
 ;; Suppress the fucking ASDF warnings.
