@@ -130,7 +130,7 @@ is like Lish arguments, e.g.:
 	 (:documentation ,(s+ "Set the value of " name-string ".")))
        (defmethod (setf ,sym) (value (sh shell))
 	 (,setter value sh))
-       (push (make-argument ',(cons name-string arg))
+       (push (make-argument (list ',name ',(first arg) ,@(rest arg)))
 	     *options*))))
 
 (setf *options* nil)
@@ -141,7 +141,7 @@ with SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
 those functions for more detail about prompt formatting."
 ;;  :default nil
   :default
-  ((:green "%u") "@" (:cyan "%h") " " (:white "%w") (:red ">") " ")
+  '((:green "%u") "@" (:cyan "%h") " " (:white "%w") (:red ">") " ")
  )
 
 (defoption prompt-function function
@@ -202,7 +202,7 @@ number ignore it that many times before exiting."
 (defoption history-style choice
   :help "Style of history to use. Simple stores just text lines. Fancy stores
 more information, such as the date."
-  :choices ("simple" "fancy")
+  :choices '("simple" "fancy")
   :default :fancy)
 
 (defmethod history-style ((sh shell))
@@ -217,9 +217,11 @@ more information, such as the date."
 
 (defoption history-format choice
   :help "Style of history to use."
-  :choices ("datbase" "text-file")
-  :default #.(if (getf rl-config::*config* :use-sqlite)
-		 :database :text-file))
+  :choices '("datbase" "text-file")
+  ;; :default #.(if (getf rl-config::*config* :use-sqlite)
+  ;; 		 :database :text-file))
+  :default (if (getf rl-config::*config* :use-sqlite)
+	       :database :text-file))
 
 (defmethod history-format ((sh shell))
   (keywordify (get-option sh 'history-format)))
@@ -245,7 +247,7 @@ more information, such as the date."
 (defoption partial-line-indicator object
   :help "A string to put at the end of partial lines before the prompt, or NIL
 not to indicate partial lines."
-  :default "%")
+  :default (span-to-fat-string '(:standout "%")))
 
 (defmethod set-lish-partial-line-indicator (value (sh shell))
   (setf (arg-value (find-option sh 'partial-line-indicator)) value
