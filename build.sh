@@ -13,7 +13,8 @@ if [ ! -n "$LISP" ] ; then
 fi
 if [ ! -n "$LISP" -o ! -n `command -v $LISP` ] ; then
   echo "I can't find a Lisp to run. Please set the environment variable LISP to"
-  echo "the name of an installed Lisp, and re-run this script. For example: "
+  echo "the name of an installed Common Lisp, and re-run this script."
+  echo "For example: "
   echo
   echo "LISP=/usr/bin/sbcl sh build.sh"
   echo
