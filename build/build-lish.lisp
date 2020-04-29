@@ -141,6 +141,18 @@ strings."
     (increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
+(defmethod build ((target (eql 'run)))
+  (msg "[Build target ~s]" target)
+  (load "build/build-init.lisp" :verbose nil)
+  (let ((ql (intern "QUICKLOAD" (find-package :ql))))
+    (funcall ql :dlib :verbose nil)
+    (funcall ql :tiny-repl :verbose nil)
+    (funcall ql :deblarg :verbose nil)
+    (funcall ql :lish :verbose nil)
+    (load "build/fully-loaded.lisp" :verbose nil)
+    (funcall (intern "LISH" (find-package :lish)) :debug t)
+    (setf *exit-code* 0)))
+
 ;; Plain, aka without my (or your) startup
 
 (defmethod build ((target (eql 'lishp)))
