@@ -1,6 +1,6 @@
-;;
-;; lish.lisp - Unix Shell & Lisp somehow smushed together
-;;
+;;;
+;;; lish.lisp - Unix Shell & Lisp somehow smushed together
+;;;
 
 ;; This file contains the basic REPL and dispatch, and some other odd and ends.
 
@@ -2026,7 +2026,8 @@ suspend itself."
   (loop :with len = (length values) :and i = 0
      :for v :in values
      :do
-     (format t "~s" v)
+     ;; (format t "~s" v)
+     (format t "~w" v)
      (if (and (> len 1) (< i (- len 1)))
 	 (format t " ;~%"))
      (incf i)
@@ -2112,14 +2113,25 @@ suspend itself."
 		  c)))))
 
 (defun load-history (sh &key update)
-  (handler-case
-      (history-store-load (lish-history-store sh) (history-style sh)
-			  :update update)
-    (serious-condition (c)
-      (if (lish-debug *shell*)
-	  (invoke-debugger c)
-	  (format t "Loading history failed. Turn on debug if you want.~%~a~%"
-		  c)))))
+  ;; (handler-case
+  ;;     (history-store-load (lish-history-store sh) (history-style sh)
+  ;; 			  :update update)
+  ;;   (serious-condition (c)
+  ;;     (if (lish-debug *shell*)
+  ;; 	  (invoke-debugger c)
+  ;; 	  (format t "Loading history failed. Turn on debug if you want.~%~a~%"
+  ;; 		  c)))))
+  (handler-bind
+      ((serious-condition
+	#'(lambda (c)
+	    (if (lish-debug *shell*)
+		(invoke-debugger c)
+		(format t "Loading history failed. Turn on debug if you ~
+			   want.~%~a~%"
+			c)))))
+    (history-store-load (lish-history-store sh) (history-style sh)
+			:update update)))
+
 
 (defun init-history (sh)
   "Create the history store and load the history from it."
