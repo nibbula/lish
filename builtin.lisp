@@ -1287,13 +1287,13 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	 (format t "~a is the function ~s~%" cmd (symbol-function x)))))))
 
 (defbuiltin type
-  (("type-only" boolean :short-arg #\t
+  ((type-only boolean :short-arg #\t
     :help "Show only the type of the name.")
-   ("path-only" boolean :short-arg #\p
+   (path-only boolean :short-arg #\p
     :help "Show only the path of the name.")
-   ("all" 	boolean :short-arg #\a
+   (all boolean :short-arg #\a
     :help "Show all definitions of the name.")
-   ("names" 	string  :repeating t
+   (names string :repeating t
     :help "Names to describe."))
   "Describe what kind of command the name is."
   (when names
@@ -1305,29 +1305,34 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	 (path-only
 	  (let ((paths (command-paths n)))
 	    (when paths
-	      (format t "~a~%" (first paths)))))
+	      (format t "~a~%" (setf *output* (first paths))))))
 	 (all
 	  (let ((x (gethash n (lish-aliases *shell*))))
 	    (when x
 	      (format t "~a is aliased to ~a~%" n x)
+	      (push x *output*)
 	      (setf did-one t)))
 	  (let ((x (gethash n (lish-global-aliases *shell*))))
 	    (when x
 	      (format t "~a is globally aliased to ~s~%" n x)
+	      (push x *output*)
 	      (setf did-one t)))
 	  (let ((x (gethash n (lish-commands))))
 	    (when x
 	      (format t "~a is the ~:[~;builtin ~]command ~a~%"
 		      n (command-built-in-p x) x)
+	      (push x *output*)
 	      (setf did-one t)))
 	  (let ((paths (command-paths n)))
 	    (when paths
 	      (format t (format nil "~~{~a is ~~a~~%~~}" n)
 		      paths)
+	      (setf *output* (append *output* paths))
 	      (setf did-one t)))
 	  (let* ((obj (read-from-string n)))
 	    (when (and (symbolp obj) (fboundp obj))
 	      (format t "~a is the function ~s~%" n (symbol-function obj))
+	      (push (symbol-function obj) *output*)
 	      (setf did-one t)))
 	  (when (not did-one)
 	    (format t "~a is unknown~%" n)))
@@ -1335,11 +1340,14 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	  (let* ((type (command-type *shell* n))
 		 (tt (string-downcase type)))
 	    (if type
-	      (if type-only
-		  (format t "~a~%" tt)
-		  (describe-command n))
+		(progn
+		  (if type-only
+		      (format t "~a~%" tt)
+		      (describe-command n))
+		  (setf *output* type))
 	      (format t "~a is unknown~%" n)))))
-	 (setf args (cdr args)))))
+       (setf args (cdr args))))
+  *output*)
 
 (defun edit-opt (name &optional (value nil value-supplied-p))
   (read-from-string
