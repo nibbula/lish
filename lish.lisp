@@ -1526,6 +1526,16 @@ probably fail, but perhaps in similar way to other shells."
 	 ;;     (call-thing command (subseq expanded-words 1) context)
 	 ;;   (run-hooks *post-command-hook* cmd :command)))
 	 (sys-cmd))
+	((typep command 'autoloaded-command)
+	 (setf command (load-lisp-command-from
+			(command-name command)
+			(command-load-from command)
+			:silent (lish-autoload-quietly sh)))
+	 (run-hooks *pre-command-hook* cmd :command)
+	 (multiple-value-prog1
+	     (call-thing command (subseq (shell-expr-words expanded-expr) 1)
+			 context)
+	   (run-hooks *post-command-hook* cmd :command)))
 	((functionp cmd)
 	 (dbugf :lish-eval "Function eval~%")
 	 ;; (format t "CHOWZA ~s~%" (rest-of-the-line expr))
@@ -1538,7 +1548,7 @@ probably fail, but perhaps in similar way to other shells."
 	;; @@@ perhaps we should cache since it seems dumb to check each time
 	;; for things we already know are a system command?
 	((and (lish-autoload-from-asdf sh)
-	      (in-lisp-path cmd)	
+	      (in-lisp-path cmd)
 	      (setf command (load-lisp-command
 			     cmd :silent (lish-autoload-quietly sh))))
 	 (dbugf :lish-eval "Trying autoload~%")

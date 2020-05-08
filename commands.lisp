@@ -53,10 +53,25 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Commands
 
-(defclass command ()
+(defclass base-command ()
   ((name
-    :accessor command-name        :initarg :name
-    :documentation "The string word that invokes the command.")
+    :accessor command-name :initarg :name
+    :documentation "The string word that invokes the command."))
+  (:documentation "Minimum common base command."))
+
+(defgeneric command-accepts (command)
+  (:documentation "What types the commands accepts as input.")
+  (:method ((command base-command)) nil))
+
+(defgeneric command-arglist (command)
+  (:documentation "The command's argument list.")
+  (:method ((command base-command)) nil))
+
+(defclass command (base-command)
+  (
+   ;; (name
+   ;;  :accessor command-name        :initarg :name
+   ;;  :documentation "The string word that invokes the command.")
    (function
     :accessor command-function    :initarg :function
     :documentation "The function that performs the command.")
@@ -326,13 +341,13 @@ BODY recognizes some special keywords:
 
 (defclass external-command (command)
   ((path
-    :initarg :path :accessor external-command-path  
+    :initarg :path :accessor external-command-path
     :documentation "File system path of the command.")
    (checksum
-    :initarg :checksum :accessor external-command-checksum  
+    :initarg :checksum :accessor external-command-checksum
     :documentation "Checksum for the data in the command file.")
    (checksum-type
-    :initarg :checksum-type :accessor external-command-checksum-type  
+    :initarg :checksum-type :accessor external-command-checksum-type
     :documentation
     "Keyword indicating the algorithm used to calculate the checksum.")
    (manual
@@ -410,19 +425,18 @@ and the name of the external program. ARGLIST is a shell argument list."
 	 (when ,nilly
 	   (close ,nilly))))))
 
-(defun load-lisp-command (command &key silent)
+(defun load-lisp-command-from (command-name package &key silent)
   "Try to load a command in the Lisp path. Return the command on success or
 NIL on failure. The Lisp path is most likely the ASDF path."
-  (let* ((pkg (intern (string-upcase command) :keyword))
-	 succeeded)
-    (dbugf :lish-load "load-lisp-command ~s~%" command)
+  (let* (succeeded)
+    (dbugf :lish-load "load-lisp-command ~s~%" command-name)
     (handler-case
 	(let ((asdf:*compile-file-warnings-behaviour* :ignore)
 	      (asdf:*compile-file-failure-behaviour* :ignore))
 	  ;; :error :warn :ignore
 	  (if silent
-	      (stfu (asdf:oos 'asdf:load-op pkg :verbose nil))
-	      (asdf:oos 'asdf:load-op pkg :verbose nil))
+	      (stfu (asdf:oos 'asdf:load-op package :verbose nil))
+	      (asdf:oos 'asdf:load-op package :verbose nil))
 	  ;; Presumable we succeeded if we didn't get an error.
 	  (setf succeeded t))
       (asdf:system-definition-error (c) (declare (ignore c)))
@@ -431,9 +445,39 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 	(progn
 	  (dbugf :lish-load "load-lisp-command")
 	  ;; (init-commands sh)
-	  (get-command command))
+	  (get-command command-name))
 	;; failed
 	nil)))
+
+(defun load-lisp-command (command &key silent)
+  "Try to load a command in the Lisp path. Return the command on success or
+NIL on failure. The Lisp path is most likely the ASDF path."
+  (load-lisp-command-from command (intern (string-upcase command) :keyword)
+			  :silent silent))
+
+(defclass autoloaded-command (base-command)
+  ((load-from
+    :initarg :load-from :accessor command-load-from
+    :documentation "Where to load the command from."))
+  (:documentation "A command automatically loaded from somewhere when invoked."))
+
+;; (defmethod initialize-instance
+;;     :after ((o autoloaded-command) &rest initargs &key &allow-other-keys)
+;;   "Initialize a autoloaded-command."
+;;   (declare (ignore initargs))
+;;   (when (not (slot-boundp o 'name))
+;;     (error "autoloaded-command must have a name."))
+;;   )
+
+(defmethod print-object ((o autoloaded-command) stream)
+  "Print a lish command in an unreadable way."
+  (print-unreadable-object (o stream :identity nil :type t)
+    ;; (if (slot-boundp o 'synopsis)
+    ;; 	(format stream "~s" (command-synopsis o))
+    ;; 	(format stream "~s" (if (slot-boundp o 'name)
+    ;; 				(command-name o)
+    ;; 				(format stream "<unnamed>"))))))
+    (format stream "from ~s" (command-load-from o))))
 
 ;; (defun load-external-command (command)
 ;;   "Try to load an external command definition."

@@ -498,20 +498,30 @@ literally in shell syntax."
 	(keywordp (first (first (shell-expr-words expr))))
 	(= word-num 1))))
 
-(defun try-command (command)
+(defun try-command (command-name)
   "See if we can dig up the dirt on a command named COMMAND.
 Uses the first available of:
   - an already loaded command
   - a command which we load by the normal command path mechanism
   - a pre-defined external command, from an external command cache
   - a mined external command"
-  (assert command)			; Don't be calling this with NIL.
-  (or (get-command command)
-      (and (in-lisp-path command)
-	   (load-lisp-command command :silent (lish-autoload-quietly *shell*))
-	   (get-command command))
-      ;;(and (load-external-command command) (get-command command))
-      (and (mine-command command) (get-command command))))
+  (assert command-name)			; Don't be calling this with NIL.
+  (let ((command (get-command command-name)))
+    (typecase command
+      (autoloaded-command
+       (load-lisp-command-from command-name
+			       (command-load-from command)
+			       :silent (lish-autoload-quietly *shell*))
+       (get-command command-name))
+      (command command)
+      (null
+       (or
+	(and (in-lisp-path command-name)
+	     (load-lisp-command command-name
+				:silent (lish-autoload-quietly *shell*))
+	     (get-command command-name))
+	;;(and (load-external-command command) (get-command command))
+	(and (mine-command command-name) (get-command command-name)))))))
 
 (defun first-command-of (word)
   (cond

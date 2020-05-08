@@ -1539,6 +1539,36 @@ Note that this option overrides the -d and -s options."))
   "QuickLoad a system."
   (ql:quickload system))
 
+(define-builtin-arg-type autoload-place (arg-keyword) ;(argument)
+  "Where to load a command from either a keyword, a string, or a pathname."
+  ()
+  ;; :convert ql-dist:system (values value)
+  ;; :convert symbol (values value)
+  ;; :convert pathname (values value)
+  :convert string
+  (if quoted
+      value
+      (if (char= (char value 0) #\:)
+	  (intern (string-upcase (subseq value 1)) (find-package :keyword))
+	  value)))
+
+(defbuiltin autoload
+  ((command-name string :optional nil
+    :help "The name of the command to load.")
+   (where autoload-place :optional nil
+    :help "Where to load a command from. A keyword for an ASDF system, or a
+string or pathname designating a file.")
+   (docstring string :help "A documentation string."))
+  "Set a command to be automatically loaded."
+  (let ((cmd (make-instance 'autoloaded-command
+			    :name command-name
+			    :load-from where)))
+    (pushnew command-name *command-list* :test #'equal)
+    ;; @@@ Is the right place to put the docstring?
+    (setf (documentation (command-function-name command-name) 'function)
+	  docstring)
+    (set-command command-name cmd)))
+
 (defparameter *doc-types* '(compiler-macro function method-combination setf
 			    structure type variable)
   "Types of documentation to try for the DOC function.")
