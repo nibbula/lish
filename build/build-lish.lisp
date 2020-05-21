@@ -84,7 +84,7 @@ strings."
 ;; Build Lishes of various kinds.
 
 (defparameter *default-target* 'lish)
-(defparameter *targets* '("lish"))
+(defparameter *targets* '('lish))
 (defparameter *version-file* "version.lisp")
 (defparameter *install-dir* (merge-pathnames "bin" *home*))
 (defparameter *lisp* (or (sf-getenv "LISP") "sbcl"))
@@ -110,6 +110,17 @@ strings."
 
 (defmethod build (target)
   (format *error-output* "I don't know how to build ~a" target))
+
+(defgeneric install (target)
+  (:documentation "Install a thing."))
+
+(defmethod install (target)
+  (format *error-output* "I don't know how to install ~a" target))
+
+(defun install-file (file &key (dir *install-dir*))
+  (when (not (directory-p dir))
+    (ensure-directories-exist dir))
+  (copy-file file dir))
 
 (defmethod build ((target (eql 'lish)))
   "Normal lish."
@@ -177,14 +188,10 @@ strings."
 					  ,@*lisp-plain-flags* "--" "-norl"))))
 
 #|
-(defun install-one (file)
-  (when (not (directory-p *install-dir*))
-    (!mkdir *install-dir*))
-  (copy-file file *install-dir*))
 
 (defun install ()
-  (build *targets*)
   (loop :for target :in *targets* :do
+     (build targets)
      (install-one target)))
 
 (defun clean-one (file)
