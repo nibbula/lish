@@ -205,7 +205,7 @@ string as an argument."
 			   (apply #'pipe stream (cdr cmds))
 			   (values-list vals))
 		       nil))
-		 (when stream
+		 (when (and stream (open-stream-p stream))
 		   (finish-output stream)
 		   (close stream))))))
     (if (streamp (car commands))
