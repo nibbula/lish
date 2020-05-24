@@ -405,7 +405,8 @@ Commands can be:
       table)))
 
 ;; For use by other things. Like my "doc" command.
-(defmethod documentation ((symbol symbol) (type (eql :command)))
+;; This used to be (eql :command), but that was take by lispworks, so fuck it.
+(defmethod documentation ((symbol symbol) (type (eql 'command)))
   (let ((cmd (get-command (string-downcase (symbol-name symbol)))))
     (when cmd
       (with-output-to-string (str)

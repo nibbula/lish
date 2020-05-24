@@ -19,7 +19,7 @@
 		 :ostring :ochar :grout
 		 #+use-re :re
 		 #-use-re :cl-ppcre
-		 :chipz :bordeaux-threads)
+		 :chipz :bordeaux-threads #|:agnostic-lizard|#)
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))

@@ -1,6 +1,6 @@
-;;
-;; prompt.lisp - Things to make the prompt
-;;
+;;;
+;;; prompt.lisp - Things to make the prompt
+;;;
 
 (in-package :lish)
 
@@ -223,18 +223,41 @@ Strings can have '%' directives which are expanded by format-prompt."
 (defun is-lisp-expr-p (expr)
   "Return true if the the shell expr is likely just a wrapped Lisp expr."
   (and (= 1 (length (shell-expr-words expr)))
-       (consp (elt (shell-expr-words expr) 0))))
+       (or (consp (elt (shell-expr-words expr) 0))
+	   (consp (word-word (elt (shell-expr-words expr) 0))))))
 
 (defun is-probably-a-lisp-expr-p (word)
   (let ((trimmed (ltrim word)))
     (and (not (zerop (length trimmed)))
 	 (eql #\( (aref trimmed 0)))))
 
+(defun colorize-function (form env)
+  (declare (ignore env))
+  `(#\( (:fg-magenta ,(string-downcase (car form))) ,@(cdr form) #\)))
+
+(defun colorize-atom (form env)
+  (declare (ignore env))
+  (s+ " " (string-downcase form)))
+
 (defun colorize-lisp (expr fat-string)
   "Colorize a lisp expression."
   (declare (ignore expr fat-string))
-  ;; @@@
-  nil)
+  #|
+  (dbugf :recolor "boglar-ize ~s~%" expr)
+  (let* ((sexp (word-word (first (shell-expr-words expr))))
+	 (colorized-span
+	  (agnostic-lizard:walk-form sexp nil
+				     :on-function-form #'colorize-function
+				     :on-every-atom #'colorize-atom))
+	 )
+    (dbugf :recolor "smooty span ~s ~s ~s~%" sexp colorized-span
+	   (olength fat-string))
+    ;; (loop :with new = (span-to-fatchar-string colorized-span)
+    ;;    :for i :from 0 :below (olength new)
+    ;;    :do (setf (oelt fat-string i) (oelt new i)))
+    (dbugf :recolor "smoot string ~s ~s~%" fat-string (olength fat-string)))
+  |#
+  )
 
 (defun themify-shell-word-in-fat-string (word string theme-item)
   "Apply the THEME-ITEM, which should be a style, to the WORD in the fat
@@ -268,17 +291,28 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	((shell-expr-p expr)
 	 (when (and first-word (stringp (word-word first-word)))
 	   ;; @@@ stupid hack to not turn lisp red
-	   (when (not (is-probably-a-lisp-expr-p (word-word first-word)))
-	     (setf type (command-type *shell* (word-word first-word)
-				      :already-known t))
-	     ;; (dbugf :recolor "command-type ~s~%" type)
-	     (case type
-	       ((:external-command :builtin-command :shell-command :command
-	         :alias :global-alias :function :loadable-system)
-		(theme-it `(:command ,type :style) first-word))
-	       (:file (theme-it '(:command :system-command :style) first-word))
-	       (:directory (theme-it '(:command :directory :style) first-word))
-	       (otherwise (theme-it '(:command :not-found :style) first-word)))))
+	   (if (is-probably-a-lisp-expr-p (word-word first-word))
+	       (progn
+		 (dbugf :recolor "smellman ~s~%" (word-word first-word))
+		 ;; (colorize-lisp (word-word first-word) fat-str)
+		 (colorize-lisp expr fat-str)
+		 )
+	       (progn
+		 (setf type (command-type *shell* (word-word first-word)
+					  :already-known t))
+		 ;; (dbugf :recolor "command-type ~s~%" type)
+		 (case type
+		   ((:external-command :builtin-command :shell-command :command
+                     :alias :global-alias :function :loadable-system)
+		    (dbugf :recolor "melgor ~s~%" first-word)
+		    (theme-it `(:command ,type :style) first-word))
+		   (:file
+		    (theme-it '(:command :system-command :style) first-word))
+		   (:directory
+		    (theme-it '(:command :directory :style) first-word))
+		   (otherwise
+		    (dbugf :recolor "glorb ~s~%" first-word)
+		    (theme-it '(:command :not-found :style) first-word))))))
 	 (loop :for w :in (rest (shell-expr-words expr))
 	    :do
 	      (when (stringp (word-word w))
@@ -302,12 +336,15 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	  (progn
 	    (let ((expr (shell-read (char-util:simplify-string (rl::buf e))
 				    :partial t)))
-	      (when (shell-expr-p expr)
-		(colorize-expr expr (rl::buf e))
-		;; (dbugf :recolor "fat-str ~s~%" (rl::buf e))
+	      (if (shell-expr-p expr)
+		  (progn
+		    (colorize-expr expr (rl::buf e)))
+		  (progn
+		    (dbugf :recolor "moomar ~s~%" expr))
 		)))
 	(error ()
 	  ;; Errors are particularly useless and annoying here. 
-	  (throw 'whatever nil))))))
+	  (throw 'whatever nil))
+	))))
 
 ;; EOF

@@ -652,7 +652,7 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 
 (defmacro push-key (new arg value keyworded)
   "Push a possibly keyworded arg VALUE to the NEW list."
-  (with-unique-names (val)
+  (with-names (val)
     `(progn
        (when ,keyworded
 	 (setf ,new (push (arg-key ,arg) ,new)))
@@ -1141,7 +1141,7 @@ become keyword arguments, in a way specified in the command's arglist."
 
 #|
 (defmacro call-with-keywords (command-name func &rest kw)
-  (with-unique-names (args)
+  (with-names (args)
     `(let ((,args (loop :with arg-kw
 		     :for a :in (lish:command-arglist
 				 (lish:get-command ,command-name))

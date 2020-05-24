@@ -1178,7 +1178,7 @@ them as a list."
 
 (defmacro with-first-value-to-output (&body body)
   "Evaluuate BODY and set *OUTPUT* to first value."
-  (with-unique-names (vals)
+  (with-names (vals)
     `(values-list
       (let ((,vals (multiple-value-list (progn ,@body))))
 	(setf *output* (first ,vals))
@@ -1251,7 +1251,7 @@ not enough arguements supplied, and *INPUT* is set, i.e. it's a recipient of
 a non-I/O pipeline, supply *INPUT* as the missing tail argument."
   (dbugf :lish-eval "call-parenless ~s ~s~%" func line)
   (let ((parenless-args (read-parenless-args line))
-	(function-args (lambda-list
+	(function-args (argument-list
 			(if (functionp func)
 			    (third
 			     (multiple-value-list
@@ -1279,7 +1279,7 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	(with-first-value-to-output (apply func parenless-args)))))
 
 (defmacro maybe-do-in-background ((bg-p name args) &body body)
-  (with-unique-names (thunk)
+  (with-names (thunk)
     `(flet ((,thunk () (progn ,@body)))
        (if (and ,bg-p bt:*supports-threads-p*)
 	   (progn
@@ -2172,7 +2172,7 @@ suspend itself."
 
 (defmacro with-error-handling ((state) &body body)
   #-sbcl (declare (ignore state))
-  (with-unique-names (results just-print-the-error condition)
+  (with-names (results just-print-the-error condition)
     `(let* (,condition
 	    (,results
 	     ;; We have to be careful to preserve the values
