@@ -491,9 +491,19 @@ NAME is replaced by EXPANSION before any other evaluation."
 		    (lish-aliases shell))))
 
 (defun get-alias (name &key global (shell *shell*))
+  "Return the alias definition of ‘NAME’, or NIL if there isn't one.
+- SHELL   The shell instance to look in, which defaults to *SHELL*.
+- GLOBAL  Return the 'global' alias."
   (if global
       (gethash name (lish-global-aliases shell))
       (gethash name (lish-aliases shell))))
+
+(defun alias (name)
+  "Return the alias definition of NAME, or NIL if there isn't one."
+  (gethash name (lish-aliases *shell*)))
+
+(defsetf alias set-alias
+ "Set the alias definition.")
 
 (defun edit-alias (name &key global)
   (rl :prompt (s+ "alias " name " ")

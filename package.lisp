@@ -105,7 +105,7 @@ without any particular knowledge of it's Lisp programming features.
    #:!times #:!time #:!ulimit #:!wait #:!export #:!format
    #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash #:!opt
    ;; convenience / scripting
-   #:set-alias #:unset-alias #:get-alias
+   #:alias #:set-alias #:unset-alias #:get-alias
    #:command-paths
    #:pipe
    #:in-bg
