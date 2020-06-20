@@ -7,7 +7,7 @@
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 ;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 
-(defkeymap *lish-default-keymap*
+(defkeymap *lish-default-keymap* ()
   "Keymap for Lish."
   `((:f1		. shell-help-key)
     ;(,(ctrl #\v)	. shell-expand-line)
