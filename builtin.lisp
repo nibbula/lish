@@ -1,6 +1,6 @@
-;;
-;; builtin.lisp - Lish built-in commands.
-;;
+;;;
+;;; builtin.lisp - Lish built-in commands.
+;;;
 
 ;; Here we define the commands that are built in to Lish.
 
@@ -1564,21 +1564,26 @@ Note that this option overrides the -d and -s options."))
 	  value)))
 
 (defbuiltin autoload
-  ((command-name string :optional nil
+  ((force boolean :short-arg #\f :help "Replace an existing command.")
+   (command-name string :optional nil
     :help "The name of the command to load.")
    (where autoload-place :optional nil
     :help "Where to load a command from. A keyword for an ASDF system, or a
 string or pathname designating a file.")
    (docstring string :help "A documentation string."))
   "Set a command to be automatically loaded."
-  (let ((cmd (make-instance 'autoloaded-command
-			    :name command-name
-			    :load-from where)))
-    (pushnew command-name *command-list* :test #'equal)
-    ;; @@@ Is the right place to put the docstring?
-    (setf (documentation (command-function-name command-name) 'function)
-	  docstring)
-    (set-command command-name cmd)))
+  (let ((old-command (get-command command-name)))
+    ;; If there's already a non-autoloaded command loaded, don't overwrite it.
+    (when (or (not old-command)
+	      (typep old-command 'autoloaded-command)
+	      force)
+      (let ((cmd (make-instance 'autoloaded-command
+				:name command-name
+				:load-from where)))
+	(pushnew command-name *command-list* :test #'equal)
+	(setf (documentation (command-function-name command-name) 'function)
+	      docstring)
+	(set-command command-name cmd)))))
 
 (defparameter *doc-types* '(compiler-macro function method-combination setf
 			    structure type variable)
@@ -1634,6 +1639,7 @@ it can't find anything else.")
 			   80))
 		  80)))
     (with-grout (*grout* stream)
+      (dbugf :poo "1 *grout* = ~s stream = ~s~%" *grout* stream)
       (labels ((maybe-doc (obj type)
 		 (without-warning (documentation obj type)))
 	       (print-doc (sym pkg doc-type &optional fake-type)
