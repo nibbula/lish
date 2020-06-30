@@ -1258,12 +1258,17 @@ for already cached commands, don't bother consulting the file system."
 		       opsys:*command-pathname-cache*))))
       (when (and table (not (or rehash packages)))
 	(if commands
-	    (loop :with path
+	    (loop
+	       :with path
+	       ;; :and multi = (> (length commands) 1)
 	       :for c :in commands :do
 	       (setf path (gethash c table))
 	       (if path
 		   (pr-cmd path c)
-		   (format t "~a is not a hashed command~%" c)))
+		   (if (setf path (command-pathname c))
+		       ;; (format t "~:[~;~a ~]~a~%" multi c path)
+		       (format t "~a~%" path)
+		       (format t "~a was not found~%" c))))
 	    (maphash #'(lambda (c p) (pr-cmd p c))
 		     table))))))
 
