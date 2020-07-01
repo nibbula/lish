@@ -141,8 +141,7 @@ with SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
 those functions for more detail about prompt formatting."
 ;;  :default nil
   :default
-  '((:green "%u") "@" (:cyan "%h") " " (:white "%w") (:red ">") " ")
- )
+  '((:magenta "%u") (:green "@") (:cyan "%h") " " (:white "%w") (:red "%$") " "))
 
 (defoption prompt-function function
   :help "Function which takes a SHELL and returns a string to output as the
