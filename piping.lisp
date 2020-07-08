@@ -144,20 +144,43 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
      :while (setf l (read-line (or stream *standard-input*) nil nil))
      :collect l))
 
+;; (defun map-output-lines (func command &key binary)
+;;   "Return a list of the results of calling the function FUNC with each output
+;; line of COMMAND. COMMAND should probably be a string, and FUNC should take one
+;; string as an argument."
+;;   (let (vals stream)
+;;     (unwind-protect
+;;       (progn
+;; 	(multiple-value-setq (vals stream)
+;; 	  (shell-eval (possibly-read command)
+;; 		      :context (modified-context *context* :out-pipe t)))
+;; 	(when (and vals (> (length vals) 0))
+;; 	  (loop
+;; 	     :with l = nil
+;; 	     :and str = (if binary
+;; 			    (make-instance 'utf8b-stream:utf8b-input-stream
+;; 					   :input-stream stream)
+;; 			    stream)
+;; 	     :while (setf l (read-line str nil nil))
+;; 	     :collect (funcall func l))))
+;;       (when stream
+;; 	(close stream)))))
+
 (defun map-output-lines (func command)
   "Return a list of the results of calling the function FUNC with each output
 line of COMMAND. COMMAND should probably be a string, and FUNC should take one
 string as an argument."
   (let (vals stream)
     (unwind-protect
-      (progn
-	(multiple-value-setq (vals stream)
-	  (shell-eval (possibly-read command)
-		      :context (modified-context *context* :out-pipe t)))
-	(when (and vals (> (length vals) 0))
-	  (loop :with l = nil
-	     :while (setf l (read-line stream nil nil))
-	     :collect (funcall func l))))
+	 (progn
+	   (multiple-value-setq (vals stream)
+	     (shell-eval (possibly-read command)
+			 :context (modified-context *context* :out-pipe t)))
+	   (when (and vals (> (length vals) 0))
+	     (loop
+		:with l = nil
+		:while (setf l (read-line stream nil nil))
+		:collect (funcall func l))))
       (when stream
 	(close stream)))))
 
@@ -265,30 +288,38 @@ expression in a separagte thread, if threads are supported."
 
 ;; I'm not really sure about these. I have a hard time remembering them,
 ;; and I worry they'll look like Perl.
+;;
+;; Most of the ! functions are wrapped in with-shell so they should be able to
+;; be used outside of an interactive shell.
 
 (defun ! (&rest args)
   "Evaluate the shell command."
-  (shell-eval (shell-read (lisp-args-to-command args))))
+  (with-shell ()
+    (shell-eval (shell-read (lisp-args-to-command args)))))
 
 (defun !? (&rest args)
   "Evaluate the shell command, converting Unix shell result code into boolean.
 This means the 0 is T and anything else is NIL."
-  (let ((result
-	 (shell-eval (shell-read (lisp-args-to-command args)))))
-    (and (numberp result) (zerop result))))
+  (with-shell ()
+    (let ((result
+	   (shell-eval (shell-read (lisp-args-to-command args)))))
+      (and (numberp result) (zerop result)))))
 
 (defun !$ (&rest command)
   "Return lines output from command as a string of words. This is basically
 like $(command) in bash."
-  (command-output-words (lisp-args-to-command command)))
+  (with-shell ()
+    (command-output-words (lisp-args-to-command command))))
 
 (defun !$$ (&rest command)
   "Return lines of output from command as a string of quoted words."
-  (command-output-words (lisp-args-to-command command) t))
+  (with-shell ()
+    (command-output-words (lisp-args-to-command command) t)))
 
 (defun !@ (&rest command)
   "Return the output from command, broken into words by the shell reader."
-  (shell-words-to-list (lish::shell-expr-words (shell-read (!- command)))))
+  (with-shell ()
+    (shell-words-to-list (lish::shell-expr-words (shell-read (!- command))))))
 
 ;; @@@ What about something like:
 ;; (defmacro !q (&rest args)
@@ -336,12 +367,14 @@ instead of having to deal with string quoting, like:
 
 (defun !_ (&rest command)
   "Return a list of the lines of output from the command."
-  (command-output-list (lisp-args-to-command command)))
+  (with-shell ()
+    (command-output-list (lisp-args-to-command command))))
 
 (defun !- (&rest command)
   "Return a string containing the output from the command."
-  (with-output-to-string (str)
-    (run-with-output-to str (lisp-args-to-command command))))
+  (with-shell ()
+    (with-output-to-string (str)
+      (run-with-output-to str (lisp-args-to-command command)))))
 
 (defun !and (&rest commands)
   "Run commands until one fails."
@@ -362,18 +395,20 @@ instead of having to deal with string quoting, like:
 
 (defun !! (&rest commands)
   "Pipe output of commands. Return a stream of the output."
-  (multiple-value-bind (vals stream)
-      (shell-eval (shell-read (lisp-args-to-command commands))
-		  :context (modified-context *context* :out-pipe t))
-    (if (and vals (> (length vals) 0))
-	stream
-	(progn
-	  (close stream)
-	  nil))))
+  (with-shell ()
+    (multiple-value-bind (vals stream)
+	(shell-eval (shell-read (lisp-args-to-command commands))
+		    :context (modified-context *context* :out-pipe t))
+      (if (and vals (> (length vals) 0))
+	  stream
+	  (progn
+	    (close stream)
+	    nil)))))
 
 (defun !> (file-or-stream &rest commands)
   "Run commands with output to a file or stream."
-  (run-with-output-to file-or-stream (lisp-args-to-command commands)))
+  (with-shell ()
+    (run-with-output-to file-or-stream (lisp-args-to-command commands))))
 
 (defun !>> (file-or-stream &rest commands)
   "Run commands with output appending to a file or stream."
@@ -396,20 +431,24 @@ instead of having to deal with string quoting, like:
 
 (defun !< (file-or-stream &rest commands)
   "Run commands with input from a file or stream."
-  (run-with-input-from file-or-stream (lisp-args-to-command commands)))
+  (with-shell ()
+    (run-with-input-from file-or-stream (lisp-args-to-command commands))))
 
 (defun !!< (file-or-stream &rest commands)
   "Run commands with input from a file or stream and return a stream of output."
-  (with-open-file-or-stream (in-stream file-or-stream)
-    (multiple-value-bind (vals stream)
-	(shell-eval (shell-read (lisp-args-to-command commands))
-		    :context
-		    (modified-context *context* :out-pipe t :in-pipe in-stream))
-      (if (and vals (> (length vals) 0))
-	  stream
-	  (progn
-	    (close stream)
-	    nil)))))
+  (with-shell ()
+    (with-open-file-or-stream (in-stream file-or-stream)
+      (multiple-value-bind (vals stream)
+	  (shell-eval (shell-read (lisp-args-to-command commands))
+		      :context
+		      (modified-context *context*
+					:out-pipe t
+					:in-pipe in-stream))
+	(if (and vals (> (length vals) 0))
+	    stream
+	    (progn
+	      (close stream)
+	      nil))))))
 
 (defun !h (n)
   "Return the N-th history item as a string. If N is positive it counts from
@@ -430,50 +469,58 @@ the most recent."
 
 (defun != (&rest args)
   "Run a command with the separate verbatim arguments, without shell syntax."
-  (shell-eval (expr-from-args args)))
+  (with-shell ()
+    (shell-eval (expr-from-args args))))
 
 (defun !?= (&rest args)
   "Evaluate the shell command, converting Unix shell result code into boolean.
 This means the 0 is T and anything else is NIL."
-  (let ((result
-	 (shell-eval (expr-from-args args))))
-    (and (numberp result) (zerop result))))
+  (with-shell ()
+    (let ((result
+	   (shell-eval (expr-from-args args))))
+      (and (numberp result) (zerop result)))))
 
 (defun !$= (&rest command)
   "Return lines output from command as a string of words. This is basically
 like $(command) in bash."
-  (command-output-words (expr-from-args command)))
+  (with-shell ()
+    (command-output-words (expr-from-args command))))
 
 (defun !$$= (&rest command)
   "Return lines of output from command as a string of quoted words."
-  (command-output-words (expr-from-args command) t))
+  (with-shell ()
+    (command-output-words (expr-from-args command) t)))
 
 (defun !@= (&rest command)
   "Return the output from command, broken into words by the shell reader."
-  (shell-words-to-list
-   (lish::shell-expr-words
-    (shell-read
-     (with-output-to-string (str)
-       (run-with-output-to str (expr-from-args command)))))))
+  (with-shell ()
+    (shell-words-to-list
+     (lish::shell-expr-words
+      (shell-read
+       (with-output-to-string (str)
+	 (run-with-output-to str (expr-from-args command))))))))
 
 (defun !_= (&rest args)
   "Run a command with the separate verbatim arguments, without shell syntax."
-  (command-output-list (expr-from-args args)))
+  (with-shell ()
+    (command-output-list (expr-from-args args))))
 
 (defun !-= (&rest command)
   "Return a string containing the output from the command."
-  (with-output-to-string (str)
-    (run-with-output-to str (expr-from-args command))))
+  (with-shell ()
+    (with-output-to-string (str)
+      (run-with-output-to str (expr-from-args command)))))
 
 (defun !!= (&rest commands)
   "Pipe output of commands. Return a stream of the output."
-  (multiple-value-bind (vals stream)
-      (shell-eval (expr-from-args commands)
-		  :context (modified-context *context* :out-pipe t))
-    (if (and vals (> (length vals) 0))
-	stream
-	(progn
-	  (close stream)
-	  nil))))
+  (with-shell ()
+    (multiple-value-bind (vals stream)
+	(shell-eval (expr-from-args commands)
+		    :context (modified-context *context* :out-pipe t))
+      (if (and vals (> (length vals) 0))
+	  stream
+	  (progn
+	    (close stream)
+	    nil)))))
 
 ;; EOF

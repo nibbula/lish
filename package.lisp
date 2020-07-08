@@ -119,6 +119,7 @@ without any particular knowledge of it's Lisp programming features.
    #:map-output-lines
    #:command-output-words
    #:command-output-list
+   #:with-shell
    ;; magic punctuation
    #:!  #:!?  #:!!  #:!$  #:!$$  #:!@  #:!_  #:!-
    #:!= #:!?= #:!!= #:!$= #:!$$= #:!@= #:!_= #:!-=

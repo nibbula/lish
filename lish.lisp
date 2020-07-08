@@ -2218,6 +2218,50 @@ suspend itself."
 	     (invoke-restart 'abort))
 	   (values-list ,results)))))
 
+;; These with-* macros break shell initialization up into pieces so we can
+;; do non-interactive commands, especially the various ! functions, without
+;; repeating ourselves, and so we can call the ! functions when not already in
+; an interactive shell.
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmacro with-new-shell ((&rest args) &body body)
+    "Evaluate the BODY with *SHELL* bound to anew shell instance."
+    `(let* ((*shell* (make-instance 'shell ,@args))
+	    (*history-context* :lish)
+	    (*lish-level* (if *lish-level*
+			      (funcall #'1+ (symbol-value '*lish-level*))
+			      0))
+	    (saved-sigs (job-control-signals)))
+       ,@body))
+
+  (defmacro with-shell-command (() &body body)
+    "Evaluate the BODY as a non-interactive shell command."
+    (with-names (result)
+    `(let (,result)
+       (catch 'interactive-interrupt
+	 (ensure-theme)
+	 (unwind-protect
+	      (progn
+		(start-job-control)
+		(run-hooks *enter-shell-hook*)
+		(setf ,result (progn ,@body)))
+	   (stop-job-control saved-sigs)
+	   (run-hooks *exit-shell-hook*)))
+       (if (lish-exit-values *shell*)
+	   (values-list (lish-exit-values *shell*))
+	   ,result))))
+
+  (defmacro with-shell (() &body body)
+    "Evaluate the body as a non-interactive shell command, making a new shell
+if we aren't already inside one."
+    `(if *shell*
+	 ;; @@@ How can we avoid the code duplication? I don't think the thunk
+	 ;; trick will work here?
+	 (progn ,@body)
+	 (with-new-shell ()
+	   (with-shell-command ()
+	     ,@body)))))
+
 (defun lish (&key debug terminal-name
 	       ;;(terminal-type (pick-a-terminal-type))
 	       terminal-type
@@ -2233,19 +2277,24 @@ Arguments:
                    pick-a-terminal-type and so *default-terminal-type*.
   INIT-FILE     - File to load on startup or *default-lishrc* if not given.
   COMMAND       - A command to evaluate and exit."
-  (let* ((*shell* (make-instance 'shell :debug debug))
-	 (sh *shell*)		; shorthand
-	 (state (make-read-state))
-	 (*history-context* :lish)
-	 (*lish-level* (if *lish-level*
-			   (funcall #'1+ (symbol-value '*lish-level*))
-			   0))
-	 (*lishrc* init-file) ;; So it's inherited by sub-shells.
-	 ! ;-) !
-	 (saved-sigs (job-control-signals))
-	 ;; (old-terminal *terminal*)
-	 )
-    (setf (lish-debug *shell*) debug)	; @@@ the arg to make-instance doesn't
+  ;; (let* ((*shell* (make-instance 'shell :debug debug))
+  ;; 	 (sh *shell*)		; shorthand
+  ;; 	 (state (make-read-state))
+  ;; 	 (*history-context* :lish)
+  ;; 	 (*lish-level* (if *lish-level*
+  ;; 			   (funcall #'1+ (symbol-value '*lish-level*))
+  ;; 			   0))
+  ;; 	 (*lishrc* init-file) ;; So it's inherited by sub-shells.
+  ;; 	 ! ;-) !
+  ;; 	 (saved-sigs (job-control-signals))
+  ;; 	 ;; (old-terminal *terminal*)
+  ;; 	 )
+  (with-new-shell (:debug debug)
+    (let* ((sh *shell*)		; shorthand
+	   (state (make-read-state))
+	   (*lishrc* init-file) ;; So it's inherited by sub-shells.
+	   !)
+      (setf (lish-debug *shell*) debug)	; @@@ the arg to make-instance doesn't
 
     ;; Make the user package if it doesn't exist.
     (when (not (find-package :lish-user))
@@ -2264,17 +2313,27 @@ Arguments:
 
     ;; Perhaps do a single command and exit.
     (when command
-      (let (result)
-	(catch 'interactive-interrupt
-	  (ensure-theme)
-	  (start-job-control)
-	  (run-hooks *enter-shell-hook*)
-	  (setf result (lish-eval sh (shell-read command) (make-read-state)))
-	  (stop-job-control saved-sigs)
-	  (run-hooks *exit-shell-hook*))
-	(return-from lish (if (lish-exit-values sh)
-			      (values-list (lish-exit-values sh))
-			      result))))
+      ;; (let (result)
+      ;; 	(catch 'interactive-interrupt
+      ;; 	  (ensure-theme)
+      ;; 	  (start-job-control)
+      ;; 	  (run-hooks *enter-shell-hook*)
+      ;; 	  (setf result (lish-eval sh
+      ;; 				  (typecase command
+      ;; 				    (list command)
+      ;; 				    (t (shell-read command)))
+      ;; 				  (make-read-state)))
+      ;; 	  (stop-job-control saved-sigs)
+      ;; 	  (run-hooks *exit-shell-hook*))
+      ;; 	(return-from lish (if (lish-exit-values sh)
+      ;; 			      (values-list (lish-exit-values sh))
+      ;; 			      result))))
+      (return-from lish
+	(with-shell-command ()
+	  (lish-eval sh (typecase command
+			  (list command)
+			  (t (shell-read command)))
+		     (make-read-state)))))
 
     ;; Figure out the terminal type.
     (setf terminal-type (or terminal-type
@@ -2371,7 +2430,7 @@ Arguments:
 			  (values-list (lish-exit-values sh)))))
     (format t "*EOF*~%")
     ;; Well, let's hope that this will clear the EOF on *standard-input*
-    (clear-input *standard-input*)))
+    (clear-input *standard-input*))))
 
 (defvar *standalone* nil
   "True if we are nearly just a shell.") ; [sic]
