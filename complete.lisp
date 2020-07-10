@@ -1,6 +1,6 @@
-;;
-;; complete.lisp - Completion for Lish
-;;
+;;;
+;;; complete.lisp - Completion for Lish
+;;;
 
 (in-package :lish)
 
@@ -516,7 +516,8 @@ Uses the first available of:
       (command command)
       (null
        (or
-	(and (in-lisp-path command-name)
+	(and (or (not *shell*) (lish-autoload-from-asdf *shell*))
+	     (in-lisp-path command-name)
 	     (load-lisp-command command-name
 				:silent (lish-autoload-quietly *shell*))
 	     (get-command command-name))
