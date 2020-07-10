@@ -118,9 +118,11 @@ strings."
   (format *error-output* "I don't know how to install ~a" target))
 
 (defun install-file (file &key (dir *install-dir*))
-  (when (not (directory-p dir))
-    (ensure-directories-exist dir))
-  (copy-file file dir))
+  (declare (ignore file dir))
+  ;; (when (not (directory-p dir))
+  ;;   (ensure-directories-exist dir))
+  ;; (copy-file file dir)
+  )
 
 (defmethod build ((target (eql 'lish)))
   "Normal lish."
