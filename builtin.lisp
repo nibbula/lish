@@ -1004,8 +1004,10 @@ symbolic format, otherwise output in octal."
 		       (:name "Soft Value")
 		       (:name "Hard Value")
 		       (:name ("Description" :wrap))))))
-	 (print-table table :max-width (get-cols))
-	 (terpri)
+	 ;; (print-table table :max-width (get-cols))
+	 ;; (terpri)
+	 (with-grout ()
+	   (grout-print-table table))
 	 (setf *output* table)))
       (limit
        (let ((limit-number (uos:rlimit-number limit nil))
