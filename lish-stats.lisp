@@ -62,8 +62,10 @@
 	    (list 
 	     (car k) (command-record-type h) (command-record-count h)))))
     ;; @@@ why is this sort so insane on sbcl? it spits a bunch of notes????
-    (setf table (sort table #'> :key #'third))
-    (table:nice-print-table table '("Command" "Type" "Count"))))
+    (setf table (sort table #'> :key #'third)
+	  table (make-table-from table
+				 :column-names '("Command" "Type" "Count")))
+    (table:print-table table)))
 
 (defun merge-stats (from to)
   (when (not (equal (command-record-type from) (command-record-type to)))

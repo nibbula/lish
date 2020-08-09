@@ -268,7 +268,7 @@ literally in shell syntax."
 		    (if (arg-default a)
 			(s+ " [" (arg-default a) "]")
 			""))))
-       :column-names '("Arg" ("desc" :wrap)))
+       :columns '((:name "Arg") (:name "desc" :align :wrap)))
        (make-instance 'text-table-renderer)
        str
        :trailing-spaces nil
@@ -304,7 +304,8 @@ literally in shell syntax."
 			     (substitute #\space #\newline (arg-help a)))
 			(format nil "~s ~(~a~)"
 				(arg-default a) (arg-type a))))))
-       :column-names '(("Arg" :overflow) ("desc" :wrap)))
+       :columns '((:name "Arg" :align :overflow)
+		  (:name "desc" :align :wrap)))
        (make-instance 'text-table-renderer) str
        :trailing-spaces nil :print-titles nil :max-width (term-cols)))
     (setf result (trim result))

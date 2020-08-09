@@ -393,8 +393,9 @@ Commands can be:
 			 (or (and (slot-boundp a 'help)
 				  (substitute #\space #\newline (arg-help a)))
 			     (arg-name a))))
-		:column-names
-		'("Short" "Long" #| "default" |# "Type" ("Help" :wrap))))
+		:columns
+		'((:name "Short") (:name "Long") (:name "Type")
+		  (:name "Help" :align :wrap))))
 	 :long-titles nil :print-titles nil #|:max-width (get-cols)|#
 	 :trailing-spaces nil))
       (when (and (command-accepts cmd)
@@ -1003,7 +1004,7 @@ symbolic format, otherwise output in octal."
 		     '((:name "Name")
 		       (:name "Soft Value")
 		       (:name "Hard Value")
-		       (:name ("Description" :wrap))))))
+		       (:name "Description" :align :wrap)))))
 	 ;; (print-table table :max-width (get-cols))
 	 ;; (terpri)
 	 (with-grout ()
