@@ -1258,6 +1258,7 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 			      (function-lambda-expression func)))
 			    func)))
 	(*context* context))
+    (dbugf :lish-eval "parenless args ~s~%" parenless-args)
     (if (and (< (length parenless-args) (length function-args))
 	     *input*)
 	(progn
@@ -1267,7 +1268,9 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 		       (context-pipe-plus *context*))
 		(with-first-value-to-output
 		    (if (context-pipe-plus *context*)
-			(apply #'omap func `(,@parenless-args ,*input*))
+			(let ((curried (_ (apply func `(,@parenless-args ,_)))))
+			  ;; @@@ maybe there's faster way to do this?
+			  (apply #'omap curried (list *input*)))
 			(apply func `(,@parenless-args ,*input*)))))
 	      (progn
 		(dbugf 'pipe "applying *pipe-plus* = ~s~%" *pipe-plus*)
