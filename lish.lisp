@@ -28,7 +28,6 @@
   (loop :with isym :and isymbol-type :and esym :and esymbol-type
      :for p :in (package-use-list :cl-user) :do
      (when (not (position p (flattened-package-use-list *lish-user-package*)))
-       (dbug "Package ~w~%" p)
        ;; Things directly in lish-user are uninterned in favor of one
        ;; in cl-user.
        (unintern-conflicts *lish-user-package* p)
@@ -43,11 +42,9 @@
 	 (when (not (equal esym isym))
 	   (case isymbol-type
 	     ((:internal :external)
-	      (dbug "CONFLICT ~w ~w ~w~%" p (symbol-name sym) isymbol-type)
 	      (shadow isym *lish-user-package*))
 	     (:inherited
 	      (when (not (eq (symbol-package esym) (symbol-package isym)))
-		(dbug "CONFLICT ~w ~w ~w~%" p (symbol-name sym) isymbol-type)
 		(shadowing-import isym *lish-user-package*))))))
        (use-package p *lish-user-package*)))
   ;; Update all symbols
@@ -500,7 +497,6 @@ Otherwise, return words which will evaluate a lisp expression."
 	       (or (consp (shell-word-word w)) (symbolp (shell-word-word w)))
 	       (shell-word-eval w))
       :do
-      (dbugf :lish-eval "Expanding eval of ~s~%" (shell-word-word w))
       (setf results (eval (shell-word-word w)))
       :and :if (and (listp results) (not (shell-word-quoted w)))
 	;; Spread list results into separate args
@@ -1121,23 +1117,16 @@ into a shell-expr with shell-read."
 (defun get-accepts (expr)
   (typecase expr
     (shell-expr
-     (dbugf :accepts "get-accepts: shell-expr ~s~%" expr)
      (get-accepts (nth-expr-word 0 expr)))
     (list
-     (dbugf :accepts "get-accepts: list ~s~%" expr)
      (get-accepts (if (keywordp (car expr))
 		      (cdr expr)
 		      (car expr))))
     (string
-     ;;(dbugf :accepts "get-accepts: string ~s~%" expr)
      (let* ((cmd-name (resolve-command expr))
 	    (cmd (get-command cmd-name)))
-       (when cmd
-         (dbugf :accepts "command ~a accepts ~s~%"
-		cmd-name (command-accepts cmd)))
        (and cmd (command-accepts cmd))))
     (t
-     (dbugf :accepts "get-accepts: -T- ~s ~s~%" (type-of expr) expr)
      :unspecified)))
 
 (defun accepts (first-type &rest other-types)
@@ -1249,7 +1238,6 @@ consulting the file system."
   "Apply the function to the line, and return the proper values. If there are
 not enough arguements supplied, and *INPUT* is set, i.e. it's a recipient of
 a non-I/O pipeline, supply *INPUT* as the missing tail argument."
-  (dbugf :lish-eval "call-parenless ~s ~s~%" func line)
   (let ((parenless-args (read-parenless-args line))
 	(function-args (argument-list
 			(if (functionp func)
@@ -1258,14 +1246,11 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 			      (function-lambda-expression func)))
 			    func)))
 	(*context* context))
-    (dbugf :lish-eval "parenless args ~s~%" parenless-args)
     (if (and (< (length parenless-args) (length function-args))
 	     *input*)
 	(progn
 	  (if parenless-args
 	      (progn
-		(dbugf 'pipe "applying *pipe-plus* = ~s~%"
-		       (context-pipe-plus *context*))
 		(with-first-value-to-output
 		    (if (context-pipe-plus *context*)
 			(let ((curried (_ (apply func `(,@parenless-args ,_)))))
@@ -1273,7 +1258,6 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 			  (apply #'omap curried (list *input*)))
 			(apply func `(,@parenless-args ,*input*)))))
 	      (progn
-		(dbugf 'pipe "applying *pipe-plus* = ~s~%" *pipe-plus*)
 		(with-first-value-to-output
 		    (if (context-pipe-plus *context*)
 			(omap func *input*)
@@ -1286,13 +1270,11 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
     `(flet ((,thunk () (progn ,@body)))
        (if (and ,bg-p bt:*supports-threads-p*)
 	   (progn
-	     (dbugf :lish-eval "in the BG ~s~%" ,name)
 	     (let ((nn (prin1-to-string ,name))
 		   (aa ,args))		; so we only eval once
 	       (add-job nn (or (and aa (shell-words-to-string aa)) "")
 			(bt:make-thread #',thunk :name nn))))
 	   (progn
-	     (dbugf :lish-eval "not in th BG ~s~%" ,name)
 	     (funcall #',thunk))))))
 
 (defun call-thing (thing args context &optional parenless)
@@ -1311,29 +1293,22 @@ CALL-PARENLESS."
   (with-slots (in-pipe out-pipe environement) context
     (let ((command-p (typep thing 'command))
 	  (bg (context-background context)))
-      (when command-p
-	(dbugf :accepts "command ~s ~s~%" (command-name thing) *accepts*))
       (labels ((runky (thing args)
 		 (cond
 		   (command-p
 		     (let ((lisp-args (posix-to-lisp-args thing args))
 			   (cmd-func (symbol-function (command-function thing)))
 			   (*context* context))
-		       (dbugf :lish-eval "call-thing command ~s~%" cmd-func)
 		       (if (> (length lisp-args) 0)
 			   (maybe-do-in-background (bg (command-name thing) args)
 			     (apply cmd-func lisp-args))
 			   (maybe-do-in-background (bg (command-name thing) args)
                              (funcall cmd-func)))))
 		   (parenless
-		    (dbugf :lish-eval "call-thing parenless ~s~%" thing)
 		    (call-parenless thing parenless context))
 		   (t
-		    (dbugf :lish-eval "call-thing plain eval ~s ~s~%" thing
-			   context)
 		    (maybe-do-in-background (bg thing args)
 		      (eval thing))))))
-	(dbugf :lish-eval "call-thing args = ~s~%" args)
 	(if out-pipe
 	    (let ((out-str (make-stretchy-string 20)))
 	      (values
@@ -1354,13 +1329,11 @@ CALL-PARENLESS."
 		  (if command-p
 		      (runky thing args)
 		      (let ((vals (multiple-value-list (runky thing args))))
-			(dbugf :lish-eval "call-thing in-pipe vals ~s~%" vals)
 			(values vals nil t))))
 		(if command-p
 		    (runky thing args)
 		    ;; (values (list (runky thing args)) nil t))))))))
 		    (let ((vals (multiple-value-list (runky thing args))))
-		      (dbugf :lish-eval "call-thing vals ~s~%" vals)
 		      (values vals nil t)))))))))
 
 (defun do-system-command (expr context)
@@ -1369,7 +1342,6 @@ EXPR is a shell-expr.
 IN-PIPE is an input stream to read from, if non-nil.
 OUT-PIPE is T to return a input stream which the output of the command can be
 read from."
-  (dbugf :lish-eval "system command ~w ~w~%" expr context)
   (let* ((command-line
 	  ;; System command arguments must be strings
 	  (mapcar (_ (or (and (stringp _) _)
@@ -1397,8 +1369,6 @@ read from."
 	    ;; 	  in-pipe
 	    ;; 	  (slurp in-pipe))
 	    ;;   (file-position in-pipe 0))
-	    (dbugf :sheep "piping ~s args: ~s~%in-pipe ~s out-pipe ~a~%"
-		   path args in-pipe out-pipe)
 	    (setf result-stream
 		  (apply #'nos:pipe-program
 			 `(,path ,args
@@ -1419,7 +1389,6 @@ read from."
 	      ;; (format t "background = ~a~%args = ~s~%" background args)
 	      )
 	    |#
-	    (dbugf :sheep "system command ~s args: ~s~%" path args)
 	    (setf pid
 		  (apply
 		   ;; #+(or clisp ecl lispworks) #'fork-and-exec
@@ -1471,8 +1440,6 @@ probably fail, but perhaps in similar way to other shells."
 	 (alias (gethash cmd (lish-aliases sh)))
 	 (expanded-expr (lisp-exp-eval expr))
 	 result result-stream)
-    (dbugf :lish-eval "words = ~w~%" (shell-expr-words expr))
-    (dbugf :lish-eval "expanded expr = ~w~%" expanded-expr)
     ;; These are in order of precedence, so:
     ;;  aliases, lisp path, commands, system path
     (flet ((sys-cmd ()
@@ -1481,7 +1448,6 @@ probably fail, but perhaps in similar way to other shells."
 	     (setf (values result result-stream)
 		   (do-system-command expanded-expr context))
 	     (run-hooks *post-command-hook* cmd :system-command)
-	     (dbugf :lish-eval "result = ~w~%" result)
 	     (when (not result)
 	       (format t "Command failed.~%"))
 	     (force-output)	   ; @@@ is this really a good place for this?
@@ -1502,20 +1468,17 @@ probably fail, but perhaps in similar way to other shells."
 	     (values-list
 	      (let ((vals (multiple-value-list
 			   (call-thing func '() context line))))
-		(dbugf 'pipe "run-fun ~s~%" vals)
 		(run-hooks *post-command-hook* cmd :function)
 		vals))))
       (cond
 	;; Alias
 	((and alias (not no-alias))
-	 (dbugf :lish-eval "Expanding alias~%")
 	 ;; re-read and re-eval the line with the alias expanded
 	 (shell-eval (expand-alias alias expanded-expr)
 		     :context context
 		     :no-expansions t))
 	;; Lish command
 	((typep command 'internal-command)
-	 (dbugf :lish-eval "Calling command ~s ~s~%" command context)
 	 (run-hooks *pre-command-hook* cmd :command)
 	 (multiple-value-prog1
 	     (call-thing command (subseq (shell-expr-words expanded-expr) 1)
@@ -1523,7 +1486,6 @@ probably fail, but perhaps in similar way to other shells."
 	   (run-hooks *post-command-hook* cmd :command)))
 	;; external command
 	((typep command 'external-command)
-	 (dbugf :lish-eval "Calling external command ~s ~s~%" command context)
 	 (run-hooks *pre-command-hook* cmd :command)
 	 ;; (multiple-value-prog1
 	 ;;     (call-thing command (subseq expanded-words 1) context)
@@ -1540,11 +1502,9 @@ probably fail, but perhaps in similar way to other shells."
 			 context)
 	   (run-hooks *post-command-hook* cmd :command)))
 	((functionp cmd)
-	 (dbugf :lish-eval "Function eval~%")
 	 ;; (format t "CHOWZA ~s~%" (rest-of-the-line expr))
 	 (run-fun cmd (rest-of-the-line expr)))
 	((and (symbolp cmd) (fboundp cmd))
-	 (dbugf :lish-eval "fbound symbol eval~%")
 	 ;; (format t "FLEOOP ~s~%" (rest-of-the-line expr))
 	 (run-fun (symbol-function cmd) (rest-of-the-line expr)))
 	;; Autoload
@@ -1554,7 +1514,6 @@ probably fail, but perhaps in similar way to other shells."
 	      (in-lisp-path cmd)
 	      (setf command (load-lisp-command
 			     cmd :silent (lish-autoload-quietly sh))))
-	 (dbugf :lish-eval "Trying autoload~%")
 	 ;; now try it as a command
 	 (run-hooks *pre-command-hook* cmd :command)
 	 (multiple-value-prog1
@@ -1562,7 +1521,6 @@ probably fail, but perhaps in similar way to other shells."
 			 context)
 	   (run-hooks *post-command-hook* cmd :command)))
 	((stringp cmd)
-	 (dbugf :lish-eval "String command~%")
 	 ;; If we can find a command in the path, try it first.
 	 (cond
 	   ((and (lish-auto-cd sh) (directory-p cmd))
@@ -1579,15 +1537,11 @@ probably fail, but perhaps in similar way to other shells."
 	       (if (and (symbolp symb) (fboundp symb))
 		   (if (macro-function symb)
 		       (progn
-			 (dbugf :lish-eval "re-wrap macro~%")
 			 (shell-eval (cons symb
 					   (read-parenless-args
 					    (rest-of-the-line expr)))
 				     :context context))
 		       (progn
-			 ;; (dbugf :lish-eval "parenless literal ~s ~s~%"
-			 ;; 	expr
-			 ;; 	(literal-rest-of-the-line expr))
 			 (run-fun (symbol-function symb)
 				  ;;(subseq (shell-expr-line expr) pos)
 				  ;;(rest-of-the-line expr)
@@ -1597,7 +1551,6 @@ probably fail, but perhaps in similar way to other shells."
 		   (sys-cmd))))))
 	(t ;; Some other type, just return it, like it's self evaluating.
 	 ;;(values (multiple-value-list (eval cmd)) nil t))))))
-	 (dbugf :lish-eval "Self evaluating ~s ~s~%" cmd context)
 	 ;; (values (multiple-value-list
 	 ;; 	  ;;(with-first-value-to-output
 	 ;; 	  (call-thing (car cmd) (cdr cmd) context))
@@ -1681,34 +1634,27 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	;; @@@ But what if there's multiple eval-able lisp exprs?
 	(cond
 	  ((not (shell-expr-p expr))
-	   (dbugf :lish-eval "Evaluating a Lisp expression.~%")
 	   ;; A full Lisp expression all by itself
 	   (cond
 	     ((and (consp expr) expr
 		   (and (symbolp (car expr)) (fboundp (car expr))))
 	      ;; Give precedence to functions
-	      (dbugf :lish-eval "fbound expr = ~s.~%" expr)
 	      ;; (with-package *lish-user-package*
 	      ;; 	(values (multiple-value-list (eval expr)) nil t)))
 	      (with-package *lish-user-package*
-		(dbugf 'pipe "flipped-io = ~s~%" flipped-io)
 		(when (not flipped-io)
 		    (setf *input* *output*
 			  *output* nil
 			  flipped-io t))
-		(dbugf 'pipe "*input* = ~s~%" *input*)
 		(multiple-value-bind (result-values output show-p)
 		    (call-thing expr nil *context*)
 		  (setf *output* (car result-values))
-		  (dbugf 'pipe "*output* = ~s~%" *output*)
-		  (dbugf :lish-eval "results = ~s~%" result-values)
 		  (values result-values output show-p))
 		))
 	     ((consp expr)
 	      (case (command-type shell (string-downcase (car expr)))
 		((:command :file)
 		 ;; Try to do a system command in s-exp syntax
-		 (dbugf :lish-eval "command or file expr = ~s.~%" expr)
 		 (shell-eval
 		  (shell-read
 		   (join-by-string
@@ -1724,14 +1670,11 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		    #\space))
 		  :context context))
 		(t
-		 (dbugf :lish-eval "non command list expr = ~s.~%" expr)
 		 (with-package *lish-user-package*
 		   (values (multiple-value-list (eval expr)) nil t)))))
 	     ((stringp expr)
-	      (dbugf :lish-eval "string expr = ~s.~%" expr)
 	      (shell-eval (shell-read expr) :context context))
 	     (t
-	      (dbugf :lish-eval "other expr = ~s.~%" expr)
 	      (with-package *lish-user-package*
 		(values (multiple-value-list (eval expr)) nil t)))))
 	  ((zerop (length (shell-expr-words expr)))
@@ -1740,25 +1683,18 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	  ((and (listp (setf first-word (nth-expr-word 0 expr)))
 		(keywordp (first first-word)))
 	   ;; First word is a list with a keyword, so it's a compound command.
-	   (dbugf :lish-eval "Evaluating a compound expression ~a.~%" first-word)
 	   (unless no-expansions
 	     (do-expansions expr))
-	   (dbugf 'pipe "(first first-word) = ~s~%" (first first-word))
 	   (case (first first-word)
 	     ((:pipe :pipe-plus)
-	      (dbugf 'pipe "flipped-io = ~s~%" flipped-io)
 	      (when (not flipped-io)
 		(setf *input* *output*
 		      *output* nil
 		      *pipe-plus* (eq (first first-word) :pipe-plus)
 		      (context-pipe-plus *context*) (eq (first first-word) :pipe-plus)
 		      flipped-io t))
-	      (dbugf 'pipe "*input* = ~s~%" *input*)
-	      (dbugf 'pipe "*pipe-plus* = ~s~%" *pipe-plus*)
-	      ;;(dbugf :accepts "*accepts* = ~s~%" *accepts*)
 	      (setf (values vals out-stream show-vals)
 		    (eval-compound (successful vals) t))
-	      (dbugf 'pipe "*output* = ~s~%" *output*)
 	      (values vals out-stream show-vals))
 	     (:and      (eval-compound (successful vals) nil))
 	     (:or       (eval-compound (not (successful vals)) nil))
@@ -1779,28 +1715,22 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	      (error "Unknown compound command type."))))
 	  (t
 	   ;; The first word is not a list, so it's a ‘simple’ command.
-	   (dbugf :lish-eval "Evaluating a simple command.~%")
 	   (unless no-expansions
 	     (do-expansions expr))
-	   (dbug "~w~%" expr)
 	   ;; A stupid way to do backgrounding:
 	   (when (equal (word-word (car (last (shell-expr-words expr)))) "&")
-	     (dbugf :lish-eval "simple command in the BG.~%")
 	     (setf background t
 		   (shell-expr-words expr) (nbutlast (shell-expr-words expr))))
 	   (with-package *lish-user-package*
 	     ;; accepts is :unspecified because we're last in the
 	     ;; pipeline.
-	     (dbugf 'pipe "flipped-io = ~s~%" flipped-io)
 	     (when (not flipped-io)
 	       (setf *input* *output*
 		     *output* nil
 		     flipped-io t))
-	     (dbugf 'pipe "*input* = ~s~%" *input*)
 	     (setf (values vals out-stream show-vals)
 		   (shell-eval-command shell expr *context*
 				       :no-alias no-expansions))
-	     (dbugf 'pipe "*output* = ~s~%" *output*)
 	     (values vals out-stream show-vals))))))))
 
 (defun load-file (file)
@@ -2049,25 +1979,19 @@ suspend itself."
 (defun lish-eval (sh expr state)
   "Evaluate the shell expressions in EXPR."
   (declare (ignore sh))
-  (dbugf 'lish-repl
-	 "~s (~a) ~s~%" expr (type-of expr) (eq expr *empty-symbol*))
   (with-slots ((str string) (pre-str prefix-string)) state
     (cond
       ((eq expr *continue-symbol*)
        (if (stringp pre-str)
 	   (setf pre-str (format nil "~a~%~a" pre-str str))
-	   (setf pre-str (format nil "~a" str)))
-       (dbugf 'lish-repl "DO CONTIUE!!~%"))
+	   (setf pre-str (format nil "~a" str))))
       ((eq expr *empty-symbol*)
        ;; do nothing
-       (format t "~%")			; <<<<
-       (dbugf 'lish-repl "EMPTY - DO NOTHING!!~%"))
+       (format t "~%"))			; <<<<
       ((eq expr *error-symbol*)
        ;; do nothing
-       (break)
-       (dbugf 'lish-repl "ERROR - DO NOTHING!!~%"))
+       (break))
       (t
-       (dbugf 'lish-repl "Do Something!!~%")
        (setf pre-str nil
 	     *input* nil
 	     *output* nil)
@@ -2196,7 +2120,6 @@ suspend itself."
 		    ;; Normal error handling
 		    (serious-condition
 		     #'(lambda (c)
-			 (dbugf :lish "Handler bind~%")
 			 ;; This should be the purview of the debugger.
 			 ;; (incf (read-state-error-count ,state))
 			 ;; (when (> (read-state-error-count ,state) 10)
