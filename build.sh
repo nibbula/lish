@@ -5,7 +5,7 @@
 if [ ! -n "$LISP" ] ; then
   LISPS="sbcl ccl lisp clisp ecl"
   for l in $LISPS ; do
-    if [ -n `command -v $l` ] ; then
+    if [ x`command -v $l` != x ] ; then
       LISP=$l
       break;
     fi
@@ -30,6 +30,7 @@ try_to_figure_flags()
     *ccl*)   OUR_PLAIN_LISP_FLAGS="--no-init"     ; BATCH_ARGS="" ;;
     *clisp*) OUR_PLAIN_LISP_FLAGS="-norc"         ; BATCH_ARGS="" ;;
     *abcl*)  OUR_PLAIN_LISP_FLAGS="--noinit"      ; BATCH_ARGS="" ;;
+    *ecl*)   OUR_PLAIN_LISP_FLAGS="--norc"        ; BATCH_ARGS="" ;;
     *)
       echo "I'm not sure how to set flags for $LISP."
       ;;
