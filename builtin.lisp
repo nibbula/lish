@@ -1751,4 +1751,19 @@ Try typing \"doc doc\".
 	(when (not (%doc thing))
 	  (describe thing)))))
 
+;; This is just a convenient wrapper around defparameter. I'm not really sure
+;; this is a "good thing", but it can be useful for interactive programming.
+;; Not having to declare variables, was probably first invented for interactive
+;; programming in Lisp, but this can still have it's use. Of; course
+;; implementations vary on getting a warning.
+(defbuiltin var
+  ((name string :optional nil :help "Name of the variable.")
+   (value object :help "Initial value of the variable." )
+   (documentation string :use-supplied-flag t
+    :help "Documentation string for the variable."))
+  "Define a variable, if you are so inclined."
+  (eval `(defparameter ,(intern (string-upcase name))
+	   ,value
+	   ,@(when documentation-supplied-p (list documentation)))))
+
 ;; EOF
