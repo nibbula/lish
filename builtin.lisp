@@ -1536,6 +1536,59 @@ Note that this option overrides the -d and -s options."))
   "Load a file."
   (load file))
 
+;; This is not very close to being correct.
+(defun load-dirs ()
+  "Directories where things may get loaded from."
+  (remove-if #'keywordp
+	     (flatten (concatenate 'list
+				   asdf:*central-registry*
+				   asdf:*source-registry-parameter*))))
+
+(defbuiltin ldirs
+  ((push   boolean :short-arg #\p :help "Push directories on the load path.")
+   (add    boolean :short-arg #\a :help "Append directories to the load path.")
+   (remove boolean :short-arg #\r :help "Remove directories to the load path.")
+   (dir pathname :optional t :repeating t :help "Directories to operate on."))
+  "List some directories where things are maybe loaded from. Missing directories
+are printed in red on some terminals. If a directory is given without an action
+option, it is as if --push was given."
+  (labels ((pr (d) (grout-format "~a~%" d))
+	   ;; This should probably be some system specific thing in opsys.
+	   (fix-dir (d)
+	     (let ((result (nos:safe-namestring d)))
+	       (when (and (plusp (length result))
+			  (not (equal (char result (1- (length result)))
+				      nos:*directory-separator*)))
+		 (setf result (s+ result nos:*directory-separator*)))
+	       result))
+	   (do-push ()
+	     (map nil (_ (pushnew (fix-dir _) asdf:*central-registry*
+				  :test #'equal)) dir)))
+    (with-grout ()
+      (when (> (count t `(,push ,add ,remove)) 1)
+	(error "Please specidify only one of push, add, or remove."))
+      (when (and (or push add remove) (not dir))
+	(error "~:(~a) requires a directory." (or push add remove)))
+      (cond
+	(push (do-push))
+	(add (nconc asdf:*central-registry* (map 'list (_ (fix-dir _)) dir)))
+	(remove
+	 (map nil (_ (setf asdf:*central-registry*
+			   (delete (fix-dir _) asdf:*central-registry*
+				   :test #'equal)))
+	      dir))
+	(dir (do-push))
+	(t ;; No args
+	 (loop :for d :in (load-dirs)
+	    :do
+	    (if (not (nos:file-exists d))
+		(progn
+		  (grout-set-color :red :black)
+		  (pr d)
+		  (grout-set-normal))
+		(pr d)))
+	 (setf *output* asdf:*central-registry*))))))
+
 (defun quicklisp-system-list ()
   (dlib-misc:quickloadable-systems :as-strings t))
 
