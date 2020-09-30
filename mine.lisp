@@ -422,11 +422,13 @@ a known compression suffix, then the stream is appropriately decompressed."
      :collect (apply #'make-instance type a)))
 
 ;; @@@ Implement checksums 
-(defun mine-command (command-name)
+(defun mine-command (command-name &key quietly)
   (let* ((cmd (get-command command-name))
 	 (path (command-pathname command-name))
 	 (mined (or (and path (get-binary-usage path))
-		    (mine-manual command-name))))
+		    (if quietly
+			(without-warning (mine-manual command-name))
+			(mine-manual command-name)))))
     (when mined
       (cond
 	((not cmd)
@@ -458,6 +460,8 @@ a known compression suffix, then the stream is appropriately decompressed."
 	 (error "Command must be external or undefined to mine it."))))))
 
 (defun mine-command-help ()
+  ;; This is probably a bad idea. If we ever implement it, it should be an
+  ;; option which is off by default.
   )
 
 (defun mine ()

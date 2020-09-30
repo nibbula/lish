@@ -523,7 +523,8 @@ Uses the first available of:
 				:silent (lish-autoload-quietly *shell*))
 	     (get-command command-name))
 	;;(and (load-external-command command) (get-command command))
-	(and (mine-command command-name) (get-command command-name)))))))
+	(and (mine-command command-name :quietly t)
+	     (get-command command-name)))))))
 
 (defun first-command-of (word)
   (cond
@@ -555,6 +556,9 @@ package, and boolean indicating if the package was with the external notation."
     (multiple-value-setq (package external)
       (completion::find-back-pack string word-start))
     (values type word package external)))
+
+;; @@@ consider consolidation of this and what's in colorize-expr
+;; @@@ or just wait until parse
 
 (defun guess-word-before (string position)
   "Try to guess what the word before POSTION in STRING is.
