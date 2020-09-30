@@ -206,10 +206,18 @@ strings."
 
 ;; Main or something.
 
-(if (> (length (lisp-args)) 1)
-    (build (intern (string-upcase (second (lisp-args)))))
-    (build *default-target*))
+(let ((env-target (sf-getenv "TARGET")))
+  (when (and env-target (not (zerop (length env-target))))
+    (setf *default-target* (intern (string-upcase env-target)))))
 
-(exit-lisp :code *exit-code*)
+(let (pos)
+  (if (and (> (length (lisp-args)) 1)
+	   (setf pos (position "--" (lisp-args) :test #'equal)))
+      (build (intern (string-upcase (nth (1+ pos) (lisp-args)))))
+      (build *default-target*)))
+
+(when (not (sf-getenv "NO_EXIT"))
+  (exit-lisp :code *exit-code*))
+
 
 ;; EOF
