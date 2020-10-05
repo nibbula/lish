@@ -1,6 +1,6 @@
-;;
-;; shell.lisp - The shell object and it's options.
-;;
+;;;
+;;; shell.lisp - The shell object and it's options.
+;;;
 
 (in-package :lish)
 

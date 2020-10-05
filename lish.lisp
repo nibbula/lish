@@ -1070,9 +1070,21 @@ into a shell-expr with shell-read."
 		(:symbol (symbol-help))
 		(:command (command-help))
 		(:command-or-symbol
-		 (if (get-command word)
-		     (command-help)
-		     (symbol-help)))
+		 (case (command-type word)
+		   ((:builtin-commandd :shell-command :command)
+		    (command-help))
+		   (:external-command
+		    ;; @@@ if it has a man page show it
+		    ;; otherwise do our fake command help
+		    (command-help))
+		   (:file
+		    ;; @@@ show a man page if it exists
+		    )
+		   (:directory
+		    ;; @@@ like maybe ls -l or something, but that violates
+		    ;; dependencies :(
+		    )
+		   (t (symbol-help))))
 		(otherwise
 		 ;; (inator:message editor "Sorry. No help for a ~s." type)
 		 (error "FUCKALL")
@@ -1129,17 +1141,30 @@ into a shell-expr with shell-read."
     (t
      :unspecified)))
 
+;; *accepts*
+;;   accept-type
+;; where
+;;   accept-type =>
+;;     keyword
+;;     or
+
+;; Fake types are keywords.
+;; Fake types are for things that would be hard to specify with a type
 (defun accepts (first-type &rest other-types)
   "Return true if *ACCEPTS* matches or is a subtype of one of the given types.
 This should be used rather than directly testing *ACCEPTS*."
-  (let ((types (cons first-type other-types)))
+  ;; (let ((types (cons first-type other-types)))
+  (let ((types (append (list first-type) other-types)))
     (labels ((is-like (x type)
 	       (or (equal x type)
 		   #+clisp (ignore-errors (subtypep x type))
 		   #-clisp (subtypep x type)
 		   )))
       (typecase *accepts*
-	(sequence (some (_ (position _ *accepts* :test #'is-like)) types))
+	(cons
+	 (if (keywordp (car *accepts*))
+	     (some (_ (position _ *accepts* :test #'is-like)) types)
+	     (some (_ (is-like *accepts* _)) types)))
 	(keyword  (some (_ (eq       _ *accepts*)) types))
 	(t        (some (_ (is-like  _ *accepts*)) types))))))
 
@@ -2058,17 +2083,19 @@ suspend itself."
   ;; 	  (invoke-debugger c)
   ;; 	  (format t "Loading history failed. Turn on debug if you want.~%~a~%"
   ;; 		  c)))))
-  (handler-bind
-      ((serious-condition
-	#'(lambda (c)
-	    (if (lish-debug *shell*)
-		(invoke-debugger c)
-		(format t "Loading history failed. Turn on debug if you ~
-			   want.~%~a~%"
-			c)))))
-    (history-store-load (lish-history-store sh) (history-style sh)
-			:update update)))
-
+  (with-simple-restart (continue
+			"Keep going even though history failed to load.")
+    (handler-bind
+	((serious-condition
+	  #'(lambda (c)
+	      (if (lish-debug *shell*)
+		  (invoke-debugger c)
+		  (progn
+		    (format t "Loading history failed. Turn on debug if you ~
+                             want.~%~a~%" c)
+		    (continue))))))
+      (history-store-load (lish-history-store sh) (history-style sh)
+			  :update update))))
 
 (defun init-history (sh)
   "Create the history store and load the history from it."

@@ -1,6 +1,6 @@
-;;
-;; commands.lisp - How Lish does commands
-;;
+;;;
+;;; commands.lisp - How Lish does commands
+;;;
 
 ;; This defines the structure of commands and specification of command
 ;; arguments. Lish commands have thier own style of arguments, which are
