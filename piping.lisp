@@ -33,9 +33,9 @@ spaces between every argument."
 	  (princ a str))))))
 
 (defun possibly-read (expr)
-  (if (shell-expr-p expr)
-      expr
-      (shell-read expr)))
+  (typecase expr
+    (string (shell-read expr))
+    (t expr)))
 
 #|
 ;; This needs so much work.
