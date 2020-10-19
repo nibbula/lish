@@ -1,0 +1,85 @@
+Lish Dependencies                                        -*- org -*-
+
+* Dependencies
+** A Common Lisp implementation:
+   For example, one of:
+*** sbcl (recommended)
+    http://sbcl.org/
+*** ccl
+    https://ccl.clozure.com/
+*** ecl
+    https://common-lisp.net/project/ecl/
+** Quicklisp
+   https://www.quicklisp.org/beta/
+** Lisp software not in quicklisp:
+*** https://github.com/nibbula/yew.git
+**** dlib
+**** stretchy
+**** char-util
+**** tiny-repl
+**** keymap
+**** collections
+**** ochar
+**** ostring
+**** color
+**** fatchar
+**** fatchar-io
+**** glob
+**** table
+**** table-print
+**** dlib-misc
+**** dl-list
+**** reader-ext
+**** syntax
+**** syntax-lisp
+**** theme
+**** style
+**** terminal-table
+**** grout
+**** completion
+**** unipose
+**** inator
+**** fui
+**** terminal-inator
+**** dlib-interactive
+**** magic
+**** <maybe others ...>
+*** https://github.com/nibbula/opsys.git
+**** opsys
+**** opsys-base
+**** opsys-<system>
+*** https://github.com/nibbula/terminal.git
+**** terminal
+**** terminal-crunch
+**** terminal-ansi
+**** terminal-dumb
+*** https://github.com/nibbula/deblarg.git
+**** deblarg
+*** https://github.com/nibbula/rl.git
+**** rl
+*** https://github.com/nibbula/lish.git
+**** lish
+** Lisp packages in quicklisp, are probably:
+   - asdf
+   - uiop
+   - trivial-features
+   - babel
+   - alexandria
+   - cffi
+   - trivial-gray-streams
+   - cl-ppcre
+   - eclector
+   - closer-mop
+   - acclimation
+   - cl-unicode
+   - flexi-streams
+   - chipz
+   - bordeaux-threads
+
+   Once lish is loaded you can see the real dependencies with the view-lisp
+   command.
+
+* COMMENT MeTaDaTa
+creation date: [2020-10-19 06:12:31]
+creator: "Nibby Nebbulous" <nibbula@gmail.com>
+tags: lish build dependencies

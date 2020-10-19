@@ -1,30 +1,25 @@
-*¡NOTA BENE! / WARNING*
-
-Lish is full of bugs! Don't use it near any data that you don't want to risk
-losing! Since it's a shell, it's very good at recursively wreaking havoc upon
-files and commands. You may quite regularly use software highly dubious
-quality, but a shell is perhaps far more dangerous than most software. Lish
-is also very incomplete. It will certainly change in incompatible ways. Unless
-you intrepidly want to experiment, or are interested in helping turn it into
-something stable and tested, I recommend not using it yet!
+Lish is a command line shell written in Common Lisp. It is a non-POSIX shell,
+and can also be used a Lisp REPL.
 
 * Installing
-  Pick one of the following options to install Lish:
-
 ** Install a binary
 *** Pick one from the binary release page. [LINK NEEDED]
 *** Put it somewhere in your path.
 ** Build from source
-   : git clone --recurse-submodules https://github.com/nibbula/yew.git
+   This only works on unix-like systems.
+   : git clone https://github.com/nibbula/yew.git
    : cd yew/lish
    : sh build.sh
+*** For Windows
+    Building is quite possible, but we don't currently have a simple build
+    solution. (see windows.org)
 ** Loading without the build script
 *** Loading
 **** Install quicklisp from https://quicklisp.org if you don't already have it.
-**** Install lish & dependencies into local-projects
+**** Install lish & some dependencies into local-projects
 #+BEGIN_SRC shell
    cd ~/quicklisp/local-projects
-   git clone --recurse-submodules https://github.com/nibbula/yew.git
+   git clone https://github.com/nibbula/yew.git
 #+END_SRC shell
 
 **** In your Lisp, use quicklisp to load Lish:
@@ -33,92 +28,25 @@ something stable and tested, I recommend not using it yet!
 #+END_SRC
 
 **** Dependencies
-***** A Common Lisp implementation:
-****** sbcl (recommended)
-****** ccl
-****** ecl
-****** cmucl
-****** clisp
-***** Quicklisp
-***** Lisp software not in quicklisp:
-****** https://github.com/nibbula/yew.git
-******* dlib
-******* stretchy
-******* char-util
-******* tiny-repl
-******* keymap
-******* collections
-******* ochar
-******* ostring
-******* color
-******* fatchar
-******* fatchar-io
-******* glob
-******* table
-******* table-print
-******* dlib-misc
-******* dl-list
-******* reader-ext
-******* syntax
-******* syntax-lisp
-******* theme
-******* style
-******* terminal-table
-******* grout
-******* completion
-******* unipose
-******* inator
-******* fui
-******* terminal-inator
-******* dlib-interactive
-******* magic
-****** https://github.com/nibbula/opsys.git
-******* opsys
-******* opsys-base
-******* opsys-<system>
-****** https://github.com/nibbula/terminal.git
-******* terminal
-******* terminal-crunch
-******* terminal-ansi
-******* terminal-dumb
-****** https://github.com/nibbula/deblarg.git
-******* deblarg
-****** https://github.com/nibbula/rl.git
-******* rl
-****** https://github.com/nibbula/lish.git
-******* lish
-***** Lisp packages in quicklisp, are probably:
-      - asdf
-      - uiop
-      - trivial-features
-      - babel
-      - alexandria
-      - cffi
-      - trivial-gray-streams
-      - cl-ppcre
-      - eclector
-      - closer-mop
-      - acclimation
-      - cl-unicode
-      - flexi-streams
-      - chipz
-      - bordeaux-threads
+     see dependencies.org
 *** Building an executable
+    The easiest way is to use the build script. But if you don't want to,
+    another way is:
 
 #+BEGIN_SRC lisp
   (lish:make-standlone)
 #+END_SRC
 
-  This should make an executable named "lish" in your current directory.
-  Put it wherevere you'd like.
+    This should make an executable named "lish" in your current directory.
+    Put it wherevere you'd like.
 
-  Alternatively, you should be able to use:
+    Alternatively, you should be able to use:
 #+BEGIN_SRC lisp
   (asdf:operate 'asdf:program-op :lish)
 #+END_SRC
 
-  Which will likely put an executable in whatever
-  `(asdf:apply-output-translations "lish")` returns.
+    Which will likely put an executable in whatever
+    `(asdf:apply-output-translations "lish")` returns.
 
 * Running
   From another shell:
@@ -152,3 +80,10 @@ something stable and tested, I recommend not using it yet!
 **** Character picker
 **** List choosing
 **** Table broweer
+
+
+* *WARNING*
+
+Lish is full of bugs! It has not been tested. It will probably delete your
+files. Lish is also very incomplete. It will certainly change in incompatible
+ways. It should only be used for experimental purposes.

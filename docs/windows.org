@@ -1,0 +1,41 @@
+Building Lish on MS Windows                                        -*- org -*-
+
+* Problems
+  A build.bat based on build.sh would not be hard, since all it needs to do is
+  run a Lisp with appropriate arguments, but opsys on Windows requires ‘call
+  by value’ for structs due to the windows API, and building a CFFI on Windows
+  that can support that, seems to require a C compiler and an appropriately
+  compiled libffi.dll, which generally requires cygwin. Arranging this seems
+  far-fetched for a humble build.bat.
+
+  How to really remedy this?
+
+  1. Make CFFI not need libffi to do call by value on all† implementations.
+  1a. Make all† implementations support call by value C FFI natively on
+      all‡ platforms.
+  2. Make CFFI not have to use a C compiler to grovel at all.
+
+  † all implementations really means sbcl
+  ‡ just windows actually
+
+* Possible steps on how to build
+  @@@@ FINISH ME
+** install cygwin
+   https://www.cygwin.com/
+** install mingw-gcc
+** install libffi-dev
+** copy libffi*.dll to c:\Program FIles\Steel Bank Common Lisp\<version>\bin
+** run sbcl with options to build things that need cffi groveling
+** run sbcl with options build lish
+** run with options to run lish
+* Other possibilities
+  It seems like it should be possible to build using LFW and a mingw toolchain.
+  I haven't tried it.
+* Visual Studio
+  There must be a way. I started working on it but gave up.
+  It seems like you would need an sbcl compiled with VS.
+
+* COMMENT MeTaDaTa
+creation date: [2020-10-19 05:37:45]
+creator: "Nibby Nebbulous" <nibbula@gmail.com>
+tags: lish build windows 
