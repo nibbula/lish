@@ -1487,7 +1487,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
    (debug boolean :short-arg #\d :help "Use the debugging optimzation profile.")
    (speed boolean :short-arg #\s :help "Use the speed optimzation profile.")
    (optimization list :short-arg #\O
-    :help "A list optimize declaration qualities, e.g. '((speed 3) (safety 2))
+    :help "A list of optimize declaration qualities, e.g. '((speed 3) (safety 2))
 Note that this option overrides the -d and -s options."))
   "Load a system."
   ;; We could theoretically use asdf:*compile-file-warnings-behaviour*
