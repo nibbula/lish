@@ -2464,17 +2464,25 @@ by spaces."
       ;; )
     (nos:exit-lisp)))
 
-(defun make-standalone (&optional (name "lish"))
+(defun make-standalone (&key (name "lish") smaller)
   "Make a lish executable."
   ;; (update-version)
-  #+sbcl
-  (progn
-    ;; So that the saved image can start with a fresh external format.
-    (setf *saved-default-external-format*
-	  sb-impl::*default-external-format*)
-    ;; In case we were built with the debugger turned off.
-    (sb-ext:enable-debugger))
-  (save-image-and-exit name #'lish:shell-toplevel))
+  (let (options)
+    #+sbcl
+    (progn
+      ;; So that the saved image can start with a fresh external format.
+      (setf *saved-default-external-format*
+	    sb-impl::*default-external-format*)
+      ;; In case we were built with the debugger turned off.
+      ;; @@@ Maybe this should be in the top level function??
+      (sb-ext:enable-debugger)
+      ;; Turn on core compression if it's available
+      (when (has-feature :sb-core-compression)
+	(setf options '(:compression t))))
+    ;; Make sure ASDF is cleared.
+    (asdf:clear-configuration)
+    (apply #'save-image-and-exit name :initial-function #'lish:shell-toplevel
+	   options)))
 
 ;; So we can conditionalize adding of lish commands in other packages.
 (d-add-feature :lish)
