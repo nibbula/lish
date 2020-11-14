@@ -135,7 +135,7 @@ strings."
 		(ql:quickload :tiny-repl :verbose nil) ~
 		(ql:quickload :deblarg :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
-		(lish:make-standalone)"))
+		(lish:make-standalone :smaller t)"))
     (increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
@@ -150,7 +150,7 @@ strings."
 		(ql:quickload :deblarg :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
 		(load \"build/fully-loaded.lisp\" :verbose nil) ~
-		(lish:make-standalone)"))
+		(lish:make-standalone :smaller t)"))
     (increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
