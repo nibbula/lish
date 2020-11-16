@@ -1070,7 +1070,7 @@ into a shell-expr with shell-read."
 		(:symbol (symbol-help))
 		(:command (command-help))
 		(:command-or-symbol
-		 (case (command-type word)
+		 (case (command-type *shell* word)
 		   ((:builtin-commandd :shell-command :command)
 		    (command-help))
 		   (:external-command
@@ -2464,7 +2464,7 @@ by spaces."
       ;; )
     (nos:exit-lisp)))
 
-(defun make-standalone (&key (name "lish") smaller)
+(defun make-standalone (&key (name "lish") (smaller t))
   "Make a lish executable."
   ;; (update-version)
   (let (options)
@@ -2477,7 +2477,7 @@ by spaces."
       ;; @@@ Maybe this should be in the top level function??
       (sb-ext:enable-debugger)
       ;; Turn on core compression if it's available
-      (when (has-feature :sb-core-compression)
+      (when (and smaller (has-feature :sb-core-compression))
 	(setf options '(:compression t))))
     ;; Make sure ASDF is cleared.
     (asdf:clear-configuration)
