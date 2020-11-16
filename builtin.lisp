@@ -401,8 +401,14 @@ Commands can be:
       (when (and (command-accepts cmd)
 		 (not (eq (command-accepts cmd) :unspecified)))
 	(grout-format "~&Accepts: ~a~%" (command-accepts cmd)))
-      (when (and (not (command-built-in-p cmd)) (command-loaded-from cmd))
-	(grout-format "Loaded from: ~a~%" (command-loaded-from cmd)))
+      (typecase cmd
+	(command
+	 (when (and (not (command-built-in-p cmd))
+		    (command-loaded-from cmd))
+	   (grout-format "Loaded from: ~a~%" (command-loaded-from cmd))))
+	;; (autoloaded-command
+	;;  (grout-format "Load from: ~a~%" (command-load-from cmd)))
+	)
       table)))
 
 ;; For use by other things. Like my "doc" command.
@@ -1610,6 +1616,15 @@ option, it is as if --push was given."
     :help "System designator to load."))
   "QuickLoad a system."
   (ql:quickload system))
+
+(defmethod documentation ((b autoloaded-command) (doctype (eql 'function)))
+  "Return the documentation string for the given shell command."
+  (with-output-to-string (str)
+    (format str "Auto-loaded from ~a" (command-load-from b))
+    (when (documentation (command-function-name (command-name b)) 'function)
+      (format str "~%~a" (documentation
+			  (command-function-name (command-name b))
+			  'function)))))
 
 (define-builtin-arg-type autoload-place (arg-keyword) ;(argument)
   "Where to load a command from either a keyword, a string, or a pathname."
