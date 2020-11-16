@@ -604,11 +604,11 @@ Sorry you'll have to figure it out yourself."
 		(word (and shell-word (word-word shell-word)))
 		(word-num (word-word (shell-word-num exp position)))
 		(first-word (word-word (first-word-in-expr exp position)))
-		 word-pos)
+		#| word-pos |#)
 	   ;; word is the text of the word
 	   ;; word-pos is the relative position in the word
-	   (when shell-word
-	     (setf word-pos (- position (shell-word-start shell-word))))
+	   ;; (when shell-word
+	   ;;   (setf word-pos (- position (shell-word-start shell-word))))
 	   (cond
 	     ((or (and (not word) (zerop position))
 		  (start-of-a-compound-p exp position))
