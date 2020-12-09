@@ -1548,13 +1548,13 @@ probably fail, but perhaps in similar way to other shells."
 	((stringp cmd)
 	 ;; If we can find a command in the path, try it first.
 	 (cond
+	   ((get-command-path cmd)
+	    (sys-cmd))
 	   ((and (lish-auto-cd sh) (directory-p cmd))
 	    (when (> (length (shell-expr-words expr)) 1)
 	      (cerror "Ignore the rest of the line."
 		      "Arguments aren't allowed after the auto-cd directory."))
 	    (change-directory cmd))
-	   ((get-command-path cmd)
-	    (sys-cmd))
 	   (t ;; Otherwise try a parenless Lisp line.
 	     (multiple-value-bind (symb pos)
 		 (read-from-string (shell-expr-line expr) nil nil)
