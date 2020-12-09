@@ -1467,7 +1467,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
     (asdf:oos 'asdf:load-op symbol :verbose verbose :force force)))
 
 (defparameter *debug-profile*
-  '((speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0))
+  '((speed 0) (safety 3) (debug 3) (space 1) (compilation-speed 0))
   "Optimization settings for debugging.")
 
 (defparameter *speed-profile*
@@ -1475,7 +1475,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
   "Optimization settings for execution speed.")
 
 (defparameter *speed-debug-profile*
-  '((speed 3) (safety 0) (debug 3) (space 0) (compilation-speed 0))
+  '((speed 3) (safety 0) (debug 3) (space 1) (compilation-speed 0))
   "Optimization settings for execution speed and debugging.")
 
 (defbuiltin l
