@@ -27,8 +27,13 @@
 (load "build/load-quicklisp.lisp" :verbose nil)
 
 (push (truename "../")          asdf:*central-registry*)
+(push (truename "../lib/")      asdf:*central-registry*)
 (push (truename "../opsys/")    asdf:*central-registry*)
+(push (truename "../io/")       asdf:*central-registry*)
+(push (truename "../iof/")      asdf:*central-registry*)
 (push (truename "../terminal/") asdf:*central-registry*)
+(push (truename "../inator/")   asdf:*central-registry*)
+(push (truename "../syntax/")   asdf:*central-registry*)
 (push (truename "../rl/")       asdf:*central-registry*)
 (push (truename "../deblarg/")  asdf:*central-registry*)
 (push (truename "../unicode/")  asdf:*central-registry*)
