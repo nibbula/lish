@@ -13,8 +13,8 @@
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 1)
-		   (compilation-speed 0)))
+;; (declaim (optimize (speed 0) (safety 3) (debug 3) (space 1)
+;; 		   (compilation-speed 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Command definitions
@@ -1466,16 +1466,23 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	     (intern (string-upcase (princ-to-string system)) :keyword))))
     (asdf:oos 'asdf:load-op symbol :verbose verbose :force force)))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *default-quality-number* 1
+    "The default optimization quality number."))
+
 (defparameter *debug-profile*
-  '((speed 0) (safety 3) (debug 3) (space 1) (compilation-speed 0))
+  `((speed ,*default-quality-number*)
+    (safety 3) (debug 3)
+    (space ,*default-quality-number*)
+    (compilation-speed ,*default-quality-number*))
   "Optimization settings for debugging.")
 
 (defparameter *speed-profile*
-  '((speed 3) (safety 2) (debug 0) (space 2) (compilation-speed 0))
+  `((speed 3) (safety 2) (debug 0) (space 2) (compilation-speed 0))
   "Optimization settings for execution speed.")
 
 (defparameter *speed-debug-profile*
-  '((speed 3) (safety 0) (debug 3) (space 1) (compilation-speed 0))
+  `((speed 3) (safety 0) (debug 3) (space 1) (compilation-speed 0))
   "Optimization settings for execution speed and debugging.")
 
 (defbuiltin l
