@@ -208,7 +208,7 @@ from stack."
 
 (defparameter *help-subjects*
   '("commands" "builtins" "external" "editor" "keys" "options" "syntax"
-    "startup")
+    "startup" "differences")
   "Subjects we have help about.")
 
 (defun help-choices ()
@@ -243,13 +243,14 @@ Lish version ~a help:
 Further help is available on these subjects:
 
   help builtins       Show help on built-in commands.
-  help commands       Show help on added commands.
-  help external       Show help on external commands.
   help editor         Show help on the line editor.
   help keys           Show help on key bindings.
   help options	      Show help on shell options.
   help syntax         Show help on shell syntax.
   help startup        Show help on what happens when the shell starts.
+  help differences    Show help on differences from other shells.
+  help commands       Show help on added commands.
+  help external       Show help on external commands.
   help <command>      Show help for the command.
 ")
 
@@ -257,7 +258,7 @@ Further help is available on these subjects:
 "You can use some Emacs-like commands to edit the command line.
 
 Some notable keys are:
- <Tab>        Try to complete the word in front of the cursor.
+ <Tab>        Try to complete the word in front of the cursor. Twice for more.
  ?            Show what input is expected. List possibilities.
  <Control-D>  Quit, when on an empty line, or delete the following character.
  <Control-P>  Previous history line. Also the <Up Arrow> key.
@@ -318,6 +319,29 @@ Commands can be:
     documentation for RL for details.
   - Evaluate the *enter-shell-hook* functions.
     The current value is: ~a.~%~%")
+
+(defparameter *differences-help*
+  "Lish is very different from a POSIX shell. The most notable differences are:
+
+- Parentheses switch to Lisp syntax, and don't mean run in sub-shell.
+  Lisp inside parentheses is evaluated and substituted in the current line.
+- String quoting is done only with double quote \". Single quote ' and back
+  quote `, are not special to avoid confusion with Lisp.
+- The prefix VAR=value isn't supported. Use the ‘env’ command instead.
+- Redirection syntax is different, e.g \"2>&1\" doesn't work.
+- Commands can be Lish commands and Lisp functions, as well as executables
+  in your PATH. Lish commands can be searched for and automatically loaded
+  from ASDF places, manipulated by the ‘ldirs’ command.
+- Most scripting related shell commands are missing, e.g. if, test, case.
+  Scripting parameter expansion like $1 $* ${} are missing. Use Lisp instead.
+- Shell expansions are different. Many expansions can be done by Lish functions
+  starting with ! , such as (!_ \"ss\") expands to a list of strings of the
+  lines of output, (!? \"grep fuse /proc/filesystems\") returns a boolean status.
+  Comma can be used to substitute a Lisp value, e.g. \"echo ,*package*\".
+- Comments start with ; not #
+
+For more detail see the section ‘Differences from POSIX shells’ in docs/doc.org
+")
 
 (defun print-columnar-help (rows)
   ;; (with-input-from-string
@@ -437,10 +461,9 @@ available."
 	  ((eq subject-kw :external)
 	   (format t "Defined external commands:~%")
 	   (print-multiple-command-help (command-list 'external-command)))
-	  ((eq subject-kw :editor)
-	   (format t *editor-help*))
-	  ((eq subject-kw :syntax)
-	   (format t *syntax-help*))
+	  ((eq subject-kw :editor) (format t *editor-help*))
+	  ((eq subject-kw :syntax) (format t *syntax-help*))
+	  ((eq subject-kw :differences) (format t *differences-help*))
 	  ((eq subject-kw :options)
 	   (format t "~
 Options can be examined and changed with the ‘opt’ command.~%~
