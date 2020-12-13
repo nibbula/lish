@@ -23,7 +23,7 @@ Lish Documentation                                        -*- org -*-
 **** Pick one from the binary release page. [LINK NEEDED]
 **** Put it somewhere in your path.
 *** Building an executable from source
-    : git clone --recurse-submodules https://github.com/nibbula/yew.git
+    : git clone https://github.com/nibbula/yew.git
     : cd yew/lish
     : sh build.sh
 
