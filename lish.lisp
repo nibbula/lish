@@ -1333,7 +1333,8 @@ CALL-PARENLESS."
 		    (call-parenless thing parenless context))
 		   (t
 		    (maybe-do-in-background (bg thing args)
-		      (eval thing))))))
+		      (let ((- thing))
+			(eval thing)))))))
 	(if out-pipe
 	    (let ((out-str (make-stretchy-string 20)))
 	      (values
@@ -1674,8 +1675,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		(multiple-value-bind (result-values output show-p)
 		    (call-thing expr nil *context*)
 		  (setf *output* (car result-values))
-		  (values result-values output show-p))
-		))
+		  (values result-values output show-p))))
 	     ((consp expr)
 	      (case (command-type shell (string-downcase (car expr)))
 		((:command :file)
@@ -1907,8 +1907,7 @@ suspend itself."
   prefix-string
   this-command
   last-command
-  ;; (error-count 0)
-  )
+  (error-count 0))
 
 (cffi:defcallback sigint-handler :void ((signal-number :int))
   (declare (ignore signal-number))
@@ -2125,7 +2124,6 @@ suspend itself."
     (history-store-done (lish-history-store sh) (history-style sh))))
 
 (defmacro with-error-handling ((state) &body body)
-  #-sbcl (declare (ignore state))
   (with-names (results just-print-the-error condition)
     `(let* (,condition
 	    (,results
@@ -2147,11 +2145,6 @@ suspend itself."
 		    ;; Normal error handling
 		    (serious-condition
 		     #'(lambda (c)
-			 ;; This should be the purview of the debugger.
-			 ;; (incf (read-state-error-count ,state))
-			 ;; (when (> (read-state-error-count ,state) 10)
-			 ;;   (format t "Too many errors!~%")
-			 ;;   (break))
 			 (if (lish-debug *shell*)
 			     (invoke-debugger c)
 			     ;; We can't just print the error here because
@@ -2166,6 +2159,14 @@ suspend itself."
 		  ,@body)))))
        (if (eq (car ,results) ',just-print-the-error)
 	   (progn
+	     ;; We can't leave this error counting to the debugger, since
+	     ;; we never get into it when debugging is off.
+	     (incf (read-state-error-count ,state))
+	     (when (> (read-state-error-count ,state) 10)
+	       (format t "Too many errors!~%")
+	       ;; This will mostly happen if we get an error in the shell or
+	       ;; line editor code. Errors from commands probably won't recur.
+	       (break))
 	     (format t "~&~a~&" ,condition)
 	     (finish-output)			; semi-dubious
 	     (invoke-restart 'abort))
@@ -2363,8 +2364,7 @@ Arguments:
 		       (progn
 			 (setf eof-count 0)
 			 (lish-eval sh expr state)))
-		   ;; (setf (read-state-error-count state) 0)
-		   )
+		   (setf (read-state-error-count state) 0))
 		 (abort ()
 		   :report
 		   (lambda (stream)
