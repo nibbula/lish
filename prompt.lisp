@@ -25,39 +25,39 @@ LISH_LEVEL environment variable.")
 (defun format-prompt (sh prompt &optional (escape-char #\%))
   "Return the prompt string with bash-like formatting character replacements.
 So far we support:
-%%      A percent.
-%a      #\\bell
-%e      #\\escape
-%n      #\\newline
-%r      #\\return
-%NNN    The character whose ASCII code is the octal value NNN.
-%s      The name of the shell, which is usually “Lish”.
-%v      Shell version.
-%V      Even more shell version.
-%u      User name.
-%h      Host name truncated at the first dot.
-%H      Host name.
-%w      Working directory, tildified.
-%W      The basename of `$PWD', tildified.
-%$      If the effective UID is 0, `#', otherwise `$'.
-%i      The lisp implementation nickname.
-%p      The shortest nickname of *lish-user-package*.
-%P      The current value of *lish-user-package*.
-%d      <3 char weekday> <3 char month name> <date>.
-%t      24 hour HH:MM:SS
-%T      12 hour HH:MM:SS
-%@      The time, in 12-hour am/pm format.
-%A      The time, in 24-hour HH:MM format.
-Not implemented yet:
-%!      The history number of this command.
-%#      The command number of this command.
-%[      Start of non-printing characters.
-%]      End of non-printing characters.
-%l      The basename of the shell's terminal device name.
-%D{FORMAT}
-        Some date formated by Unix strftime. Without the FORMAT just put some
-        locale-specific date.
-%j      The number of jobs currently managed by the shell.
+ %%      A percent.
+ %a      #\\bell
+ %e      #\\escape
+ %n      #\\newline
+ %r      #\\return
+ %NNN    The character whose ASCII code is the octal value NNN.
+ %s      The name of the shell, which is usually “Lish”.
+ %v      Shell version.
+ %V      Even more shell version.
+ %u      User name.
+ %h      Host name truncated at the first dot.
+ %H      Host name.
+ %w      Working directory, tildified.
+ %W      The basename of `$PWD', tildified.
+ %$      If the effective UID is 0, `#', otherwise `$'.
+ %i      The lisp implementation nickname.
+ %p      The shortest nickname of *lish-user-package*.
+ %P      The current value of *lish-user-package*.
+ %d      <3 char weekday> <3 char month name> <date>.
+ %t      24 hour HH:MM:SS
+ %T      12 hour HH:MM:SS
+ %@      The time, in 12-hour am/pm format.
+ %A      The time, in 24-hour HH:MM format.
+ Not implemented yet:
+ %!      The history number of this command.
+ %#      The command number of this command.
+ %[      Start of non-printing characters.
+ %]      End of non-printing characters.
+ %l      The basename of the shell's terminal device name.
+ %D{FORMAT}
+         Some date formated by Unix strftime. Without the FORMAT just put some
+         locale-specific date.
+ %j      The number of jobs currently managed by the shell.
 "
   (declare (ignore sh))
   ;;(let ((out (make-stretchy-string 80)))
