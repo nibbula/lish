@@ -20,6 +20,13 @@ LISH_LEVEL environment variable.")
   (replace-subseq (safe-namestring (fixed-homedir)) "~"
 		  (safe-namestring name) :count 1))
 
+(defun last-dot-segment (string)
+  "Return the part of string after the last #\."
+  (let ((pos (oposition #\. string :from-end t)))
+    (if (and pos (< pos (olength string)))
+	(osubseq string (1+ pos))
+	string)))
+
 ;; This is mostly for bash compatibility.
 
 (defun format-prompt (sh prompt &optional (escape-char #\%))
@@ -97,7 +104,9 @@ So far we support:
 				       *lisp-implementation-nickname*) str))
 		   (#\p (write-string
 			 (s+ (and *lish-user-package*
-				  (shortest-package-nick *lish-user-package*)))
+				   (last-dot-segment
+				    (shortest-package-nick
+				     *lish-user-package*))))
 			 str))
 		   (#\P (write-string
 			 (s+ (and *lish-user-package*
