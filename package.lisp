@@ -37,6 +37,8 @@ without any particular knowledge of it's Lisp programming features.
    #:*output*
    #:*input*
    #:*lishrc*
+   #:*version*
+   #:*major-version* #:*minor-version* #:*build-version*
    ;; hooks @@@ maybe should be made into options?
    #:*pre-command-hook*
    #:*post-command-hook*
