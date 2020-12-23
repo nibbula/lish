@@ -9,10 +9,10 @@ https://www.quicklisp.org/beta/")
   "QuickLisp is not strictly necessary, but if you don't have it, you will have
 to make sure all the dependencies are availible to be loaded by ASDF.
 
-Since you don't have a QuickLisp installation in ~a,
+Since you don't seem to have a QuickLisp installation in ~/quicklisp,
 we are taking the liberty of installing one for you. I'm sorry.
 
-If you want to build with a custom QuckLisp installation, set the environment
+If you want to build with a custom QuickLisp installation, set the environment
 variable LISH_QUICKLISP to the directory where it's installed.
 ")
 
