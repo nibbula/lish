@@ -25,7 +25,7 @@ try_to_figure_flags()
 {
   case "$LISP" in
     *sbcl*)  OUR_PLAIN_LISP_FLAGS="--no-userinit" ;
-	     BATCH_ARGS="--noinform --noprint --disable-debugger"
+	     BATCH_ARGS="--noinform --noprint --disable-debugger --no-sysinit"
 	     ;;
     *ccl*)   OUR_PLAIN_LISP_FLAGS="--no-init"     ; BATCH_ARGS="" ;;
     *clisp*) OUR_PLAIN_LISP_FLAGS="-norc"         ; BATCH_ARGS="" ;;
@@ -62,11 +62,12 @@ fail()
 }
 
 try_to_figure_flags
-PLAIN_LISP_FLAGS=${PLAIN_LISP_FLAGS:=$OUR_PLAIN_LISP_FLAGS}
+export LISH_PLAIN_FLAGS="${LISH_PLAIN_FLAGS:=$OUR_PLAIN_LISP_FLAGS}"
+export LISH_FLAGS="${BATCH_ARGS}"
 
-echo "[Using ${LISP} ${BATCH_ARGS} ${PLAIN_LISP_FLAGS}]"
+echo "[Using ${LISP} ${LISH_FLAGS} ${LISH_PLAIN_FLAGS}]"
 
 echo '(load "build/build-lish.lisp")' |
-  $LISP $BATCH_ARGS $PLAIN_LISP_FLAGS "$@" || fail
+  $LISP $LISH_FLAGS $LISH_PLAIN_FLAGS "$@" || fail
 
 exit 0

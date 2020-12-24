@@ -47,33 +47,35 @@ strings."
 		"Failed"))
     (setf *exit-code* exit-code)))
 
+(defun split (c string)
+  "Simple low-budget split-sequence."
+  (let ((start 0) end result)
+    (loop :while (and (< start (length string))
+		      (setf end (position c string :start start)))
+       :do
+       (push (subseq string start end) result)
+       (setf start (1+ end)))
+    (push (subseq string start) result)
+    (nreverse result)))
+
 ;; Very low-budget, unfancy, and brittle.
 (defun increment-build-version (file)
   "Increment the last component of the dotted version string in FILE."
-  (flet ((split (string c)
-	   (let ((start 0) end result)
-	     (loop :while (and (< start (length string))
-			       (setf end (position c string :start start)))
-		:do
-		(push (subseq string start end) result)
-		(setf start (1+ end)))
-	     (push (subseq string start) result)
-	     (nreverse result))))
-    (format t "increment-build-version ~s~%" file)
-    (let* ((vers (uiop:read-file-form file))
-	   (vers-nums (mapcar (lambda (x)
-				(parse-integer x :junk-allowed t))
-			      (split vers #\.)))
-	   (new-vers (format nil "~a.~a.~a" (first vers-nums)
-			     (second vers-nums)
-			     (1+ (third vers-nums)))))
-      (when (not (every #'integerp vers-nums))
-	(cerror "Ok, whatever. Don't increment the version then."
-		"The version number incrementing seems to have failed.")
-	(return-from increment-build-version nil))
-      (with-open-file (stream file :direction :output :if-exists :overwrite)
-	(write new-vers :stream stream)
-	(terpri stream)))))
+  (format t "increment-build-version ~s~%" file)
+  (let* ((vers (uiop:read-file-form file))
+	 (vers-nums (mapcar (lambda (x)
+			      (parse-integer x :junk-allowed t))
+			    (split #\. vers)))
+	 (new-vers (format nil "~a.~a.~a" (first vers-nums)
+			   (second vers-nums)
+			   (1+ (third vers-nums)))))
+    (when (not (every #'integerp vers-nums))
+      (cerror "Ok, whatever. Don't increment the version then."
+	      "The version number incrementing seems to have failed.")
+      (return-from increment-build-version nil))
+    (with-open-file (stream file :direction :output :if-exists :overwrite)
+      (write new-vers :stream stream)
+      (terpri stream))))
 
 ;; So, ideally we would increment the build version number only if the build
 ;; succeeds, but that seems like a pain, since we would have to pass the new
@@ -83,7 +85,7 @@ strings."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Build Lishes of various kinds.
 
-(defparameter *default-target* 'lish)
+(defparameter *default-target* 'lishfu)
 (defparameter *targets* '('lish))
 (defparameter *version-file* "version.lisp")
 (defparameter *install-dir* (merge-pathnames "bin" *home*))
@@ -210,6 +212,13 @@ strings."
   (when (and env-target (not (zerop (length env-target))))
     (setf *default-target* (intern (string-upcase env-target)))))
 
+(flet ((env-or (env default-value)
+	 (let ((result (sf-getenv env)))
+	   (or (and result (split #\space result))
+	       default-value))))
+  (setf *lisp-flags*       (env-or "LISH_FLAGS" *lisp-flags*)
+	*lisp-plain-flags* (env-or "LISH_PLAIN_FLAGS" *lisp-plain-flags*)))
+
 (let (pos)
   (if (and (> (length (lisp-args)) 1)
 	   (setf pos (position "--" (lisp-args) :test #'equal)))
@@ -218,6 +227,5 @@ strings."
 
 (when (not (sf-getenv "NO_EXIT"))
   (exit-lisp :code *exit-code*))
-
 
 ;; EOF
