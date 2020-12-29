@@ -216,7 +216,7 @@ more information, such as the date."
 
 (defoption history-format choice
   :help "Style of history to use."
-  :choices '("datbase" "text-file")
+  :choices '("database" "text-file")
   ;; :default #.(if (getf rl-config::*config* :use-sqlite)
   ;; 		 :database :text-file))
   :default (if (getf rl-config::*config* :use-sqlite)
