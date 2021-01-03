@@ -33,10 +33,10 @@
 				     "shell"))
      (:file "lish"   	:depends-on ("package" "vars" "args" "jobs" "commands"
 				     "shell" "prompt" "complete"))
-     (:file "builtin"   :depends-on ("package" "vars" "args" "jobs" "commands"
-				     "shell" "complete" "lish"))
      (:file "piping"	:depends-on ("package" "vars" "args" "commands"
 				     "shell" "lish"))
+     (:file "builtin"   :depends-on ("package" "vars" "args" "jobs" "commands"
+				     "shell" "complete" "lish"))
      (:file "mine"      :depends-on ("package" "vars" "args" "commands"
 				     "shell" "lish" "piping")))
     :in-order-to ((asdf:test-op (asdf:test-op :lish-test))))
