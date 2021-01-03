@@ -105,7 +105,7 @@ without any particular knowledge of it's Lisp programming features.
    #:!cd #:!pwd #:!pushd #:!popd #:!dirs #:!suspend #:!history #:!echo
    #:!help #:!alias #:!unalias #:!type #:!exit #:!source #:!debug #:!bind
    #:!times #:!time #:!ulimit #:!wait #:!export #:!format
-   #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash #:!opt
+   #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash #:!opt #:!doc
    ;; convenience / scripting
    #:alias #:set-alias #:unset-alias #:get-alias
    #:command-paths
