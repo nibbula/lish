@@ -8,7 +8,6 @@
 ;; perhaps on another operating system you might not need them.
 ;; For example we might have a set of commands for an internet appliance
 ;; like a router.
-;; @@@ Perhaps we should make some Windows PowerShell commands.
 ;; @@@ Perhaps we should be able to load a built-in ‘personality’.
 
 (in-package :lish)

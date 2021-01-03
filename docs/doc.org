@@ -535,14 +535,13 @@ Lish Documentation                                        -*- org -*-
 ** Pipelines
    Pipelines send the output of one process to the input of another.
 ** Job Control
- Some of the the many differences from other shells.
+   Some of the the many differences from other shells.
 ** Syntax
 ** Shell Commands
 ** Programming
 ** Completion
 ** Prompting
 ** Command Pipelines
-** Job Control
 * COMMENT MeTaDaTa
 creation date: [2018-05-10 16:28:30]
 creator: "Nibby Nebbulous" <nibbula@gmail.com>
