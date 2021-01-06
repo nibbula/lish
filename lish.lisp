@@ -2328,6 +2328,7 @@ Arguments:
 	       :with expr = nil
 	       :and lvl = *lish-level*
 	       :and eof-count = 0
+	       :and retry = nil
 	       :if (lish-exit-flag sh)
 		 :if (confirm-quit)
 		   :return (values-list (lish-exit-values sh))
@@ -2339,7 +2340,9 @@ Arguments:
 	       (restart-case
 		 (with-error-handling (state)
 		   (check-all-job-status sh)
-		   (setf expr (lish-read sh state))
+		   (if retry
+		       (setf retry nil)
+		       (setf expr (lish-read sh state)))
 		   (when (and (eq expr *real-eof-symbol*) (confirm-quit))
 		     (return-from pippy expr))
 		   (if (eq expr *quit-symbol*)
@@ -2371,6 +2374,14 @@ Arguments:
 		     (format stream
 			     "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
 			     (= lvl 0) (/= lvl 0) lvl))
+		   nil)
+		 (retry ()
+		   :report
+		   (lambda (stream)
+		     (format stream
+			     "Retry Lish command ~:[~;TOP ~]level~:[~; ~d~]."
+			     (= lvl 0) (/= lvl 0) lvl))
+		   (setf retry t)
 		   nil))))))))
 	  (stop-job-control saved-sigs))
 	;;(save-command-stats)

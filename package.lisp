@@ -1,6 +1,6 @@
-;;
-;; package.lisp - Package definition for Lish
-;;
+;;;
+;;; package.lisp - Package definition for Lish
+;;;
 
 (defpackage :lish
   (:documentation
@@ -21,6 +21,7 @@ without any particular knowledge of it's Lisp programming features.
 	:terminal :terminal-ansi :rl :fatchar :fatchar-io :collections
 	:ostring :ochar :grout :dtime
 	#+use-regex :regex #-use-regex :cl-ppcre)
+  #+sbcl (:import-from :sb-ext #:retry)
   (:export
    ;; Main entry point(s)
    #:lish
