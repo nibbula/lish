@@ -1375,15 +1375,20 @@ read from."
 		     (shell-expr-words expr)))
 	 (program (car command-line))
 	 (args    (cdr command-line))
-	 (path    (get-command-path program))
+	 (path    #| (get-command-path program) |#)
 	 result result-stream pid status job)
     ;; Since run-program can't throw an error when the program is not found,
     ;; we try to do it here.
-    (when (not path)
-      (signal
-       'unknown-command-error
-       :name 'path
-       :command-string program :format "not found."))
+    (loop
+       :while
+       (not (with-simple-restart (continue "Try the command again.")
+	      (setf path (get-command-path program))
+	      (when (not path)
+		(signal
+		 'unknown-command-error
+		 :name 'path
+		 :command-string program :format "not found."))
+	      (setf path (get-command-path program)))))
 
     ;; This actually should be in the child process:
     ;;(set-default-job-sigs)
@@ -2142,20 +2147,46 @@ suspend itself."
 			      (progn
 				(format t "~%") (finish-output)
 				(invoke-restart (find-restart 'abort))))))
-		    ;; Normal error handling
-		    (serious-condition
-		     #'(lambda (c)
-			 (if (lish-debug *shell*)
-			     (invoke-debugger c)
-			     ;; We can't just print the error here because
-			     ;; the terminal could be screwed up, in a way which
-			     ;; can make the conditional newline fail, so we
-			     ;; throw out, so that hopefully the terminal will
-			     ;; be reset by unwind code and then print and abort.
-			     (progn
-			       (setf ,condition c)
-			       (throw ',just-print-the-error
-				 ',just-print-the-error))))))
+		     (unknown-command-error
+		      #'(lambda (c)
+			  (cond
+			    ((lish-debug *shell*)
+			     (if *unknown-command-hook*
+				 (progn
+				   (with-simple-restart
+				       (continue
+					"~a"
+					(or
+					 (documentation *unknown-command-hook*
+							'function)
+					 "Continue the *unknown-command-hook*"))
+				     (invoke-debugger c))
+				   (funcall *unknown-command-hook*
+					    *shell* c))
+				 (invoke-debugger c)))
+			    (*unknown-command-hook*
+			     (if (funcall *unknown-command-hook* *shell* c)
+				 (continue)
+				 (signal c)))
+			    (t
+			     (setf ,condition c)
+			     (throw ',just-print-the-error
+			       ',just-print-the-error)))))
+		     ;; Normal error handling
+		     (serious-condition
+		      #'(lambda (c)
+			  (if (lish-debug *shell*)
+			      (invoke-debugger c)
+			      ;; We can't just print the error here because the
+			      ;; terminal could be screwed up, in a way which
+			      ;; can make the conditional newline fail, so we
+			      ;; throw out, so that hopefully the terminal will
+			      ;; be reset by unwind code and then print and
+			      ;; abort.
+			      (progn
+				(setf ,condition c)
+				(throw ',just-print-the-error
+				  ',just-print-the-error))))))
 		  ,@body)))))
        (if (eq (car ,results) ',just-print-the-error)
 	   (progn

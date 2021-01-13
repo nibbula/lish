@@ -43,6 +43,7 @@ without any particular knowledge of it's Lisp programming features.
    ;; hooks @@@ maybe should be made into options?
    #:*pre-command-hook*
    #:*post-command-hook*
+   #:*unknown-command-hook*
    #:*enter-shell-hook*
    #:*exit-shell-hook*
    ;; installation

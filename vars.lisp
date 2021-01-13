@@ -1,6 +1,6 @@
-;;
-;; vars.lisp - Variables for Lish
-;;
+;;;
+;;; vars.lisp - Variables for Lish
+;;;
 
 (in-package :lish)
 
@@ -265,6 +265,10 @@ input, output and environment.")
   "Called after a command is run. Arguments are:
  COMMAND-NAME : string   - The name of the command.
  COMMAND-TYPE : keyword  - What kind of command it is.")
+
+(defvar *unknown-command-hook* nil
+  "Called when a command is not found. Arguments are the shell and the
+condition.")
 
 (defvar *enter-shell-hook* nil
   "Called when the shell starts, after loading the *lishrc*.")
