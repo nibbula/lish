@@ -80,31 +80,41 @@ value, an explaination which consists of (tag-symbol datum...)."
 		     in-word nil
 		     in-first-word nil
 		     did-quote nil))
+	     (add-finished-word ()
+	       (push (make-shell-word
+		      :word (if sub-expr sub-expr (copy-seq w))
+		      :eval (and sub-expr t)
+		      :start word-start
+		      :end i
+		      :quoted did-quote)
+		     args))
+	     (try-char ()
+	       ;; As a special hack for reading lisp characters for
+	       ;; parenless lisp evaluation, convert words starting with
+	       ;; #\ to the actual character.
+	       (dbugf 'reader "try-char ~s~%" w)
+	       (let ((char (ignore-errors
+			    (read-from-string
+			     (copy-seq w) nil *continue-symbol*))))
+		 (cond
+		   ((characterp char)
+		    (push (make-shell-word
+			   :word char
+			   :eval nil
+			   :start word-start
+			   :end i
+			   :quoted nil)
+			  args))
+		   (t
+		    (add-finished-word)))))
 	     (finish-word ()
 	       "Finish the current word."
 	       (dbugf 'reader "finish-word ~s ~s~%" w in-word)
 	       (when in-word
 		 (if (and (not sub-expr) (>= (length w) 2)
 			  (char= (aref w 0) #\#) (char= (aref w 1) #\\))
-		     (progn
-		       ;; As a special hack for reading lisp characters for
-		       ;; parenless lisp evaluation, convert words starting with
-		       ;; #\ to the actual character.
-		       (push (make-shell-word
-			      :word (read-from-string
-				     (copy-seq w) nil *continue-symbol*)
-			      :eval nil
-			      :start word-start
-			      :end i
-			      :quoted nil)
-			     args))
-		     (push (make-shell-word
-			    :word (if sub-expr sub-expr (copy-seq w))
-			    :eval (and sub-expr t)
-			    :start word-start
-			    :end i
-			    :quoted did-quote)
-			   args)))
+		     (try-char)
+		     (add-finished-word)))
 	       (reset-word))
 	     ;; (ignore-word ()
 	     ;;   "Ignore the current word."
