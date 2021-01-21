@@ -901,6 +901,7 @@ really want to keep expanding." i)))
     (labels ((write-thing (w)
 	       (typecase w
 		 (string (princ (quotify w) stream))
+		 (character (print w stream))
 		 (cons
 		  (let ((s (compound-tag-string (car w))))
 		    (if (and s (shell-expr-p (second w)))
