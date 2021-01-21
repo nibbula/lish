@@ -24,6 +24,25 @@
   (complete-list str (length str) all
 		 (mapcar (_ (nos:user-info-name _)) (nos:user-list))))
 
+;; @@@ This is completely wateful. We should use dictionary completion as soon
+;; as we finish it.
+
+(defvar *char-names* nil
+  "A terrible way to hog memory.")
+
+(defun char-names ()
+  (or *char-names*
+      (setf *char-names*
+	    (with-spin ()
+	      (loop :for i :from 0 :below char-code-limit
+		 :collect (char-name (code-char i))
+		 :do (when (zerop (mod i 1000)) (spin)))))))
+
+(defun complete-char-name (str all)
+  ;; (complete-string-sequence
+  ;;  str all (mapcar #'(lambda (x) (string (car x))) (nos:environment))))
+  (complete-list (string-upcase str) (length str) all (char-names)))
+
 (defvar *verb-list* nil
   "List of current lish commands. Includes aliases, built-in commands, and ~
 exectuables in the path. Use the \"rehash\" command to update after new ~
@@ -772,6 +791,11 @@ complete, and call the appropriate completion function."
 	     ((consp word)		; (foo)
 	      (dbugf 'completion "junky~%")
 	      (shell-complete-symbol context pos all))
+	     ((characterp word)
+	      (dbugf 'completion "real char~%")
+	      (simple-complete #'complete-char-name
+			       (char-name word)
+			       (+ (shell-word-start shell-word) 2)))
 	     ((not (stringp word))
 	      ;; We don't know how to complete it.
 	      ;; Of course we could implement completion for random typed
@@ -798,6 +822,13 @@ complete, and call the appropriate completion function."
 	      (simple-complete #'complete-user-name
 			       (subseq word 1)
 			       (1+ (shell-word-start shell-word))))
+	     ((and (eql (aref word 0) #\#) ; #\
+		   (> (length word) 1)
+		   (eql (aref word 1) #\\))
+	      (dbugf 'completion "bogo char~%")
+	      (simple-complete #'complete-char-name
+			       (subseq word 2)
+			       (+ (shell-word-start shell-word) 2)))
 	     ;; first word, when not starting with directory chars
 	     ((and
 	       (in-command-position-p exp word-num)
