@@ -35,8 +35,8 @@ without any particular knowledge of it's Lisp programming features.
    #:*dir-list*
    #:*shell-path*
    #:*accepts*
-   #:*output*
-   #:*input*
+   #:*output* #:output
+   #:*input* #:input
    #:*lishrc*
    #:*version*
    #:*major-version* #:*minor-version* #:*build-version*
@@ -66,6 +66,7 @@ without any particular knowledge of it's Lisp programming features.
    #:lish-history-format           #:set-lish-history-format
    #:lish-auto-suggest             #:set-lish-auto-suggest
    #:lish-partial-line-indicator   #:set-lish-partial-line-indicator
+   #:lish-export-pipe-results      #:set-lish-export-pipe-results
    #:make-prompt
    ;; shell object
    #:shell

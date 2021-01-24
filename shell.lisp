@@ -252,6 +252,9 @@ not to indicate partial lines."
   (setf (arg-value (find-option sh 'partial-line-indicator)) value
 	(rl::partial-line-indicator (lish-editor sh)) value))
 
+(defoption export-pipe-results boolean
+  :help "True to export LISH_INPUT and LISH_OUTPUT to sub-processes.")
+
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.
 (defvar *shell-path* '()

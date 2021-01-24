@@ -4,8 +4,8 @@
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
-		   (compilation-speed 0)))
+;; (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+;; 		   (compilation-speed 0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Versioning
@@ -126,6 +126,46 @@ means every dumped executable."))
 
 (defvar *shell* nil
   "The current shell instance.")
+
+(defvar %*input* nil
+  "The output of the previous command in pipeline.")
+
+(defvar %*output* nil
+  "The output of the current command.")
+
+(defun input ()
+  "The pipeline input object."
+  %*input*)
+
+(defun output ()
+  "The pipeline output object."
+  %*output*)
+
+(defun set-input (value)
+  "Set the pipeline input object to VALUE."
+  (setf %*input* value)
+  (when (and (lish-export-pipe-results *shell*) %*input*)
+    (setf (nos:env "LISH_INPUT") (princ-to-string %*input*)))
+  value)
+
+(defun set-output (value)
+  "Set the pipeline output object to VALUE."
+  (setf %*output* value)
+  (when (and (lish-export-pipe-results *shell*) %*output*)
+    (setf (nos:env "LISH_OUTPUT") (princ-to-string %*output*)))
+  value)
+
+(defsetf input set-input)
+(defsetf output set-output)
+
+(define-symbol-macro *input* (input))
+(define-symbol-macro *output* (output))
+
+(defvar *accepts* nil
+  "What the next command in the pipeline accepts.")
+
+(defvar *pipe-plus* nil
+  "True to omap objects to a parenless function call.")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-user-package ()

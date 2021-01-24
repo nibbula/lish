@@ -1093,18 +1093,6 @@ into a shell-expr with shell-read."
     (condition (x)
       (inator:message editor "Help got an error: ~s" x))))
 
-(defvar *input* nil
-  "The output of the previous command in pipeline.")
-
-(defvar *output* nil
-  "The output of the current command.")
-
-(defvar *accepts* nil
-  "What the next command in the pipeline accepts.")
-
-(defvar *pipe-plus* nil
-  "True to omap objects to a parenless function call.")
-
 (defun nth-expr-word (n expr)
   "Return the Nth, potentially unwrapped, word of the shell-expr."
   (let ((w (nth n (shell-expr-words expr))))
@@ -1196,7 +1184,7 @@ them as a list."
   (with-names (vals)
     `(values-list
       (let ((,vals (multiple-value-list (progn ,@body))))
-	(setf *output* (first ,vals))
+	(setf (output) (first ,vals))
 	,vals))))
 
 ;; (defun expand-alias-words (alias words)
@@ -1680,7 +1668,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			  flipped-io t))
 		(multiple-value-bind (result-values output show-p)
 		    (call-thing expr nil *context*)
-		  (setf *output* (car result-values))
+		  (setf (output) (car result-values))
 		  (values result-values output show-p))))
 	     ((consp expr)
 	      (case (command-type shell (string-downcase (car expr)))
@@ -1756,7 +1744,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	     ;; accepts is :unspecified because we're last in the
 	     ;; pipeline.
 	     (when (not flipped-io)
-	       (setf *input* *output*
+	       (setf *input* (output)
 		     *output* nil
 		     flipped-io t))
 	     (setf (values vals out-stream show-vals)

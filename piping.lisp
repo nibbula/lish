@@ -1,14 +1,14 @@
-;;
-;; piping.lisp - Piping for Lish
-;;
+;;;
+;;; piping.lisp - Piping for Lish
+;;;
 
 ;; Piping, I/O redirection, and I/O functions that are useful for using in
 ;; a lish command line or script.
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 1)
-		   (compilation-speed 0)))
+;; (declaim (optimize (speed 0) (safety 3) (debug 3) (space 1)
+;; 		   (compilation-speed 0)))
 
 (defun lisp-args-to-command (args &key (auto-space nil))
   "Turn the arguments into a string of arguments for a system command. String
