@@ -59,25 +59,28 @@ Lish Dependencies                                        -*- org -*-
 **** rl
 *** https://github.com/nibbula/lish.git
 **** lish
-** Lisp packages in quicklisp, are probably:
-   - asdf
-   - uiop
-   - trivial-features
-   - babel
-   - alexandria
-   - cffi
-   - trivial-gray-streams
-   - cl-ppcre
-   - eclector
-   - closer-mop
-   - acclimation
-   - cl-unicode
-   - flexi-streams
-   - chipz
-   - bordeaux-threads
+** External Lisp packages in Quicklisp, are probably:
+*** lish
+    - asdf
+    - uiop
+    - cffi
+      - alexandria
+      - trivial-features
+      - babel
+    - trivial-gray-streams
+    - cl-ppcre
+    - cl-base64
+    - chipz
+    - bordeaux-threads
+*** with los?
+    - eclector
+    - closer-mop
+    - acclimation
+    - cl-unicode
+    - flexi-streams
 
-   Once lish is loaded you can see the real dependencies with the view-lisp
-   command.
+  Once lish is loaded you can see the real dependencies with the view-lisp
+  command.
 
 * COMMENT MeTaDaTa
 creation date: [2020-10-19 06:12:31]
