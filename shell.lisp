@@ -232,6 +232,10 @@ more information, such as the date."
     (set-option sh 'history-format value)
     (init-history sh)))
 
+(defoption history-save-values boolean
+  :help "True to save the result values of expressions in the history."
+  :default nil)
+
 (defoption command-glob boolean
   :help "Let Lish commands do their own globbing.")
 

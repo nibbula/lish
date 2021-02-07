@@ -2038,6 +2038,13 @@ suspend itself."
 			 ** *
 			 * (car vals-list))
 		   (when show-vals
+		     ;; Maybe save expression values in history.
+		     (when (get-option *shell* 'history-save-values)
+		       (setf (getf (rl::history-entry-extra
+				    (dl-list:dl-content
+				     (rl::history-current-get)))
+				   :values)
+			     vals))
 		     (lish-print vals)))
 		 nil))
 	 ;; Got an intterrupt, so stop reading this multi-line expression.

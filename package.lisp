@@ -64,6 +64,7 @@ without any particular knowledge of it's Lisp programming features.
    #:lish-auto-cd                  #:set-lish-auto-cd
    #:lish-history-style            #:set-lish-history-style
    #:lish-history-format           #:set-lish-history-format
+   #:lish-history-save-values      #:set-lish-history-save-values
    #:lish-auto-suggest             #:set-lish-auto-suggest
    #:lish-partial-line-indicator   #:set-lish-partial-line-indicator
    #:lish-export-pipe-results      #:set-lish-export-pipe-results
