@@ -146,6 +146,13 @@ without any particular knowledge of it's Lisp programming features.
    #:symbolic-prompt-to-string
    #:load-file
    #:suspend-job
+   #:find-job
+   #:job #:job-id #:job-name #:job-command-line #:job-status
+   #:job-pid
+   #:continue-job-in-foreground
+   #:continue-job-in-background
+   #:kill-job
+   #:list-all-jobs
    #:accepts
    #:get-accepts
    #:twiddlify
