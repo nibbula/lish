@@ -189,7 +189,8 @@ from stack."
 	   filename))
     (delete (format t "Sorry, delete is not implemented yet.~%"))
     (table (setf *output* (rl:history-table :context :lish)))
-    (t (rl:show-history :context :lish :show-time show-times))))
+    (t (rl:show-history :context :lish :show-time show-times
+			:show-extra (get-option *shell* 'history-save-values)))))
 
 ;; This seems stupid and unnecessary. 
 ;; (defbuiltin #:|:| (("args" t :repeating t))
