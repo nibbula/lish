@@ -3,8 +3,9 @@
 ;;;
 
 (defun msg (fmt &rest args)
-  (format t "~&~?~%" fmt args)
-  (finish-output))
+  (when *build-verbose*
+    (format t "~&~?~%" fmt args)
+    (finish-output)))
 
 (defun sf-getenv (s)
   #+clisp (ext:getenv s)

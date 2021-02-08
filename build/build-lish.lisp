@@ -1,6 +1,6 @@
-;;
-;; build-lish.lisp - Build Lish
-;;
+;;;
+;;; build-lish.lisp - Build Lish
+;;;
 
 ;; A fake Makefile.
 
@@ -10,9 +10,12 @@
   (:export
    #:build-lish
    ))
+(defparameter build-lish::*default-target*
+  (or (and (boundp '*target*) (symbol-value '*target*)) 'lishfu))
 (in-package :build-lish)
 
 ;; Do things that are too horrible to mention here.
+(defvar *build-verbose* t)
 (load "build/horrible.lisp" :verbose nil)
 
 (msg "[Start builder on ~a ~a]" (lisp-implementation-type)
@@ -85,7 +88,7 @@ strings."
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Build Lishes of various kinds.
 
-(defparameter *default-target* 'lishfu)
+;; (defparameter *default-target* 'lishfu)
 (defparameter *targets* '('lish))
 (defparameter *version-file* "version.lisp")
 (defparameter *install-dir* (merge-pathnames "bin" *home*))
