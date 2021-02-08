@@ -1286,8 +1286,9 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	   (progn
 	     (let ((nn (prin1-to-string ,name))
 		   (aa ,args))		; so we only eval once
-	       (add-job nn (or (and aa (shell-words-to-string aa)) "")
-			(bt:make-thread #',thunk :name nn))))
+	       (setf (lish-last-background-job *shell*)
+		     (add-job nn (or (and aa (shell-words-to-string aa)) "")
+			      (bt:make-thread #',thunk :name nn)))))
 	   (progn
 	     (funcall #',thunk))))))
 
@@ -1426,7 +1427,8 @@ read from."
 	    ;; (uos::syscall (uos:tcsetpgrp 0 (uos:getpid)))
 	    ;; (cerror "Keep going" "Your breakpoint, sir?")
 	    (if background
-		(setf (job-status job) :running)
+		(setf (job-status job) :running
+		      (lish-last-background-job *shell*) job)
 		(progn
 		  ;; Wait for it...
 		  (multiple-value-setq (result status)

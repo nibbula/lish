@@ -77,6 +77,7 @@ without any particular knowledge of it's Lisp programming features.
    #:lish-old-pwd
    #:lish-dir-list
    #:lish-suspended-jobs
+   #:lish-last-background-job
    #:lish-start-time
    #:lish-options
    ;; arguments

@@ -51,6 +51,11 @@
    (jobs
     :accessor lish-jobs :initarg :jobs :initform nil
     :documentation "List of jobs.")
+   (last-background-job
+    :accessor lish-last-background-job
+    :initform nil
+    :documentation
+    "The last job run in background, or NIL if there wasn't one.")
    (start-time
     :initarg :start-time :accessor lish-start-time :type integer
     :documentation
