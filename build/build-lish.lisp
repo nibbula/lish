@@ -11,7 +11,7 @@
    #:build-lish
    ))
 (defparameter build-lish::*default-target*
-  (or (and (boundp '*target*) (symbol-value '*target*)) 'lishfu))
+  (or (and (boundp '*target*) (symbol-value '*target*)) 'build-lish::lishfu))
 (in-package :build-lish)
 
 ;; Do things that are too horrible to mention here.

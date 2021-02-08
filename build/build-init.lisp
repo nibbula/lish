@@ -7,6 +7,7 @@
   (:use :cl))
 (in-package :build-init)
 
+(defvar *build-verbose* t)
 ;; Do things that are too horrible to mention here.
 (load "build/horrible.lisp" :verbose nil)
 
@@ -41,6 +42,7 @@
 (push (truename "./")           asdf:*central-registry*)
 
 ;; Suppress the fucking ASDF warnings.
+#+(or) ; we're in an alternate future
 (let ((bitch (find-symbol "*SUPPRESS-DEFINITION-WARNINGS*" :asdf))
       (troublemakers
        '(:cl-ppcre-test :puri-tests :cl-base64-tests :flexi-streams-test
