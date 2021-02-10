@@ -1583,7 +1583,7 @@ Note that this option overrides the -d and -s options."))
 (defbuiltin ldirs
   ((push   boolean :short-arg #\p :help "Push directories on the load path.")
    (add    boolean :short-arg #\a :help "Append directories to the load path.")
-   (remove boolean :short-arg #\r :help "Remove directories to the load path.")
+   (remove boolean :short-arg #\r :help "Remove directories from the load path.")
    (dir pathname :optional t :repeating t :help "Directories to operate on."))
   "List some directories where things are maybe loaded from. Missing directories
 are printed in red on some terminals. If a directory is given without an action
@@ -1592,10 +1592,16 @@ option, it is as if --push was given."
 	   ;; This should probably be some system specific thing in opsys.
 	   (fix-dir (d)
 	     (let ((result (nos:safe-namestring d)))
+	       ;; @@@ special case, we should actually just convert to an
+	       ;; absolute path.
+	       (when (equal result ".")
+		 (setf result (nos:current-directory)))
 	       (when (and (plusp (length result))
 			  (not (equal (char result (1- (length result)))
 				      nos:*directory-separator*)))
 		 (setf result (s+ result nos:*directory-separator*)))
+	       (unless (nos:absolute-path-p result)
+		 (error "Relative paths shouldn't be added."))
 	       result))
 	   (do-push ()
 	     (map nil (_ (pushnew (fix-dir _) asdf:*central-registry*
