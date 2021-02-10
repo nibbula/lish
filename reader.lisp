@@ -30,9 +30,55 @@ the end and didn't get a close quote, the third value is true.~
        (incf i))
     (values v i (not end-quote))))
 
-;; I'm not so old fashioned that I think ^L should be in here, but are there
-;; any other unicode things that should?
-(defparameter *whitespace* #(#\space #\newline #\tab #\return)
+;; XXX This is horribly wrong, since it doesn't actually respect the syntax.
+;; To do it right, we probably have to modify shell-read to not actually read
+;; but just accumulate characters. Also, to be balanced, we give up the ability
+;; to have a shell varibale ‘$#’, but that's okay since we don't want such a
+;; thing. Also, we don't get lexical scope, but with full parsing we could by
+;; doing something like: #$ foo ,var bar $# => (! "foo " var " bar")
+(defun sharp-dollar-reader (stream subchar arg)
+  (declare (ignore subchar arg))
+  (when (not *read-suppress*)
+    (list
+     '!
+     (with-output-to-string (s)
+       (loop :with c = (read-char stream)
+	  :and done
+	  :while (not (and (char= c #\$) (char= (peek-char nil stream) #\#)))
+	  :do
+	    (write-char c s)
+	    (setf c (read-char stream)))
+       (read-char stream))))) ;; read the final #
+
+(defvar *saved-readtable* nil
+  "Save a copy of the starting readtable so we can go back to it.")
+
+(defun enable-sharp-dollar-reader ()
+  "Turn on the #$ reader macro. Saves the readtable so it can be restored with
+disable-sharpsign-dollar-reader."
+  (when (not *saved-readtable*)
+    (setf *saved-readtable* *readtable*
+	  *readtable* (copy-readtable))
+    (set-dispatch-macro-character #\# #\$ #'sharp-dollar-reader)))
+
+(defun disable-sharp-dollar-reader ()
+  "Turn off the #$ reader macro, and restore original readtable."
+  (when *saved-readtable*
+    (setf *readtable* *saved-readtable*
+	  *saved-readtable* nil)))
+
+(defmacro file-enable-sharp-dollar-reader ()
+  "Turns on the #$ reader syntax for the rest of the file."
+  '(eval-when (:compile-toplevel :load-toplevel :execute)
+    ;; It works to just set it because when a file is finished loading the
+    ;; *readtable* is restored.
+    (setf *readtable* (copy-readtable))
+    (set-dispatch-macro-character #\# #\$ #'sharpsign-dollar-reader)))
+
+;; I gave in and added ^L.
+;; @@@ This should probably use some unicode definition of space, like in
+;; sb-unicode:whitespace-p
+(defparameter *whitespace* #(#\space #\newline #\tab #\return #\page)
   "Word separators for lish.")
 
 (defun contains-whitespace-p (s)
