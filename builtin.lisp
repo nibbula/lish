@@ -87,7 +87,7 @@ from stack."
 ;;    :choice-func #'job-id-list)
 ;;   (:documentation "A job descriptor."))
 
-(defbuiltin resume
+(defbuiltin fg
   ((job-descriptor job-descriptor :optional t :help "Job to resume."))
   "Resume a suspended job."
   (let (job)
@@ -95,7 +95,7 @@ from stack."
       ((or (null (lish-jobs *shell*))
 	   (= (length (lish-jobs *shell*)) 0))
        (format t "No jobs to resume.~%")
-       (return-from !resume (values)))
+       (return-from !fg (values)))
       ((= (length (lish-jobs *shell*)) 1)
        (setf job (first (lish-jobs *shell*))))
       (t
