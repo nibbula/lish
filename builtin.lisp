@@ -1557,6 +1557,7 @@ Note that this option overrides the -d and -s options."))
     (if (or no-notes no-warn)
 	(handler-bind ((condition
 			(lambda (c)
+			  #-sbcl (ignore c)
 			  #+sbcl
 			  (cond
 			    ((and no-notes (typep c 'sb-ext::compiler-note))
@@ -1617,6 +1618,7 @@ option, it is as if --push was given."
 	(remove
 	 (map nil (_ (setf asdf:*central-registry*
 			   (delete (fix-dir _) asdf:*central-registry*
+				   :key #'safe-namestring
 				   :test #'equal)))
 	      dir))
 	(dir (do-push))
