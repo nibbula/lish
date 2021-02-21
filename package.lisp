@@ -107,10 +107,11 @@ without any particular knowledge of it's Lisp programming features.
    #:internal-command #:shell-command #:builtin-command #:external-command
    #:command-list
    #:defcommand #:defexternal
-   #:!cd #:!pwd #:!pushd #:!popd #:!dirs #:!suspend #:!history #:!echo
-   #:!help #:!alias #:!unalias #:!type #:!exit #:!source #:!debug #:!bind
-   #:!times #:!time #:!ulimit #:!wait #:!export #:!format
-   #:!read #:!kill #:!umask #:!jobs #:!exec #:|!:| #:!hash #:!opt #:!doc
+   #:!cd #:!pwd #:!pushd #:!popd #:!dirs #:!suspend #:!fg #:!bg #:!jobs
+   #:!history #:!echo #:!help #:!alias #:!unalias #:!exit #:!quit #:!source
+   #:!debug #:!export #:!env #:!kill #:!time #:!times #:!umask #:!ulimit
+   #:!wait #:!exec #:!bind #:!undefcommand #:!hash #:!type #:!opt #:!l #:!load
+   #:!ldirs #:!ql #:!autoload #:!doc #:!var
    ;; convenience / scripting
    #:alias #:set-alias #:unset-alias #:get-alias
    #:command-paths
