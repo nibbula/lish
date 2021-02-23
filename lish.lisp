@@ -2067,14 +2067,16 @@ suspend itself."
 
 (defun save-history (sh &key update)
   "Save the history."
-  (handler-case
-      (history-store-save (lish-history-store sh) (history-style sh)
-			  :update update)
-    (serious-condition (c)
-      (if (lish-debug *shell*)
-	  (invoke-debugger c)
-	  (format t "Saving history failed. Turn on debug if you want.~%~a~%"
-		  c)))))
+  (handler-bind
+      ((serious-condition
+	#'(lambda (c)
+	    (if (lish-debug *shell*)
+		(invoke-debugger c)
+		(format t "Saving history failed. ~
+                           Turn on debug if you want.~%~a~%" c)))))
+    (history-store-save (lish-history-store sh) (history-style sh)
+			:update update)))
+
 
 (defun load-history (sh &key update)
   ;; (handler-case
