@@ -114,6 +114,19 @@
   "Get the option named NAME, for shell SH."
   (arg-value (find-option sh name)))
 
+;; @@@ The whole option setting interface is stupid, and we should probably
+;; convert to just using (option name) and (setf (option name))
+
+(defun option (name)
+  (arg-value (find-option *shell* name)))
+
+(defun %set-option (name value)
+  (set-option *shell* name value)
+  value)
+
+(defsetf option %set-option
+  "Set a shell option.")
+
 (defmacro defoption (name &rest arg)
   "Define a shell option named NAME, with the properties in arg. The syntax
 is like Lish arguments, e.g.:
@@ -263,6 +276,11 @@ not to indicate partial lines."
 
 (defoption export-pipe-results boolean
   :help "True to export LISH_INPUT and LISH_OUTPUT to sub-processes.")
+
+(defoption auto-report-time integer
+  :help "If a job takes longer than this number of seconds, report timing
+statistics."
+  :default -1)
 
 ;;; @@@ Shouldn't this be in the shell object?
 ;;; @@@ But it doesn't do anything right now anyway.
