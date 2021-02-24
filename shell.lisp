@@ -31,7 +31,7 @@
     :accessor lish-global-aliases
     :documentation "Hash table of global aliases.")
    (editor
-    :accessor lish-editor
+    :accessor lish-editor :initform nil
     :documentation "Line editor instance.")
    (history-store
     :initarg :history-store
@@ -262,8 +262,10 @@ more information, such as the date."
   :default t)
 
 (defmethod set-lish-auto-suggest (value (sh shell))
-  (setf (arg-value (find-option sh 'auto-suggest)) value
-	(line-editor-auto-suggest-p (lish-editor sh)) value))
+  (setf (arg-value (find-option sh 'auto-suggest)) value)
+  (when (lish-editor sh)
+    ;; There isn't always an editor.
+    (setf (line-editor-auto-suggest-p (lish-editor sh)) value)))
 
 (defoption partial-line-indicator object
   :help "A string to put at the end of partial lines before the prompt, or NIL
@@ -271,8 +273,9 @@ not to indicate partial lines."
   :default (span-to-fat-string '(:standout "%")))
 
 (defmethod set-lish-partial-line-indicator (value (sh shell))
-  (setf (arg-value (find-option sh 'partial-line-indicator)) value
-	(rl::partial-line-indicator (lish-editor sh)) value))
+  (setf (arg-value (find-option sh 'partial-line-indicator)) value)
+  (when (lish-editor sh)
+    (setf (rl::partial-line-indicator (lish-editor sh)) value)))
 
 (defoption export-pipe-results boolean
   :help "True to export LISH_INPUT and LISH_OUTPUT to sub-processes.")
