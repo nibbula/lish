@@ -462,6 +462,16 @@ counts from the beginning of history. If N is negative it counts backward from
 the most recent."
   (rl:history-nth n))
 
+(defun !v (n)
+  "Return the N-th history result values list. If N is positive it counts from
+the beginning of history. If N is negative it counts backward from the most
+recent."
+  (getf (rl:history-entry-extra (rl:history-nth n)) :values))
+
+(defsetf !v (n) (new-values)
+  `(setf (getf (rl:history-entry-extra (rl:history-nth ,n)) :values)
+	 ,new-values))
+
 ;; @@@ What about !h as a complex executed command object?
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
