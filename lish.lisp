@@ -455,7 +455,7 @@ Otherwise, return words which will evaluate a lisp expression."
 	    (if (and obj (integerp obj)
 		     *shell* (get-option *shell* 'history-expansion))
 		;;(setf expansion (shell-read (rl:history-nth obj))
-		(setf expansion (rl:history-nth obj)
+		(setf expansion (rl:history-entry-line (rl:history-nth obj))
 		      results
 		      (typecase expansion
 			(shell-expr (shell-expr-words expansion))
@@ -1984,6 +1984,22 @@ suspend itself."
 			     (s+ pre-str #\newline str)
 			     str)))))))
 
+(defun maybe-save-values (vals show-vals)
+  "Save result values in the history if the option is on."
+  (when (get-option *shell* 'history-save-values)
+    (if (and show-vals vals (olength-at-least-p 1 vals))
+	(setf (getf (rl:history-entry-extra
+		     (dl-list:dl-content
+		      (rl::history-current-get)))
+		    :values)
+	      (copy-list vals))
+	(when *output*
+	  (setf (getf (rl:history-entry-extra
+		       (dl-list:dl-content
+			(rl::history-current-get)))
+		      :values)
+		(list *output*))))))
+
 (defun lish-print (values)
   "Print the results of an evaluation. VALUES are a list of values to print."
   (loop :with len = (length values) :and i = 0
@@ -2039,14 +2055,9 @@ suspend itself."
 			 *** **
 			 ** *
 			 * (car vals-list))
+		   (maybe-save-values vals show-vals)
 		   (when show-vals
 		     ;; Maybe save expression values in history.
-		     (when (get-option *shell* 'history-save-values)
-		       (setf (getf (rl::history-entry-extra
-				    (dl-list:dl-content
-				     (rl::history-current-get)))
-				   :values)
-			     vals))
 		     (lish-print vals)))
 		 nil))
 	 ;; Got an intterrupt, so stop reading this multi-line expression.
