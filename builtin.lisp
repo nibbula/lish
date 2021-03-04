@@ -1633,27 +1633,29 @@ option, it is as if --push was given."
 		(pr d)))
 	 (setf *output* asdf:*central-registry*))))))
 
-(defun quicklisp-system-list ()
-  (dlib-misc:quickloadable-systems :as-strings t))
+#+quicklisp
+(progn
+  (defun quicklisp-system-list ()
+    (dlib-misc:quickloadable-systems :as-strings t))
 
-(define-builtin-arg-type quicklisp-system-designator (arg-keyword)
-  "A system designator for QUICKLOAD, either a keyword or a string."
-  ()
-  :convert ql-dist:system (values value)
-  :convert string
-  (if (and (stringp value) (char= (char value 0) #\:))
-      (intern (string-upcase (subseq value 1)) (find-package :keyword))
-      value))
+  (define-builtin-arg-type quicklisp-system-designator (arg-keyword)
+    "A system designator for QUICKLOAD, either a keyword or a string."
+    ()
+    :convert ql-dist:system (values value)
+    :convert string
+    (if (and (stringp value) (char= (char value 0) #\:))
+	(intern (string-upcase (subseq value 1)) (find-package :keyword))
+	value))
 
-(defmethod argument-choices ((arg arg-quicklisp-system-designator))
-  (declare (ignore arg))
-  (dlib-misc:quickloadable-systems :as-strings t))
+  (defmethod argument-choices ((arg arg-quicklisp-system-designator))
+    (declare (ignore arg))
+    (dlib-misc:quickloadable-systems :as-strings t))
 
-(defbuiltin ql
-  ((system quicklisp-system-designator :optional nil
-    :help "System designator to load."))
-  "QuickLoad a system."
-  (ql:quickload system))
+  (defbuiltin ql
+    ((system quicklisp-system-designator :optional nil
+      :help "System designator to load."))
+    "QuickLoad a system."
+    (ql:quickload system)))
 
 (defmethod documentation ((b autoloaded-command) (doctype (eql 'function)))
   "Return the documentation string for the given shell command."
