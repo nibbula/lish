@@ -42,7 +42,8 @@ directory."
 
 (defbuiltin pwd ()
   "Print the current working directory."
-  (format t "~a~%" (nos:current-directory)))
+  (format t "~a~%" (setf *output* (nos:current-directory)))
+  *output*)
 
 (defbuiltin pushd
   ((directory directory :help "Directory to push on the stack."))
@@ -862,18 +863,18 @@ variables explicitly set in arguments are passed to the command."
 #|
 ;;; make printf an alias
 (defbuiltin format
-    (("format-string" string :optional nil :help "Format control string.")
-     ("args" object :repeating t :help "Format arguments."))
+    ((format-string string :optional nil :help "Format control string.")
+     (args object :repeating t :help "Format arguments."))
   "Formatted output."
   (apply #'format t format-string args))
 
 ;; Since this is for scripting in other shells, I think we don't need to worry
 ;; about it, since the user can just call READ-LINE-like functions directly.
 (defbuiltin read
-    (("name"    string                 :help "Variable to read.")
-     ("prompt"  string  :short-arg #\p :help "Prompt to print.")
-     ("timeout" integer :short-arg #\t :help "Seconds before read times out.")
-     ("editing" boolean :short-arg #\e :help "True to use line editing."))
+    ((name    string                 :help "Variable to read.")
+     (prompt  string  :short-arg #\p :help "Prompt to print.")
+     (timeout integer :short-arg #\t :help "Seconds before read times out.")
+     (editing boolean :short-arg #\e :help "True to use line editing."))
   "Read a line of input."
   ;; @@@ totally faked & not working
   (declare (ignore timeout name))
@@ -983,6 +984,13 @@ symbolic format, otherwise output in octal."
   #-unix '()
   "List of limits for ulimit command.")
 
+#+unix
+(defun format-limit (cell width)
+  "Format a numeric resource limit."
+  (if (and (numberp cell) (= cell uos:+RLIMIT-INFINITY+))
+      (format nil "~v@a" width "unlimited")
+      (format nil "~vd" width cell)))
+
 (defbuiltin ulimit
   ((print-all boolean :short-arg #\a
     :help "True to print all limits.")
@@ -1023,16 +1031,16 @@ symbolic format, otherwise output in octal."
 			(setf val (uos:getrlimit l))
 			:and
 			:collect (list (string-downcase l)
-				       (value->string (uos:rlimit-current val))
-				       (value->string (uos:rlimit-maximum val))
+				       (uos:rlimit-current val)
+				       (uos:rlimit-maximum val)
 				       (documentation
 					(symbolify (s+ "+RLIMIT-" l "+")
 						   :package :uos)
 					'variable)))
 		     :columns
-		     '((:name "Name")
-		       (:name "Soft Value")
-		       (:name "Hard Value")
+		     `((:name "Name")
+		       (:name "Soft Value" :type number :format ,#'format-limit)
+		       (:name "Hard Value" :type number :format ,#'format-limit)
 		       (:name "Description" :align :wrap)))))
 	 ;; (print-table table :max-width (get-cols))
 	 ;; (terpri)
@@ -1862,7 +1870,7 @@ Try typing \"doc doc\".
 ;; This is just a convenient wrapper around defparameter. I'm not really sure
 ;; this is a "good thing", but it can be useful for interactive programming.
 ;; Not having to declare variables, was probably first invented for interactive
-;; programming in Lisp, but this can still have it's use. Of; course
+;; programming in Lisp, but this can still have it's use. Of course
 ;; implementations vary on getting a warning.
 (defbuiltin var
   ((name string :optional nil :help "Name of the variable.")
