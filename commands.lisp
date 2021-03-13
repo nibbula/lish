@@ -729,8 +729,7 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 		 ;(when ,keyworded
 		 (setf ,new (push (arg-key ,arg) ,new))
 		 (setf ,new (push (convert-arg
-				   ,arg (eval (arg-default ,arg))) ,new)))
-	       ))))))
+				   ,arg (eval (arg-default ,arg))) ,new)))))))))
 
 ;; I used to handle default values to arguments here, but they were not getting
 ;; evaluated properly, so it's probably best to let the command function handle
