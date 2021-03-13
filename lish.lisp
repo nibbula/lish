@@ -2090,14 +2090,6 @@ suspend itself."
 
 
 (defun load-history (sh &key update)
-  ;; (handler-case
-  ;;     (history-store-load (lish-history-store sh) (history-style sh)
-  ;; 			  :update update)
-  ;;   (serious-condition (c)
-  ;;     (if (lish-debug *shell*)
-  ;; 	  (invoke-debugger c)
-  ;; 	  (format t "Loading history failed. Turn on debug if you want.~%~a~%"
-  ;; 		  c)))))
   (with-simple-restart (continue
 			"Keep going even though history failed to load.")
     (handler-bind
