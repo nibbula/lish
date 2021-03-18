@@ -34,3 +34,6 @@ How the build works.
 	 - Loads whatever pre-requirements, which vary depending on the target.
 	 - Loads lish
 	 - Saves an executable
+
+If you want building to increment the build version number, set the environment
+variable LISH_MAINTAINER. This is probably only useful if you are publishing it.

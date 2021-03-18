@@ -1,5 +1,5 @@
 ;;;
-;;; lish.lisp - Unix Shell & Lisp somehow smushed together
+;;; lish.lisp - A Lisp shell.
 ;;;
 
 ;; This file contains the basic REPL and dispatch, and some other odd and ends.
@@ -2256,7 +2256,7 @@ if we aren't already inside one."
 	       ;;(init-file (or *lishrc* *default-lishrc*))
 	       (init-file (pick-an-rc-file))
 	       command)
-  "Unix Shell & Lisp somehow smushed together.
+  "Lish is a LIsp SHell.
 Type the “help” command for more documentation.
 Arguments:
   DEBUG         - True to turn on entering the debugger on errors.

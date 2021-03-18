@@ -1,6 +1,6 @@
-;;
-;; fully-loaded.lisp - Load shell commands before dumping Lish.
-;;
+;;;
+;;; fully-loaded.lisp - Load shell commands before dumping Lish.
+;;;
 
 (let ((*load-verbose* nil))
   (push (truename "../los") asdf:*central-registry*)

@@ -80,6 +80,11 @@ strings."
       (write new-vers :stream stream)
       (terpri stream))))
 
+(defun maybe-increment-build-version (file)
+  "Only increment the version for maintainers."
+  (when (sf-getenv "LISH_MAINTAINER")
+    (increment-build-version file)))
+
 ;; So, ideally we would increment the build version number only if the build
 ;; succeeds, but that seems like a pain, since we would have to pass the new
 ;; version nubmer to both ASDF and the code being built, without setting it
@@ -141,7 +146,7 @@ strings."
 		(ql:quickload :deblarg :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
 		(lish:make-standalone :smaller t)"))
-    (increment-build-version *version-file*)
+    (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
 (defmethod build ((target (eql 'lishfu)))
@@ -156,7 +161,7 @@ strings."
 		(ql:quickload :lish :verbose nil) ~
 		(load \"build/fully-loaded.lisp\" :verbose nil) ~
 		(lish:make-standalone :smaller t)"))
-    (increment-build-version *version-file*)
+    (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
 (defmethod build ((target (eql 'run)))
@@ -190,7 +195,7 @@ strings."
 		(setf asdf:*central-registry* ~
 		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
 		(lish:make-standalone)"))
-    (increment-build-version *version-file*)
+    (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags*
 					  ,@*lisp-plain-flags* "--" "-norl"))))
 
