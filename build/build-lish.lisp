@@ -194,7 +194,29 @@ strings."
 		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
-		(lish:make-standalone)"))
+		(lish:make-standalone :smaller t)"))
+    (maybe-increment-build-version *version-file*)
+    (run-with-input-from stream `(,*lisp* ,@*lisp-flags*
+					  ,@*lisp-plain-flags* "--" "-norl"))))
+
+(defmethod build ((target (eql 'lishpfu)))
+  (msg "[Build target ~s]" target)
+  (with-input-from-string
+      (stream
+       (format nil
+	       "(load \"build/build-init.lisp\") ~
+		(push (truename \"../\") asdf:*central-registry*) ~
+		(push (truename \"../opsys/\") asdf:*central-registry*) ~
+		(push (truename \"../rl/\") asdf:*central-registry*) ~
+		(push (truename \"./\") asdf:*central-registry*) ~
+		(ql:quickload :dlib :verbose nil) ~
+		(ql:quickload :lish :verbose nil) ~
+		(setf asdf:*central-registry* ~
+		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
+		(setf asdf:*central-registry* ~
+		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
+		(load \"build/fully-loaded.lisp\" :verbose nil) ~
+		(lish:make-standalone :smaller t)"))
     (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags*
 					  ,@*lisp-plain-flags* "--" "-norl"))))
