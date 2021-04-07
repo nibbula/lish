@@ -1613,8 +1613,10 @@ option, it is as if --push was given."
 		 (error "Relative paths shouldn't be added."))
 	       result))
 	   (do-push ()
-	     (map nil (_ (pushnew (fix-dir _) asdf:*central-registry*
-				  :test #'equal)) dir)))
+	     (map nil (_ (let ((fixed-dir (fix-dir _)))
+			   (pushnew fixed-dir asdf:*central-registry*
+				    :test #'equal)
+			   (add-asdf-directory fixed-dir))) dir)))
     (with-grout ()
       (when (> (count t `(,push ,add ,remove)) 1)
 	(error "Please specidify only one of push, add, or remove."))
@@ -1622,7 +1624,10 @@ option, it is as if --push was given."
 	(error "~:(~a) requires a directory." (or push add remove)))
       (cond
 	(push (do-push))
-	(add (nconc asdf:*central-registry* (map 'list (_ (fix-dir _)) dir)))
+	(add
+	 (let ((dirs (map 'list (_ (fix-dir _)) dir)))
+	   (map nil #'add-asdf-directory dirs)
+	   (nconc asdf:*central-registry* dirs)))
 	(remove
 	 (map nil (_ (setf asdf:*central-registry*
 			   (delete (fix-dir _) asdf:*central-registry*
