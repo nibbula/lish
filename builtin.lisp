@@ -1884,7 +1884,7 @@ Try typing \"doc doc\".
     :help "Documentation string for the variable."))
   "Define a variable, if you are so inclined."
   (eval `(defparameter ,(intern (string-upcase name))
-	   ,value
+	   ,(or value *input*)
 	   ,@(when documentation-supplied-p (list documentation)))))
 
 ;; EOF
