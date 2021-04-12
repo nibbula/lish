@@ -259,6 +259,56 @@ expression in a separagte thread, if threads are supported."
   (when (and *shell* *context*)
     (and (context-out-pipe *context*) t)))
 
+(defun input-source-p (thing)
+  "Return true if THING could be an input source."
+  (or (and (streamp thing) (input-stream-p thing))
+      (and (or (pathnamep thing) (stringp thing))
+	   (nos:file-exists thing))
+      ;; as string stream
+      (stringp thing)
+      ;; as byte array
+      (and (vectorp thing)
+	   (equal (array-element-type thing) '(unsigned-byte 8)))))
+
+(defun as-input-stream (thing)
+  "Make an input stream out of THING."
+  (etypecase thing
+    (stream thing) ;; assuming it's an input stream
+    (pathname
+     (open thing :direction :input))
+    (string
+     (if (nos:file-exists thing)
+	 (open thing :direction :input)
+	 (make-string-input-stream thing)))
+    #|
+    @@@ finish bi-valent-streams or os-streams?
+    (vector
+     (make-bivalent-stream thing))
+    |#
+    ))
+
+(defmacro with-streamlike-input ((arg &key use-stdin) &body body)
+  "Allow a command to take stream-like input, getting the input from the
+argument ARG, or from the the shell input *input*. Set ARG to be an input
+stream, or NIL if we can't."
+  (with-names (arg-value used-stdin)
+    `(let ((,arg-value ,arg) ,used-stdin)
+       (unwind-protect
+	    (progn
+	      (setf ,arg
+		    (cond
+		      ((and (null ,arg-value)
+			    (and *input* (input-source-p *input*)))
+		       (as-input-stream *input*))
+		      ((and ,arg-value (input-source-p ,arg-value))
+		       (as-input-stream ,arg-value))
+		      (,use-stdin
+		       (setf ,used-stdin t)
+		       *standard-input*)))
+	      ,@body)
+	 (when (and ,arg (streamp ,arg) (not ,used-stdin))
+	   (close ,arg))))))
+
 ;; (defun spread (command &rest commands)
 ;;   "Send output from a command to multiple commands in parallel."
 ;;   )
@@ -483,7 +533,7 @@ recent."
     (shell-eval (expr-from-args args))))
 
 (defun !?= (&rest args)
-  "Evaluate the shell command, converting Unix shell result code into boolean.
+  "Evaluate the shell command, converting the system result code into boolean.
 This means the 0 is T and anything else is NIL."
   (with-shell ()
     (let ((result
