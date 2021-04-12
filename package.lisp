@@ -113,6 +113,7 @@ without any particular knowledge of it's Lisp programming features.
    #:!debug #:!export #:!env #:!kill #:!time #:!times #:!umask #:!ulimit
    #:!wait #:!exec #:!bind #:!undefcommand #:!hash #:!type #:!opt #:!l #:!load
    #:!ldirs #:!ql #:!autoload #:!doc #:!var
+   #:print-command-help
    ;; convenience / scripting
    #:alias #:set-alias #:unset-alias #:get-alias
    #:command-paths
