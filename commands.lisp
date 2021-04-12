@@ -153,6 +153,8 @@ instances.")
     (setf *lish-commands* (make-hash-table :test #'equal)))
   *lish-commands*)
 
+;; @@@ {get,set,unset}-command should probably be deprecated for the
+;; command method
 (defun set-command (name obj)
   (setf (gethash name (lish-commands)) obj))
 
@@ -161,6 +163,20 @@ instances.")
 
 (defun get-command (name)
   (gethash name (lish-commands)))
+
+(defgeneric command (name)
+  (:documentation
+   "Return the command named NAME, or NIL if one isn't defined."))
+
+(defmethod command ((name string))
+  (gethash name (lish-commands)))
+
+(defmethod (setf command) ((object command) (name string))
+  (setf (gethash name (lish-commands)) object))
+
+(defmethod (setf command) ((object null) (name string))
+  (declare (ignore object))
+  (remhash name (lish-commands)))
 
 (defun init-commands ()
   "This doesn't really do anything anymore, we're just keeping it in case
