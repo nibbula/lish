@@ -693,8 +693,8 @@ value to be converted.
   ;;    (when (arg-has-flag a)
   ;;      (return-from args-keyworded t)))
   ;; nil)
-  ;; HOW ABOUT THIS:
   (declare (ignore args))
+  ;; HOW ABOUT THIS:
   t)
 
 ;; Thankfully this is nowhere near as hairy as posix-to-lisp-args.
@@ -746,7 +746,7 @@ value to be converted.
 			(list (symbolify (arg-name a)) (arg-default a)))
 		    (if (arg-use-supplied-flag a)
 			;; The default is NIL then.
-			(list (symbolify (arg-name a)) NIL
+			(list (symbolify (arg-name a)) 'NIL
 			      (symbolify (s+ (arg-name a) "-supplied-p")))
 			(symbolify (arg-name a))))
 		new-list)))
