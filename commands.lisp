@@ -1017,11 +1017,14 @@ become keyword arguments, in a way specified in the command's arglist."
 	   (progn
 	     (dbugf :lish-arg "skipping arg ~a ~w~%" i a)
 	     (incf i))))
+    ;; @@@ I don't think we have to do this anymore, becuase the defaults
+    ;; are put in the function definition, and if we provide the flag it messes
+    ;; up :use-supplied-flag.
     ;; Default any left over defaultable flags
-    (loop :for a :in possible-flags :do
-       (when (arg-default a)
-	 (push (arg-key a) new-flags)
-	 (push (eval (arg-default a)) new-flags)))
+    ;; (loop :for a :in possible-flags :do
+    ;;    (when (arg-default a)
+    ;; 	 (push (arg-key a) new-flags)
+    ;; 	 (push (eval (arg-default a)) new-flags)))
     (setf new-flags (nreverse new-flags))
     ;; Non-flagged mandatories.
     (setf i 0)
