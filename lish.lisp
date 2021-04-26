@@ -1824,7 +1824,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
   "Add a job with the given NAME and COMMAND-LINE. THING is either an integer
 process ID or a resume function designator. STATUS defaults to :RUNNING."
   (let (job)
-    (etypecase thing
+    (typecase thing
       (integer
        (setf job (make-instance 'system-job
 				:id (find-id *shell*)
@@ -1849,13 +1849,16 @@ process ID or a resume function designator. STATUS defaults to :RUNNING."
 			       :command-line command-line
 			       :status status
 			       :resume-function thing)))
-      (bt:thread
-       (setf job (make-instance 'thread-job
-				:id (find-id *shell*)
-				:name name
-				:command-line command-line
-				:status status
-				:thread thing))))
+      (t
+       (if (and bt:*supports-threads-p*
+		(symbol-call :typep thing 'bt:thread))
+	   (setf job (make-instance 'thread-job
+				    :id (find-id *shell*)
+				    :name name
+				    :command-line command-line
+				    :status status
+				    :thread thing))
+	 (error "Tried to a job of an unknown type ~s" (type-of thing)))))
     (push job (lish-jobs *shell*))
     job))
 
