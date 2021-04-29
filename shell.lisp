@@ -4,8 +4,8 @@
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
-;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
+;;(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
+;;(declaim (optimize (speed 3) (safety 3) (debug 3) (space 0) (compilation-speed 0)))
 
 (defkeymap *lish-default-keymap* ()
   "Keymap for Lish."
@@ -56,6 +56,10 @@
     :initform nil
     :documentation
     "The last job run in background, or NIL if there wasn't one.")
+   (saved-signals
+    :initarg :saved-signals :accessor shell-saved-signals :initform nil
+    :documentation
+    "Saved O/S signal handlers that were active when the shell was invoked.")
    (start-time
     :initarg :start-time :accessor lish-start-time :type integer
     :documentation
@@ -73,20 +77,28 @@
 (defmethod initialize-instance :after
     ((sh shell) &rest initargs &key &allow-other-keys)
   (declare (ignore initargs))
-;  (setf (slot-value sh 'commands) (make-hash-table :test #'equal))
+
+  ;; Save O/S signals
+  (setf (slot-value sh 'saved-signals) (job-control-signals))
+
+  ;; Make alias tables
   (setf (slot-value sh 'aliases) (make-hash-table :test #'equal))
   (setf (slot-value sh 'global-aliases) (make-hash-table :test #'equal))
+
   ;; Set default keymap
   (when (or (not (slot-boundp sh 'keymap)) (not (slot-value sh 'keymap)))
     (setf (slot-value sh 'keymap)
 	  (copy-keymap *lish-default-keymap*))
     (define-key (slot-value sh 'keymap)
 	#\escape (build-escape-map (slot-value sh 'keymap))))
+
   ;; Copy the objecs from the defined option list, and set the default values.
   (loop :with o :for opt :in *options* :do
      (setf o (shallow-copy-object opt)
 	   (arg-value o) (arg-default o))
      (push o (lish-options sh)))
+
+  ;; Make command table
   (init-commands))
 
 ;; Most things that are designed to be settable by the user should likely

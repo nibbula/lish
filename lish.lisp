@@ -1248,6 +1248,16 @@ consulting the file system."
       ((and (fboundp (symbolify command)))	  :function)
       (t nil))))
 
+;; @@@ Maybe this would be better done by typep, but then we'd have to somehow
+;; put aliaes, systems, and files, into the type system?
+(defun maybe-a-command-p (expr)
+  "Return true if ‘expr’ has a first symbol which might be a command."
+  (and expr
+       (symbolp (car expr))
+       (not (member (command-type *shell* (string-downcase (car expr))
+				  :already-known t)
+		    '(:directory :function)))))
+
 (defun call-parenless (func line context)
   "Apply the function to the line, and return the proper values. If there are
 not enough arguements supplied, and *INPUT* is set, i.e. it's a recipient of
@@ -1673,26 +1683,24 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		  (setf (output) (car result-values))
 		  (values result-values output show-p))))
 	     ((consp expr)
-	      (case (command-type shell (string-downcase (car expr)))
-		((:command :file)
-		 ;; Try to do a system command in s-exp syntax
-		 (shell-eval
-		  (shell-read
-		   (join-by-string
-		    (cons
-		     (string-downcase (car expr))
-		     (with-package *lish-user-package*
-		       (let ((*print-case* :downcase)
-			     (*print-escape* nil))
-			 (mapcar (_ (if (consp _)
-					(s+ #\" (prin1-to-string _) #\")
-					(prin1-to-string _)))
-				 (cdr expr)))))
-		    #\space))
-		  :context context))
-		(t
-		 (with-package *lish-user-package*
-		   (values (multiple-value-list (eval expr)) nil t)))))
+	      (if (maybe-a-command-p expr)
+		  ;; Try to do a system command in s-exp syntax
+		  (shell-eval
+		   (shell-read
+		    (join-by-string
+		     (cons
+		      (string-downcase (car expr))
+		      (with-package *lish-user-package*
+		        (let ((*print-case* :downcase)
+			      (*print-escape* nil))
+			  (mapcar (_ (if (consp _)
+					 (s+ #\" (prin1-to-string _) #\")
+				         (prin1-to-string _)))
+				  (cdr expr)))))
+		     #\space))
+		   :context context)
+		  (with-package *lish-user-package*
+		    (values (multiple-value-list (eval expr)) nil t))))
 	     ((stringp expr)
 	      (shell-eval (shell-read expr) :context context))
 	     (t
@@ -1927,7 +1935,7 @@ suspend itself."
       (uos:set-signal-action uos:+SIGQUIT+ :ignore)
       ;; Ignore suspend
       (push (cons uos:+SIGTSTP+ (uos:signal-action uos:+SIGTSTP+)) result)
-      ;;(uos:set-signal-action uos:+SIGTSTP+ :ignore)
+      ;; (uos:set-signal-action uos:+SIGTSTP+ :ignore)
       (uos:set-signal-action uos:+SIGTSTP+ 'sigtstp-handler)
       ;; Handle interrupt
       ;; #-sbcl
@@ -1950,30 +1958,21 @@ suspend itself."
   "Read a string with the line editor and convert it shell expressions."
   (with-slots ((str string) (pre-str prefix-string) this-command last-command)
       state
-    (let (saved-signals)
-      (unwind-protect
-	   (progn
-	     ;;(break)
-	     (finish-output)
-	     (tt-finish-output)
-	     (setf saved-signals (set-signals)
-		   str (rl
-			:eof-value *real-eof-symbol*
-			:quit-value *quit-symbol*
-			:history-context :lish
-			:editor (lish-editor sh)
-			:accept-does-newline nil
-			:re-edit (when pre-str
-				   (setf pre-str nil)
-				   t)
-			:prompt
-			;; (if pre-str
-			;;     (lish-sub-prompt sh)
-			    (safety-prompt sh)
-			:right-prompt (safety-prompt sh :right)
-			    )))
-	(when saved-signals
-	  (restore-signals saved-signals))))
+    (finish-output)
+    (tt-finish-output)
+    (setf str (rl :eof-value *real-eof-symbol*
+		  :quit-value *quit-symbol*
+		  :history-context :lish
+		  :editor (lish-editor sh)
+		  :accept-does-newline nil
+		  :re-edit (when pre-str
+			     (setf pre-str nil)
+			     t)
+		  :prompt
+		  ;; (if pre-str
+		  ;;     (lish-sub-prompt sh)
+		  (safety-prompt sh)
+		  :right-prompt (safety-prompt sh :right)))
     (cond
       ((and (stringp str) (equal 0 (length str))) *empty-symbol*)
       ((equal str *real-eof-symbol*)		  *real-eof-symbol*)
@@ -2215,14 +2214,34 @@ suspend itself."
 ; an interactive shell.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defmacro with-job-signals (() &body body)
+    `(unwind-protect
+	  (progn
+	    (start-job-control)
+	    ,@body)
+       (stop-job-control (shell-saved-signals *shell*))))
+
+  (defmacro with-shell-signals (() &body body)
+    "Evaluate the BODY with the system signal handlers set the way they should
+be for normal interactive execution in the shell. This usually means ignoring
+suspend ^Z and quit ^\, and setting sub-process jobs control signals."
+    (with-names (saved-signals)
+      `(let (,saved-signals)
+	 (unwind-protect
+	      (progn
+		(setf ,saved-signals (set-signals))
+		(with-job-signals ()
+		  ,@body))
+	   (when ,saved-signals
+	     (restore-signals ,saved-signals))))))
+
   (defmacro with-new-shell ((&rest args) &body body)
     "Evaluate the BODY with *SHELL* bound to anew shell instance."
     `(let* ((*shell* (make-instance 'shell ,@args))
 	    (*history-context* :lish)
 	    (*lish-level* (if *lish-level*
 			      (funcall #'1+ (symbol-value '*lish-level*))
-			      0))
-	    (saved-sigs (job-control-signals)))
+			      0)))
        ,@body))
 
   (defmacro with-shell-command (() &body body)
@@ -2232,11 +2251,9 @@ suspend itself."
        (catch 'interactive-interrupt
 	 (ensure-theme)
 	 (unwind-protect
-	      (progn
-		(start-job-control)
+	      (with-job-signals ()
 		(run-hooks *enter-shell-hook*)
 		(setf ,result (progn ,@body)))
-	   (stop-job-control saved-sigs)
 	   (run-hooks *exit-shell-hook*)))
        (if (lish-exit-values *shell*)
 	   (values-list (lish-exit-values *shell*))
@@ -2355,72 +2372,71 @@ Arguments:
 
 	(start-history sh)
 
-	(unwind-protect
-	  (progn
-	    (start-job-control)
-	    (run-hooks *enter-shell-hook*)
-	    (when (not (eq :lish-quick-exit (catch :lish-quick-exit
-	      (loop
-	       :named pippy
-	       :with expr = nil
-	       :and lvl = *lish-level*
-	       :and eof-count = 0
-	       :and retry = nil
-	       :if (lish-exit-flag sh)
-		 :if (confirm-quit)
-		   :return (values-list (lish-exit-values sh))
-		 :else
+	(with-shell-signals ()
+	  (run-hooks *enter-shell-hook*)
+	  (when (not (eq :lish-quick-exit (catch :lish-quick-exit
+	    (loop
+	      :named pippy
+	      :with expr = nil
+	      :and lvl = *lish-level*
+	      :and eof-count = 0
+	      :and retry = nil
+	      :if (lish-exit-flag sh)
+	        :if (confirm-quit)
+		  :return (values-list (lish-exit-values sh))
+		:else
 		   :do (setf (lish-exit-flag sh) nil)
-		 :end
-	       :end
-	       :do
-	       (restart-case
-		 (with-error-handling (state)
-		   (check-all-job-status sh)
-		   (if retry
-		       (setf retry nil)
-		       (setf expr (lish-read sh state)))
-		   (when (and (eq expr *real-eof-symbol*) (confirm-quit))
-		     (return-from pippy expr))
-		   (if (eq expr *quit-symbol*)
-		       (if (and (not (lish-ignore-eof sh)) (confirm-quit))
-			   (return-from pippy expr)
-			   (progn
-			     (when (numberp (lish-ignore-eof sh))
-			       (if (< eof-count (lish-ignore-eof sh))
-				   (incf eof-count)
-				   (if (confirm-quit)
-				       (return-from pippy expr)
-				       (setf eof-count 0))))
-			     (let ((remain
-				    (1+ (- (lish-ignore-eof sh) eof-count))))
-			       (format t "Type 'exit'~:[ or ~a ~d more time~p~
+		:end
+	      :end
+	      :do
+	      (restart-case
+		(with-error-handling (state)
+		  (check-all-job-status sh)
+		  (if retry
+		      (setf retry nil)
+		      (setf expr (lish-read sh state)))
+		  (when (and (eq expr *real-eof-symbol*) (confirm-quit))
+		    (return-from pippy expr))
+		  (if (eq expr *quit-symbol*)
+		      (if (and (not (lish-ignore-eof sh)) (confirm-quit))
+			  (return-from pippy expr)
+			  (progn
+			    (when (numberp (lish-ignore-eof sh))
+			      (if (< eof-count (lish-ignore-eof sh))
+				  (incf eof-count)
+				  (if (confirm-quit)
+				      (return-from pippy expr)
+				      (setf eof-count 0))))
+			    (let ((remain
+				   (1+ (- (lish-ignore-eof sh) eof-count))))
+			      (format t "Type 'exit'~:[ or ~a ~d more time~p~
 					  ~;~^~] to exit the shell.~%"
-				       (zerop eof-count)
-				       (char-util:nice-char
-					(rl::last-event (lish-editor sh))
-					:caret t)
-				       remain remain))))
-		       (progn
-			 (setf eof-count 0)
-			 (lish-eval sh expr state)))
-		   (setf (read-state-error-count state) 0))
-		 (abort ()
-		   :report
-		   (lambda (stream)
-		     (format stream
-			     "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
-			     (= lvl 0) (/= lvl 0) lvl))
-		   nil)
-		 (retry ()
-		   :report
-		   (lambda (stream)
-		     (format stream
-			     "Retry Lish command ~:[~;TOP ~]level~:[~; ~d~]."
-			     (= lvl 0) (/= lvl 0) lvl))
-		   (setf retry t)
-		   nil))))))))
-	  (stop-job-control saved-sigs))
+				      (zerop eof-count)
+				      (char-util:nice-char
+				       (rl::last-event (lish-editor sh))
+				       :caret t)
+				      remain remain))))
+		      (progn
+			(setf eof-count 0)
+			(lish-eval sh expr state)))
+		  (setf (read-state-error-count state) 0))
+		(abort ()
+		  :report
+		  (lambda (stream)
+		    (format stream
+			    "Return to Lish ~:[~;TOP ~]level~:[~; ~d~]."
+			    (= lvl 0) (/= lvl 0) lvl))
+		  nil)
+		(retry ()
+		  :report
+		  (lambda (stream)
+		    (format stream
+			    "Retry Lish command ~:[~;TOP ~]level~:[~; ~d~]."
+			    (= lvl 0) (/= lvl 0) lvl))
+		  (setf retry t)
+		  nil)))))))
+	  ;; (stop-job-control saved-sigs)
+	  )
 	;;(save-command-stats)
 	(run-hooks *exit-shell-hook*)))
 
