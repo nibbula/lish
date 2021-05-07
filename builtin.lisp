@@ -280,7 +280,7 @@ is familiar and not too surprising to those who know either.
 It is vaguely like:
   ; comment
   command [arg...]
-  command \"string\" ,*lisp-object* ,(lisp-code) $ENV_VAR
+  command \"string\" ,*lisp-object* (lisp-code) $ENV_VAR
   command *.glob ?ooba[rz]
   command word\\ with\\ spaces \"string \\\" with a double quote\"
   command | command | ...

@@ -95,7 +95,7 @@ a normal lisp object.
 The syntax is vaguely like:
   ; comment
   command [arg...]
-  command \"string\" !*lisp-object* !(lisp-code)
+  command \"string\" ,*lisp-object* (lisp-code)
   command word\ with\ spaces \"string \\\" with a double quote\"
   command | command | ...
   command < file-name
@@ -119,7 +119,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	(lisp-quote nil)
 	(in-compound nil)
 	(did-quote nil)
-	(brace-depth 0))		;
+	(brace-depth 0)			; count braces and brakets
+	(bracket-depth 0))		; so we don't expand ! or , in them
     (labels ((reset-word ()
 	       "Reset the word to be empty."
 	       (setf (fill-pointer w) 0
@@ -341,9 +342,18 @@ value, an explaination which consists of (tag-symbol datum...)."
 	    (when (plusp brace-depth)
 	      (decf brace-depth))
 	    (add-to-word))
+	   ;; Hack to not expand ! in brackets
+	   ((eql c #\[)
+	    (incf bracket-depth)
+	    (add-to-word))
+	   ((eql c #\])
+	    (when (plusp bracket-depth)
+	      (decf bracket-depth))
+	    (add-to-word))
 	   ;; a lisp expr
 	   ;; ((eql c #\!)
-	   ((or (eql c #\!) (and (eql c #\,) (zerop brace-depth)))
+	   ((or (and (eql c #\!) (zerop bracket-depth))
+		(and (eql c #\,) (zerop brace-depth)))
 	    (dbugf 'reader "sub-expr ")
 	    (setf sub-expr nil)
 	    (finish-word)
