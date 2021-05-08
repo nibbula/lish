@@ -28,7 +28,6 @@ LISH_LEVEL environment variable.")
 	string)))
 
 ;; This is mostly for bash compatibility.
-
 (defun format-prompt (sh prompt &optional (escape-char #\%))
   "Return the prompt string with bash-like formatting character replacements.
 So far we support:
@@ -67,67 +66,72 @@ So far we support:
  %j      The number of jobs currently managed by the shell.
 "
   (declare (ignore sh))
-  ;;(let ((out (make-stretchy-string 80)))
-  (let ((out (make-stretchy-string (length prompt))))
-    (with-output-to-string (str out)
-      (loop :with c :for i :from 0 :below (length prompt) :do
-	 (setf c (aref prompt i))
-	 (if (equal c escape-char)
-	     (progn
-	       (incf i)
-	       (when (< i (length prompt))
-		 (setf c (aref prompt i))
-		 (case c
-		   (#\% (write-char escape-char str))
-		   (#\a (write-char #\bell str))
-		   (#\e (write-char #\escape str))
-		   (#\n (write-char #\newline str))
-		   (#\r (write-char #\return str))
-		   ((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9)
-		    (write-char (code-char
-				 (parse-integer
-				  (subseq prompt i (+ i 3)) :radix 8))
-				str))
-		   (#\s (write-string (princ-to-string *shell-name*) str))
-		   (#\v (princ *major-version* str))
-		   (#\V (write-string (princ-to-string *version*) str))
-		   (#\u (write-string (nos:user-name) str))
-		   (#\h (write-string
-			 (initial-span (os-machine-instance) ".") str))
-		   (#\H (write-string (machine-instance) str))
-		   (#\w (write-string (twiddlify (nos:current-directory)) str))
-		   (#\W (write-string
-			 (twiddlify (basename (nos:current-directory))) str))
-		   (#\$ (write-char
-			 (if (= (nos:user-id :effective t) 0) #\# #\$) str))
-		   (#\i (write-string (princ-to-string
-				       *lisp-implementation-nickname*) str))
-		   (#\p (write-string
-			 (s+ (and *lish-user-package*
-				   (last-dot-segment
-				    (shortest-package-nick
-				     *lish-user-package*))))
-			 str))
-		   (#\P (write-string
-			 (s+ (and *lish-user-package*
-				  (package-name *lish-user-package*))) str))
-		   (#\d (write-string
-			 (format-date "~3a ~3a ~2d"
-				      (:day-abbrev :month-abbrev :date)) str))
-		   (#\t (write-string
-			 (format-date "~2,'0d:~2,'0d:~2,'0d"
-				      (:hours :minutes :seconds)) str))
-		   (#\T (write-string
-			 (format-date "~2,'0d:~2,'0d:~2,'0d"
-				      (:12-hours :minutes :seconds)) str))
-		   (#\@ (write-string
-			 (format-date "~2,'0d:~2,'0d ~2a"
-				      (:12-hours :minutes :am)) str))
-		   (#\A (write-string
-			 (format-date "~2,'0d:~2,'0d" (:hours :minutes)) str))
-		   )))
-	     (write-char c str))))
-    out))
+  (flet ((output-loop (str)
+    (loop :with c
+      :for i :from 0 :below (olength prompt) :do
+      (setf c (oelt prompt i))
+      (if (equal c escape-char)
+	  (progn
+	    (incf i)
+	    (when (< i (olength prompt))
+	      (setf c (simplify-char (oelt prompt i)))
+	      (case c
+		(#\% (write-char escape-char str))
+		(#\a (write-char #\bell str))
+		(#\e (write-char #\escape str))
+		(#\n (write-char #\newline str))
+		(#\r (write-char #\return str))
+		((#\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9)
+		 (write-char (code-char
+			      (parse-integer
+			       (osubseq prompt i (+ i 3)) :radix 8))
+			     str))
+		(#\s (write-string (princ-to-string *shell-name*) str))
+		(#\v (princ *major-version* str))
+		(#\V (write-string (princ-to-string *version*) str))
+		(#\u (write-string (nos:user-name) str))
+		(#\h (write-string
+		      (initial-span (os-machine-instance) ".") str))
+		(#\H (write-string (machine-instance) str))
+		(#\w (write-string (twiddlify (nos:current-directory)) str))
+		(#\W (write-string
+		      (twiddlify (basename (nos:current-directory))) str))
+		(#\$ (write-char
+		      (if (= (nos:user-id :effective t) 0) #\# #\$) str))
+		(#\i (write-string (princ-to-string
+				    *lisp-implementation-nickname*) str))
+		(#\p (write-string
+		      (s+ (and *lish-user-package*
+			       (last-dot-segment
+				(shortest-package-nick
+				 *lish-user-package*))))
+		      str))
+		(#\P (write-string
+		      (s+ (and *lish-user-package*
+			       (package-name *lish-user-package*))) str))
+		(#\d (write-string
+		      (format-date "~3a ~3a ~2d"
+				   (:day-abbrev :month-abbrev :date)) str))
+		(#\t (write-string
+		      (format-date "~2,'0d:~2,'0d:~2,'0d"
+				   (:hours :minutes :seconds)) str))
+		(#\T (write-string
+		      (format-date "~2,'0d:~2,'0d:~2,'0d"
+				   (:12-hours :minutes :seconds)) str))
+		(#\@ (write-string
+		      (format-date "~2,'0d:~2,'0d ~2a"
+				   (:12-hours :minutes :am)) str))
+		(#\A (write-string
+		      (format-date "~2,'0d:~2,'0d" (:hours :minutes)) str))
+		)))
+	;; (write-char c str)
+	(princ c str)
+	))))
+    (etypecase prompt
+      (string
+       (with-output-to-string (str) (output-loop str)))
+      ((or fat-string fatchar-string)
+       (with-output-to-fat-string (str) (output-loop str))))))
 
 (defun symbolic-prompt-to-string (sh symbolic-prompt #| &optional ts-in |#)
   "Take a symbolic prompt and turn it into a fat-string. This uses
