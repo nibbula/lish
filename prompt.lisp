@@ -27,6 +27,24 @@ LISH_LEVEL environment variable.")
 	(osubseq string (1+ pos))
 	string)))
 
+;; @@@ Should this be somewhere else? Do we need some kind of spacing DSL?
+(defun fill-middle (left middle-char right)
+  "Return a fat string exactly fitting the in the termimnal width, with LEFT,
+the MIDDLE-CHAR repeated an appropriate amount, and then RIGHT."
+  (let* ((l (char-util:display-length left))
+         (r (char-util:display-length right))
+         (m (max 0 (- (tt-width) l r))))
+    (if (zerop m)
+	(fs+ left middle-char right)
+        (fatchar-io:fs+
+	 left
+	 (fatchar:make-fat-string
+	  :length m
+	  :initial-element (etypecase middle-char
+			     (fatchar middle-char)
+			     (character (make-fatchar :c middle-char))))
+	 right))))
+
 ;; This is mostly for bash compatibility.
 (defun format-prompt (sh prompt &optional (escape-char #\%))
   "Return the prompt string with bash-like formatting character replacements.
@@ -161,10 +179,8 @@ Strings can have '%' directives which are expanded by format-prompt."
    (lambda (x) ; eval is magic
      (cond
        ((and (listp x) (symbolp (car x)) (fboundp (car x)))
-	;; (apply (car x) (cdr x))
 	;; Actually we need a full eval here.
-	(values (eval x) t)
-	)
+	(values (eval x) t))
        ((symbolp x)
 	(when (boundp x)
 	  (values (symbol-value x) nil)))

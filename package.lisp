@@ -149,6 +149,7 @@ without any particular knowledge of it's Lisp programming features.
    #:shell-eval
    #:shell-expand
    #:shell-expand-to-list
+   #:fill-middle
    #:format-prompt
    #:symbolic-prompt-to-string
    #:load-file
