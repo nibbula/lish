@@ -1986,6 +1986,7 @@ suspend itself."
 			     (s+ pre-str #\newline str)
 			     str)))))))
 
+#+(or)
 (defun maybe-save-values (vals show-vals)
   "Save result values in the history if the option is on."
   (when (get-option *shell* 'history-save-values)
@@ -2057,7 +2058,7 @@ suspend itself."
 			 *** **
 			 ** *
 			 * (car vals-list))
-		   (maybe-save-values vals show-vals)
+		   ;; (maybe-save-values vals show-vals)
 		   (when show-vals
 		     ;; Maybe save expression values in history.
 		     (lish-print vals)))
