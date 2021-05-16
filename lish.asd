@@ -8,7 +8,7 @@
     ;;:version            "0.1.0"
     :version		(:read-file-form "version.lisp")
     :author             "Nibby Nebbulous <nibbula -(. @ .)- gmail.com>"
-    :licence            "GPLv3"
+    :licence            "GPL-3.0-only"
     :source-control	:git
     :long-description   "Lish is a Lisp shell. Don't hold your breath."
     :entry-point	"lish:shell-toplevel"
