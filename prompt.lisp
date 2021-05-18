@@ -28,21 +28,25 @@ LISH_LEVEL environment variable.")
 	string)))
 
 ;; @@@ Should this be somewhere else? Do we need some kind of spacing DSL?
-(defun fill-middle (left middle-char right)
-  "Return a fat string exactly fitting the in the termimnal width, with LEFT,
-the MIDDLE-CHAR repeated an appropriate amount, and then RIGHT."
+(defun fill-middle (left middle-char right &key post-process)
+  "Return a fat string exactly fitting the in the termimnal width, with ‘left’,
+the ‘middle-char’ repeated an appropriate amount, and then ‘right’.
+‘post-process’ is function to apply to the middle string, the result of which
+is used as the middle string, if it's non-NIL."
   (let* ((l (char-util:display-length left))
          (r (char-util:display-length right))
-         (m (max 0 (- (tt-width) l r))))
+         (m (max 0 (- (tt-width) l r)))
+	 (middle (fatchar:make-fat-string
+		  :length m
+		  :initial-element
+		  (etypecase middle-char
+		    (fatchar middle-char)
+		    (character (make-fatchar :c middle-char))))))
     (if (zerop m)
 	(fs+ left middle-char right)
         (fatchar-io:fs+
 	 left
-	 (fatchar:make-fat-string
-	  :length m
-	  :initial-element (etypecase middle-char
-			     (fatchar middle-char)
-			     (character (make-fatchar :c middle-char))))
+	 (if post-process (or (funcall post-process middle) middle) middle)
 	 right))))
 
 ;; This is mostly for bash compatibility.
@@ -375,5 +379,42 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 	  ;; Errors are particularly useless and annoying here. 
 	  (throw 'whatever nil))
 	))))
+
+(defun gradientize (string start-color end-color &key (start 0) end (which :bg))
+  "Make the color of string be a gradient from ‘start-color’ to ‘end-color’.
+Only effect characters from ‘start’ to ‘end’. ‘which’ is either :fg or :bg to
+indicate which color to affect, and defaults to :bg."
+  (when (not end)
+    (setf end (olength string)))
+
+  (setf start-color (dcolor:lookup-color start-color)
+	end-color (dcolor:lookup-color end-color))
+
+  (let* ((steps (- end start))
+	 (end-red     (dcolor:color-component end-color :red))
+	 (end-blue    (dcolor:color-component end-color :blue))
+	 (end-green   (dcolor:color-component end-color :green))
+	 (start-red   (dcolor:color-component start-color :red))
+	 (start-blue  (dcolor:color-component start-color :blue))
+	 (start-green (dcolor:color-component start-color :green))
+	 (red-step   (/ (abs (- end-red   start-red))   (- steps 1)))
+	 (green-step (/ (abs (- end-green start-green)) (- steps 1)))
+	 (blue-step  (/ (abs (- end-blue  start-blue))  (- steps 1))))
+    (setf red-step   (if (< (- end-red  start-red) 0)
+			 (- red-step) red-step))
+    (setf green-step (if (< (- end-green  start-green) 0)
+			 (- green-step) green-step))
+    (setf blue-step  (if (< (- end-blue  start-blue) 0)
+			  (- blue-step) blue-step))
+
+    (loop :for i :from start :below (+ start steps)
+	  :for r = start-red   :then (+ r red-step)
+	  :for g = start-green :then (+ g green-step)
+	  :for b = start-blue  :then (+ b blue-step)
+       :do
+       (case which
+	 (:fg (setf (fatchar-fg (oelt string i)) (vector :rgb r g b)))
+	 (:bg (setf (fatchar-bg (oelt string i)) (vector :rgb r g b))))))
+  string)
 
 ;; EOF
