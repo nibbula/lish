@@ -150,6 +150,7 @@ without any particular knowledge of it's Lisp programming features.
    #:shell-expand
    #:shell-expand-to-list
    #:fill-middle
+   #:gradientize
    #:format-prompt
    #:symbolic-prompt-to-string
    #:load-file
