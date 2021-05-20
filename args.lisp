@@ -1,6 +1,6 @@
-;;
-;; args.lisp - Command arguments.
-;;
+;;;
+;;; args.lisp - Command arguments.
+;;;
 
 (in-package :lish)
 
