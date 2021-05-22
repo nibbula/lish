@@ -124,10 +124,6 @@ means every dumped executable."))
 (defparameter *error-symbol*    :Z-ERROR-Z)
 (defparameter *quit-symbol*     :Z-QUIT-Z)
 
-;;; A place to put the list of visited directories.
-;;; Has an hardcoded length of 32 directories.
-(defvar *directory-ring* '())
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Types?
 

@@ -48,6 +48,15 @@
     :accessor lish-dir-list
     :initform nil
     :documentation "Directory list for pushd and popd.")
+   (directory-ring
+    :initarg :directory-ring :accessor lish-directory-ring :initform '()
+    :type list
+    :documentation
+    "A place to put the list of visited directories.")
+   (directory-ring-size
+    :initarg :directory-ring-size :accessor lish-directory-ring-size
+    :initform 32 :type fixnum
+    :documentation "Limit for the directory ring.")
    (jobs
     :accessor lish-jobs :initarg :jobs :initform nil
     :documentation "List of jobs.")

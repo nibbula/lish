@@ -23,6 +23,20 @@
   (or (nos:environment-variable "HOME") (nos:user-home)
       (namestring (user-homedir-pathname))))
 
+(defun push-directory-ring (dir)
+  "Push ‘dir’ on the directory ring."
+  (with-slots (directory-ring directory-ring-size) *shell*
+    (when (> (length directory-ring) directory-ring-size)
+      (pop directory-ring))
+  (setf directory-ring (append directory-ring (list dir)))))
+
+(defun find-directory-in-ring (regexp)
+  "Return a directory from the directory ring matching ‘regexp’. If not found
+just return the current directory."
+  (let ((result (find regexp (lish-directory-ring *shell*)
+		      :test #'cl-ppcre:scan)))
+    (or result (nos:current-directory))))
+
 (defbuiltin cd ((directory directory :help "Directory to change to."))
   "Change the current directory to DIRECTORY. If DIRECTORY isn't specified,
 use *input* if it's a directory or the shell's idea of the user's home
