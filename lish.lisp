@@ -2535,8 +2535,15 @@ by spaces."
       ;; Turn on core compression if it's available
       (when (and smaller (has-feature :sb-core-compression))
 	(setf options '(:compression t))))
+    ;; Clear the user packages
+    (delete-package *lish-user-package*)
+    (delete-package *junk-package*)
+    (setf *lish-user-package* nil
+	  *lish-user-package* (make-user-package)
+	  *junk-package* (make-package :lish-junk))
     ;; Make sure ASDF is cleared.
     (asdf:clear-configuration)
+    (setf asdf:*central-registry* nil)
     (apply #'save-image-and-exit name :initial-function #'lish:shell-toplevel
 	   options)))
 
