@@ -2541,6 +2541,10 @@ by spaces."
     (setf *lish-user-package* nil
 	  *lish-user-package* (make-user-package)
 	  *junk-package* (make-package :lish-junk))
+    ;; Save the build locale data in the image so we don't need it around at
+    ;; runtime. @@@ Later it should be a option in build system, which locale
+    ;; if any, or all, should be saved in the image.
+    (locale:ensure-locale)
     ;; Make sure ASDF is cleared.
     (asdf:clear-configuration)
     (setf asdf:*central-registry* nil)
