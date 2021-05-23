@@ -16,7 +16,7 @@
 		 :table :table-print :reader-ext :dlib-interactive :completion
 		 :keymap :terminal :terminal-ansi :rl
 		 :fatchar :fatchar-io :magic :theme :style :collections
-		 :ostring :ochar :grout :utf8b-stream :dtime
+		 :ostring :ochar :grout :utf8b-stream :dtime :locale
 		 #+use-re :re
 		 #-use-re :cl-ppcre
 		 :chipz :bordeaux-threads #|:agnostic-lizard|#)
