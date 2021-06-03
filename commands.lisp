@@ -2,37 +2,19 @@
 ;;; commands.lisp - How Lish does commands
 ;;;
 
-;; This defines the structure of commands and specification of command
-;; arguments. Lish commands have thier own style of arguments, which are
-;; different than Lisp function arguments and Unix command arguments, but can
-;; be usually converted between them. This allows us to keep useful
-;; information about command arguments, but still treat Unix programs and Lisp
-;; functions as commands. The extra infomation about arguments is most useful
-;; for completion and input help. The point is to give the user a lot of
-;; assistance entering commands.
+;; Define command objects through which a command can be invoked. We store a
+;; fair amount of command properties, such the arguments to commands,
+;; documentation, and things useful for completion.
+;;
+;; We provide the ‘defcommand’ macro for defining commands. There are also a
+;; few subtypes of command such and builtin and external. This file also
+;; contains the code for converting from a unix style command invocation, to
+;; lisp arguments for the command function.
 
 (in-package :lish)
 
 (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
 		   (compilation-speed 0)))
-
-(define-condition shell-error (error)
-  ((format
-    :accessor shell-error-format
-    :initarg :format
-    :type string
-    :documentation "Format control for error reporting.")
-   (arguments
-    :accessor shell-error-arguments
-    :initarg :arguments :initform nil
-    :type list
-    :documentation "Format arguments for error reporting."))
-  (:report (lambda (c s)
-	     (when (shell-error-format c)
-	       (format s "~?"
-		       (shell-error-format c)
-		       (shell-error-arguments c)))))
-  (:documentation "An error ocurring in the shell."))
 
 (define-condition unknown-command-error (shell-error cell-error)
   ((command-string
@@ -68,11 +50,7 @@
   (:method ((command base-command)) nil))
 
 (defclass command (base-command)
-  (
-   ;; (name
-   ;;  :accessor command-name        :initarg :name
-   ;;  :documentation "The string word that invokes the command.")
-   (function
+  ((function
     :accessor command-function    :initarg :function
     :documentation "The function that performs the command.")
    (arglist
@@ -97,9 +75,6 @@
      :UNSPECIFIED	We don't know. This is the default.
      <non-keyword>	A lisp type.
      NIL		Doesn't accept anything.")
-   ;; (built-in-p
-   ;;  :accessor command-built-in-p  :initarg :built-in-p :initform nil
-   ;;  :documentation "True if the command is considered ‘built in’.")
    (loaded-from
     :accessor command-loaded-from :initarg :loaded-from :initform nil
     :documentation "Where the command was loaded from."))
@@ -209,16 +184,6 @@ we want to use it for something in the future."
 	     (set ,defs-sym (cons ',body (symbol-value ,defs-sym))))))))
 |#
 
-#|
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defun eval-defaults (arglist)
-    "Evaluate default arguments."
-    (loop :for a :in arglist :do
-       (loop :for k = (cddr a) :then (cdr
-	  (
-    ))
-|#
-
 (defun ignorable-filter (args)
   "Given a lambda list return a list of variable names to ignore."
   (lambda-list-vars args :all-p t))
@@ -264,10 +229,6 @@ we want to use it for something in the future."
 ;;   Affected By
 ;;   See Also
 ;;   Notes
-
-;; Don't export stuff because it causes package variance on reloading.
-;; @@@ Perhaps we should define commands in the LISH-USER package
-;; instead, so they can be exported and used by other packages?
 
 ;; @@@ :KEYS-AS is the deprecated name for :ARGS-AS. :ARGS-AS makes more sense
 ;; now that we don't have any non-keyword arguments.
@@ -414,7 +375,6 @@ and the name of the external program. ARGLIST is a shell argument list."
   ;;      (asdf::resolve-symlinks path))))	; XXX I know, this is cheating.
   ;; Maybe we should make our own system search function?
   ;;  i.e. push on asdf:*system-definition-search-functions*
-  (dbugf :lish-load "in-lisp-path ~s~%" command)
   (typecase command
     ((or keyword symbol)
      (ignore-errors (asdf:find-component nil command)))
@@ -445,7 +405,6 @@ and the name of the external program. ARGLIST is a shell argument list."
   "Try to load a command in the Lisp path. Return the command on success or
 NIL on failure. The Lisp path is most likely the ASDF path."
   (let* (succeeded)
-    (dbugf :lish-load "load-lisp-command ~s~%" command-name)
     (handler-case
 	(let ((asdf:*compile-file-warnings-behaviour* :ignore)
 	      (asdf:*compile-file-failure-behaviour* :ignore))
@@ -459,7 +418,6 @@ NIL on failure. The Lisp path is most likely the ASDF path."
       (asdf:operation-error (c) (declare (ignore c))))
     (if succeeded
 	(progn
-	  (dbugf :lish-load "load-lisp-command")
 	  ;; (init-commands sh)
 	  (get-command command-name))
 	;; failed
@@ -921,7 +879,7 @@ become keyword arguments, in a way specified in the command's arglist."
   ;;   (break))
   (let ((i 0)            ; Where we are in the old list, so effectively
 	                 ; a count of how many posix args we've skipped.
-;;;	(new-list        '())
+	;; (new-list     '())
 	(old-list        (copy-list p-args)) ; so we don't modify it
 	(new-flags       '())
 	(new-mandatories '())
@@ -933,9 +891,8 @@ become keyword arguments, in a way specified in the command's arglist."
 	(boolean-taken   nil)
 	(boolean-value   t)
 	possible-flags
-	has-rest-arg
 	#| (optionals '()) |#
-	)
+	has-rest-arg)
 
     ;; Pre-set some things
     (loop :for a :in (command-arglist command)
@@ -945,6 +902,12 @@ become keyword arguments, in a way specified in the command's arglist."
 	  (push a possible-flags))
 	 ((arg-rest a)
 	  (setf has-rest-arg t))))
+
+    #|
+    (let ((overrides (remove-if-not #'arg-override (command-arglist command))))
+      (when (not (null overrides))
+	(arg-override
+    |#
 
     ;; Flagged arguments (optional or manditory)
     (dbugf :lish-arg "considering flagged: ~s~%" old-list)
