@@ -99,7 +99,12 @@
     :documentation "Pattern to match."
     :initarg :pattern
     :initform nil 
-    :accessor arg-pattern))
+    :accessor arg-pattern)
+   (override ;; @@@ get rid of this after real parsing
+    :initarg :override :accessor arg-override :initform nil
+    :documentation
+    "A boolen to process before other arguments, or a function that given the
+ argument returns a boolean indicating whether to overrride."))
   (:documentation "Generic command parameter."))
 
 (defmethod initialize-instance :after
@@ -163,6 +168,28 @@
 	      short-arg *arg-normal-flag-char* short-arg
 	      long-arg *arg-normal-flag-char* *arg-normal-flag-char* long-arg))))
 
+(define-condition argument-error (shell-error cell-error)
+  ()
+  (:report (lambda (c s)
+	     (when (shell-error-format c)
+	       (format s "~?"
+		       (shell-error-format c)
+		       (shell-error-arguments c)))))
+  (:documentation "An error with command arguments."))
+
+(defun arg-error (format &rest arguments)
+  "Shorthand for an argument error."
+  (restart-case
+      (signal 'argument-error :format format :arguments arguments)
+    (use-value (value)
+      :report "Use a new value."
+      :interactive (lambda ()
+		     (multiple-value-list
+		      (eval
+		       (read-from-string
+			(rl:rl :prompt "Enter a new value (evaluated): ")))))
+      value)))
+
 (defgeneric convert-arg (arg value &optional quoted)
   (:documentation "Convert an argument value from one type to another.")
   (:method ((arg argument) value &optional quoted)
@@ -185,7 +212,7 @@
   (cond
     ((position value +true-strings+ :test #'equalp) t)
     ((position value +false-strings+ :test #'equalp) nil)
-    (t (error "Can't convert ~w to a boolean." value))))
+    (t (arg-error "Can't convert ~w to a boolean." value))))
 ;; (defmethod argument-choices ((arg arg-boolean))
 ;;   (concatenate 'list +true-strings+ +false-strings+))
 
@@ -195,7 +222,7 @@
   (let* ((num (safe-read-from-string value nil nil)))
     (if (and num (numberp num))
 	num
-	(error "Can't convert ~w to a number." value))))
+	(arg-error "Can't convert ~w to a number." value))))
 
 (defclass arg-integer (arg-number) () (:documentation "An integer."))
 (defmethod convert-arg ((arg arg-integer) (value string) &optional quoted)
@@ -204,10 +231,10 @@
       (let ((int (parse-integer-with-radix value)))
 	(if (and int (integerp int))
 	    int
-	    (error "Can't convert ~w to an integer." value)))
+	    (arg-error "Can't convert ~w to an integer." value)))
     ;; Make the error be a little more descriptive.
     (error (c)
-      (error (format nil "Can't convert arg ~w to an integer: ~a" value c)))))
+      (arg-error "Can't convert arg ~w to an integer: ~a" value c))))
 
 (defclass arg-float (arg-number) ()
   (:documentation "An floating point number."))
@@ -216,7 +243,7 @@
   (let* ((num (safe-read-from-string value nil nil)))
     (if (and num (floatp num))
 	num
-	(error "Can't convert ~w to a float." value))))
+	(arg-error "Can't convert ~w to a float." value))))
 
 (defclass arg-character (argument) () (:documentation "A character."))
 (defmethod convert-arg ((arg arg-character) (value character) &optional quoted)
@@ -228,7 +255,7 @@
   (if (= (length value) 1)
       (char value 0)
       (or (name-char value)
-	  (error "Can't convert character arg from string: ~s" value))))
+	  (arg-error "Can't convert character arg from string: ~s" value))))
 
 (defclass arg-string (argument) () (:documentation "A string."))
 (defmethod convert-arg ((arg arg-string) (value string) &optional quoted)
@@ -418,8 +445,8 @@
       (error "Choice argument has no choices ~a." (arg-name arg)))
     (if (setf choice (find value choices :test (arg-choice-test arg)))
 	choice
-	(error "~s is not one of the choices for the argument ~:@(~a~)."
-	       value (arg-name arg)))))
+	(arg-error "~s is not one of the choices for the argument ~:@(~a~)."
+		   value (arg-name arg)))))
 
 (defmethod argument-choices ((arg arg-choice))
   (cond
@@ -484,7 +511,7 @@
 ;;   (cond
 ;;     ((position value +true-strings+ :test #'equalp) t)
 ;;     ((position value +false-strings+ :test #'equalp) nil)
-;;     (t (error "Can't convert ~w to a boolean." value))))
+;;     (t (arg-error "Can't convert ~w to a boolean." value))))
 
 (defun option-name-list ()
   (loop :for o :in *options* :collect (arg-name o)))
