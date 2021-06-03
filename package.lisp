@@ -83,7 +83,7 @@ without any particular knowledge of it's Lisp programming features.
    #:lish-options
    ;; arguments
    #:argument
-   #:arg-name #:arg-type #:arg-value #:arg-default #:arg-repeating
+   #:arg-name #:arg-type #:arg-value #:arg-default #:arg-repeating #:arg-rest
    #:arg-optional #:arg-hidden #:arg-prompt #:arg-help #:arg-short-arg
    #:arg-long-arg
    ;; argument types
