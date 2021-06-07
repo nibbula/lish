@@ -1635,16 +1635,14 @@ option, it is as if --push was given."
 	   ;; This should probably be some system specific thing in opsys.
 	   (fix-dir (d)
 	     (let ((result (nos:safe-namestring d)))
-	       ;; @@@ special case, we should actually just convert to an
-	       ;; absolute path.
-	       (when (equal result ".")
-		 (setf result (nos:current-directory)))
+	       (when (not (nos:absolute-path-p result))
+		 (setf result (nos:path-to-absolute result)))
 	       (when (and (plusp (length result))
 			  (not (equal (char result (1- (length result)))
 				      nos:*directory-separator*)))
 		 (setf result (s+ result nos:*directory-separator*)))
-	       (unless (nos:absolute-path-p result)
-		 (error "Relative paths shouldn't be added."))
+	       (when (and (not (nos:file-exists result)) (not remove))
+		 (warn "Adding a non-existent directory to the Lisp path."))
 	       result))
 	   (do-push ()
 	     (map nil (_ (let ((fixed-dir (fix-dir _)))
