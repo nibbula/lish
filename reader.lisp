@@ -401,6 +401,9 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ;; pipe plus
 	   ((and (eql c #\|) (eql (next-char) #\+))
 	    (make-compound :pipe-plus))
+	   ;; pipe dot
+	   ((and (eql c #\|) (eql (next-char) #\.))
+	    (make-compound :pipe-dot))
 	   ;; pipe
 	   ((and (eql c #\|) (not (eql (next-char) #\|)))
 	    (make-compound :pipe 1))

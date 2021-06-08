@@ -65,6 +65,7 @@
 			   (environment nil environment-p)
 			   (flipped-io nil flipped-io-p)
 			   (pipe-plus nil pipe-plus-p)
+			   (pipe-dot nil pipe-dot-p)
 			   (background nil background-p))
   "Return a new context based on CONTEXT, with the given slots."
   (if (not context)
@@ -74,6 +75,7 @@
        :environment environment
        :flipped-io flipped-io
        :pipe-plus pipe-plus
+       :pipe-dot pipe-dot
        :background background)
       (let ((c (copy-structure context)))
 	(when in-pipe-p     (setf (context-in-pipe     c) in-pipe))
@@ -81,6 +83,7 @@
 	(when environment-p (setf (context-environment c) environment))
 	(when flipped-io-p  (setf (context-flipped-io  c) flipped-io))
 	(when pipe-plus-p   (setf (context-pipe-plus   c) pipe-plus))
+	(when pipe-dot-p    (setf (context-pipe-dot    c) pipe-dot))
 	(when background-p  (setf (context-background  c) background))
 	c)))
 
@@ -887,7 +890,8 @@ really want to keep expanding." i)))
     :append-to     ">>"
     :redirect-from "<"
     :pipe          "|"
-    :pipe-plus     "|+")
+    :pipe-plus     "|+"
+    :pipe-dot      "|.")
   "For reconstructing expression strings.")
 
 (defun compound-tag-string (keyword)
@@ -1623,7 +1627,8 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 "
   (let ((*context* (or context (make-context)))
 	first-word vals out-stream show-vals)
-    (with-slots (in-pipe out-pipe environment flipped-io pipe-plus background)
+    (with-slots (in-pipe out-pipe environment flipped-io pipe-plus pipe-dot
+		 background)
 	*context*
       (setf flipped-io nil)
       (macrolet
@@ -1640,7 +1645,8 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 					  :out-pipe ,new-pipe
 					  :environment environment
 					  :flipped-io flipped-io
-					  :pipe-plus pipe-plus)))
+					  :pipe-plus pipe-plus
+					  :pipe-dot pipe-dot)))
 					  ;;:flipped-io (not flipped-io))))
 		(declare (ignore show-vals) (ignorable vals))
 		(when ,test
@@ -1675,7 +1681,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	      ;; 	(values (multiple-value-list (eval expr)) nil t)))
 	      (with-package *lish-user-package*
 		(when (not flipped-io)
-		    (setf *input* *output*
+		    (setf *input* (if pipe-dot nil *output*)
 			  *output* nil
 			  flipped-io t))
 		(multiple-value-bind (result-values output show-p)
@@ -1715,12 +1721,15 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	   (unless no-expansions
 	     (do-expansions expr))
 	   (case (first first-word)
-	     ((:pipe :pipe-plus)
+	     ((:pipe :pipe-plus :pipe-dot)
 	      (when (not flipped-io)
-		(setf *input* *output*
+		(setf *input* (if pipe-dot nil *output*)
 		      *output* nil
 		      *pipe-plus* (eq (first first-word) :pipe-plus)
-		      (context-pipe-plus *context*) (eq (first first-word) :pipe-plus)
+		      (context-pipe-plus *context*)
+		      (eq (first first-word) :pipe-plus)
+		      (context-pipe-dot *context*)
+		      (eq (first first-word) :pipe-dot)
 		      flipped-io t))
 	      (setf (values vals out-stream show-vals)
 		    (eval-compound (successful vals) t))
@@ -1754,7 +1763,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	     ;; accepts is :unspecified because we're last in the
 	     ;; pipeline.
 	     (when (not flipped-io)
-	       (setf *input* (output)
+	       (setf *input* (if pipe-dot nil (output))
 		     *output* nil
 		     flipped-io t))
 	     (setf (values vals out-stream show-vals)

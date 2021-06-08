@@ -211,7 +211,7 @@ literally in shell syntax."
        (if (>= pos (shell-word-start w))
 	   w
 	   nil)) ; We couldn't find it?
-      ((and (consp w) (member (car w) '(:pipe :pipe-plus)))
+      ((and (consp w) (member (car w) '(:pipe :pipe-plus :pipe-dot)))
        (if (and w2 (shell-word-p w2)
 		(>= pos (shell-word-start w2)))
 	   w2

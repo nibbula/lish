@@ -170,6 +170,8 @@ variables."
   background
   ;; True if we should map parenless function calls.
   pipe-plus
+  ;; True if we should not pass the *output*.
+  pipe-dot
   )
 
 (defvar *context* nil
