@@ -11,4 +11,4 @@ sh ./build.sh
 
 The help command may be of use.
 
-*Note* that this is depends on [yew](https://github.com/nibbula/yew) and infrequently updated from there.
+*Note* that this depends on [yew](https://github.com/nibbula/yew) and is infrequently updated from there.
