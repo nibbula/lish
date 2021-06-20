@@ -242,31 +242,45 @@ we want to use it for something in the future."
   (let ((func-name (command-function-name name))
 	(name-string (string-downcase name))
 	(accepts :unspecified)
-	(fixed-body body)
+	(my-fixed-body body)
 	(fixed-arglist arglist)
-	pass-keys-as params ignorables defun-clause)
+	pass-keys-as params ignorables default-keys rest-var defun-clause)
     ;; Pull out special body tags:
     (loop :with tag
-       :while (setf tag (find (car fixed-body) *special-body-tags*)) :do
+       :while (setf tag (find (car my-fixed-body) *special-body-tags*)) :do
        (case tag
 	 (:accepts
-	  (setf accepts (cadr fixed-body)
-		fixed-body (cddr fixed-body)))
+	  (setf accepts (cadr my-fixed-body)
+		my-fixed-body (cddr my-fixed-body)))
 	 ((:keys-as :args-as)
-	  (setf pass-keys-as (cadr fixed-body)
-		fixed-body (cddr fixed-body)))))
+	  (setf pass-keys-as (setf rest-var (cadr my-fixed-body))
+		my-fixed-body (cddr my-fixed-body)))))
     (setf params (command-to-lisp-args (make-argument-list arglist t)
 				       :pass-keys-as pass-keys-as)
 	  ignorables
 	  (when (and params pass-keys-as)
 	    `((declare (ignorable ,@(ignorable-filter params)))))
+	  ;; Set the &rest parameter from the defaulted args.
+	  default-keys
+	  (when (and params pass-keys-as)
+	    `(setf ,rest-var (list
+			      ,@(loop
+				  :for a
+				  :in (remove rest-var
+					      (lambda-list-vars params))
+				  :collect (keywordify a)
+				  :collect a))))
 	  defun-clause
-	  (if do-defun
-	      `((defun ,func-name ,params
-		  ,@ignorables
-		  ,@fixed-body))
-	      `((defun ,func-name ()
-		  ,@body))))
+	  (with-decls-and-body (my-fixed-body)
+	    (if do-defun
+		`((defun ,func-name ,params
+		    ,@ignorables
+		    ,@doc-and-decls
+		    ,default-keys
+		    ,@fixed-body))
+		`((defun ,func-name ()
+		    ,@doc-and-decls
+		    ,@fixed-body)))))
     (setf fixed-arglist (loop :for a :in arglist
 			   :do (check-argument a)
 			   :collect
