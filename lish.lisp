@@ -2479,15 +2479,14 @@ Arguments:
     :choice-func (lambda () (mapcar #'string-downcase (terminal-types)))
     :help "Terminal type.")
    (debug boolean :short-arg #\d :help "True to turn on debugging."))
-  :keys-as args
+  :args-as args
   "Lisp Shell"
   (when (and greeting (not command))
     (format t "Welcome to ~a ~a~%" *shell-name* *version*))
   (remf args :greeting)
   (when (not init-file-supplied-p)
     (setf init-file (when (not no-init-file) (pick-an-rc-file))))
-  (when (getf args :no-init-file)
-    (remf args :no-init-file))
+  (remf args :no-init-file)
   (apply #'lish args))
 
 (defun wordify-list (word-list)
