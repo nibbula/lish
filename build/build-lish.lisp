@@ -238,24 +238,27 @@ strings."
 
 ;; Main or something.
 
-(let ((env-target (sf-getenv "TARGET")))
-  (when (and env-target (not (zerop (length env-target))))
-    (setf *default-target* (intern (string-upcase env-target)))))
+(defun main ()
+  (let ((env-target (sf-getenv "TARGET")))
+    (when (and env-target (not (zerop (length env-target))))
+      (setf *default-target* (intern (string-upcase env-target)))))
 
-(flet ((env-or (env default-value)
-	 (let ((result (sf-getenv env)))
-	   (or (and result (split #\space result))
-	       default-value))))
-  (setf *lisp-flags*       (env-or "LISH_FLAGS" *lisp-flags*)
-	*lisp-plain-flags* (env-or "LISH_PLAIN_FLAGS" *lisp-plain-flags*)))
+  (flet ((env-or (env default-value)
+	   (let ((result (sf-getenv env)))
+	     (or (and result (split #\space result))
+		 default-value))))
+    (setf *lisp-flags*       (env-or "LISH_FLAGS" *lisp-flags*)
+	  *lisp-plain-flags* (env-or "LISH_PLAIN_FLAGS" *lisp-plain-flags*)))
 
-(let (pos)
-  (if (and (> (length (lisp-args)) 1)
-	   (setf pos (position "--" (lisp-args) :test #'equal)))
-      (build (intern (string-upcase (nth (1+ pos) (lisp-args)))))
-      (build *default-target*)))
+  (let (pos)
+    (if (and (> (length (lisp-args)) 1)
+	     (setf pos (position "--" (lisp-args) :test #'equal)))
+	(build (intern (string-upcase (nth (1+ pos) (lisp-args)))))
+	(build *default-target*)))
 
-(when (not (sf-getenv "NO_EXIT"))
-  (exit-lisp :code *exit-code*))
+  (when (not (sf-getenv "NO_EXIT"))
+    (exit-lisp :code *exit-code*)))
+
+(main)
 
 ;; EOF
