@@ -579,12 +579,12 @@ NAME is replaced by EXPANSION before any other evaluation."
 	  (set-alias name expansion :global global :shell *shell*))))
 
 (defbuiltin unalias
-  (("global" boolean :short-arg #\g :help "True to define a global alias.")
-   ("name" string :optional nil     :help "Name of the alias to forget."))
+  ((global boolean :short-arg #\g :help "True to define a global alias.")
+   (name string :optional nil     :help "Name of the alias to forget."))
   "Remove the definition of NAME as an alias."
   (unset-alias name :global global :shell *shell*))
 
-(defbuiltin exit (("values" string :repeating t :help "Values to return."))
+(defbuiltin exit ((values string :repeating t :help "Values to return."))
   "Exit from the shell. Optionally return values."
   (when values
     (setf (lish-exit-values *shell*) (loop :for v :in values :collect v)))
@@ -592,12 +592,12 @@ NAME is replaced by EXPANSION before any other evaluation."
 
 ;; Override an implementations quit function, so that we only exit one level
 ;; of the shell, not the whole Lisp system.
-(defbuiltin quit (("values" string :repeating t :help "Values to return."))
+(defbuiltin quit ((values string :repeating t :help "Values to return."))
   :keys-as args
   "Exit from the shell. Optionally return values."
   (apply #'!exit args))
 
-(defbuiltin source (("filename" pathname :optional nil
+(defbuiltin source ((filename pathname :optional nil
  		     :help "Filename to read."))
   "Evalute lish commands in the given file."
   (without-warning (load-file filename)))
@@ -1892,7 +1892,7 @@ it can't find anything else.")
     (t
      `(progn (format t "Nothing.~%") nil))))
 
-(defbuiltin doc (("thing" object :required nil))
+(defbuiltin doc ((thing object :required nil))
   #.*doc-doc-command-doc*
   (if (not thing)
       (format t "~
