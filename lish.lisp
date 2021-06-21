@@ -1803,21 +1803,26 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	    (error "End of file in expression. Probably starting at line ~a."
 		   expression-start-line)))))))
 
+(defun expand-load-file-name (file-name)
+  (expand-tilde (expand-variables file-name)))
+
 (defun pick-an-rc-file ()
   (loop :for file :in (list *lishrc*
 			    (path-append (config-dir "lish") "lishrc")
 			    *default-lishrc*)
      :do
      (when file
-       (let ((expanded-file (expand-variables file)))
+       (let ((expanded-file (expand-load-file-name file)))
 	 (when (and expanded-file (probe-file expanded-file))
 	   (return expanded-file))))))
   
 (defun load-rc-file (init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
-  (when (and init-file (nos:file-exists init-file))
-    (let ((*lish-user-package* (find-package :lish-user)))
-      (load-file init-file))))
+  (when init-file
+    (let ((file-name (expand-load-file-name init-file)))
+      (when (nos:file-exists file-name)
+	(let ((*lish-user-package* (find-package :lish-user)))
+	  (load-file file-name))))))
 
 (defun find-id (shell)
   "Return the lowest ID that isn't in use."
