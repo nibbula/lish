@@ -24,6 +24,9 @@
     (setf systems (delete :unzip systems))
     (loop :for s :in systems
        ;; :do (asdf:load-system s :verbose nil)))
-       :do (ql:quickload s :verbose nil))))
+       :do (ql:quickload s :verbose nil)))
+
+  ;; Make sure the magic backend is loaded.
+  (magic:ensure-database))
 
 ;; EOF
