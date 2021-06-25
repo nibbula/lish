@@ -43,7 +43,7 @@ the end and didn't get a close quote, the third value is true.~
      '!
      (with-output-to-string (s)
        (loop :with c = (read-char stream)
-	  :and done
+	  ;; :and done
 	  :while (not (and (char= c #\$) (char= (peek-char nil stream) #\#)))
 	  :do
 	    (write-char c s)
