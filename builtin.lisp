@@ -1122,8 +1122,8 @@ symbolic format, otherwise output in octal."
 	    (format t "Unknown job changed ~a~%" pid)))))
   #-unix (values))
 
-(defbuiltin exec ((command-words t :repeating t
-                    :help "Words of the command to execute."))
+(defbuiltin exec
+  ((command-words t :rest t :help "Words of the command to execute."))
   "Replace the whole Lisp system with another program. This seems like a rather
 drastic thing to do to a running Lisp system."
   #+windows (declare (ignore command-words))
@@ -1131,7 +1131,7 @@ drastic thing to do to a running Lisp system."
   #+unix
   (when command-words
     (let ((path (command-pathname (first command-words))))
-      (format t "path = ~w~%command-words = ~w~%" path command-words)
+      ;; (format t "path = ~w~%command-words = ~w~%" path command-words)
       (os-unix:exec path command-words))))
 
 ;; (define-builtin-arg-type function (arg-symbol)
@@ -1599,7 +1599,7 @@ Note that this option overrides the -d and -s options."))
     (if (or no-notes no-warn)
 	(handler-bind ((condition
 			(lambda (c)
-			  #-sbcl (ignore c)
+			  #-sbcl (declare (ignore c))
 			  #+sbcl
 			  (cond
 			    ((and no-notes (typep c 'sb-ext::compiler-note))
