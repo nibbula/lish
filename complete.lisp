@@ -21,8 +21,17 @@
 		  (mapcar #'(lambda (x) (string (car x))) (nos:environment)))))
 
 (defun complete-user-name (str all)
-  (complete-list str (length str) all
-		 (mapcar (_ (nos:user-info-name _)) (nos:user-list))))
+  (let ((result
+	  (complete-list str (length str) all
+			 (mapcar (_ (nos:user-info-name _)) (nos:user-list)))))
+    ;; Put a trailing directory separator on it, it it exists.
+    (when (and (completion-result-unique result)
+	       (file-exists
+		(expand-tilde (s+ #\~ (completion-result-completion result)))))
+      (setf (completion-result-completion result)
+	    (s+ (completion-result-completion result)
+		nos:*directory-separator*)))
+    result))
 
 (defvar *verb-list* nil
   "List of current lish commands. Includes aliases, built-in commands, and ~
