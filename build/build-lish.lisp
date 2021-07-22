@@ -184,9 +184,15 @@ strings."
       (stream
        (format nil
 	       "(load \"build/build-init.lisp\") ~
-		(push (truename \"../\") asdf:*central-registry*) ~
+		(push (truename \"../lib/\") asdf:*central-registry*) ~
 		(push (truename \"../opsys/\") asdf:*central-registry*) ~
+		(push (truename \"../io/\") asdf:*central-registry*) ~
+		(push (truename \"../iof/\") asdf:*central-registry*) ~
+		(push (truename \"../syntax/\") asdf:*central-registry*) ~
+		(push (truename \"../unicode/\") asdf:*central-registry*) ~
+		(push (truename \"../terminal/\") asdf:*central-registry*) ~
 		(push (truename \"../rl/\") asdf:*central-registry*) ~
+		(push (truename \"../tools/\") asdf:*central-registry*) ~
 		(push (truename \"./\") asdf:*central-registry*) ~
 		(ql:quickload :dlib :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
@@ -205,9 +211,15 @@ strings."
       (stream
        (format nil
 	       "(load \"build/build-init.lisp\") ~
-		(push (truename \"../\") asdf:*central-registry*) ~
+		(push (truename \"../lib/\") asdf:*central-registry*) ~
 		(push (truename \"../opsys/\") asdf:*central-registry*) ~
+		(push (truename \"../io/\") asdf:*central-registry*) ~
+		(push (truename \"../iof/\") asdf:*central-registry*) ~
+		(push (truename \"../syntax/\") asdf:*central-registry*) ~
+		(push (truename \"../unicode/\") asdf:*central-registry*) ~
+		(push (truename \"../terminal/\") asdf:*central-registry*) ~
 		(push (truename \"../rl/\") asdf:*central-registry*) ~
+		(push (truename \"../tools/\") asdf:*central-registry*) ~
 		(push (truename \"./\") asdf:*central-registry*) ~
 		(ql:quickload :dlib :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
@@ -250,11 +262,13 @@ strings."
     (setf *lisp-flags*       (env-or "LISH_FLAGS" *lisp-flags*)
 	  *lisp-plain-flags* (env-or "LISH_PLAIN_FLAGS" *lisp-plain-flags*)))
 
-  (let (pos)
+  (let (pos target)
     (if (and (> (length (lisp-args)) 1)
 	     (setf pos (position "--" (lisp-args) :test #'equal)))
-	(build (intern (string-upcase (nth (1+ pos) (lisp-args)))))
-	(build *default-target*)))
+	(setf target (intern (string-upcase (nth (1+ pos) (lisp-args)))))
+	(setf target *default-target*))
+    (msg "[Target ~s]" target)
+    (build target))
 
   (when (not (sf-getenv "NO_EXIT"))
     (exit-lisp :code *exit-code*)))
