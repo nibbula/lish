@@ -104,7 +104,8 @@ means every dumped executable."))
 (defparameter *options* nil
   "List of options defined.")
 
-(defvar *default-lishrc* "$HOME/.lishrc"
+;; was "$HOME/.lishrc", but $HOME might not be set
+(defvar *default-lishrc* (nos:path-append (nos:user-home) ".lishrc")
   "Default value for the start up file.")
 
 (defvar *lishrc* nil
