@@ -2533,7 +2533,8 @@ by spaces."
       ;; )
     (nos:exit-lisp)))
 
-(defun make-standalone (&key (name "lish") (smaller t))
+(defun make-standalone (&key (name #-windows "lish" #+windows "lish.exe")
+			     (smaller t))
   "Make a lish executable."
   ;; (update-version)
   (let (options)
