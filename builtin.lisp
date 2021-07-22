@@ -410,11 +410,12 @@ For more detail see the section ‘Differences from POSIX shells’ in docs/doc.
 
 ;; This has to make sure to be able to operate without a current shell or even,
 ;; current terminal, since it's called by the documentation method.
-(defun print-command-help (cmd &optional (stream
-					  ;; (or *terminal* *standard-output*)
-					  *standard-output*
-					  ))
+(defun print-command-help (cmd &key (stream
+				     ;; (or *terminal* *standard-output*)
+				     *standard-output*)
+			       indent)
   "Print documentation for a command. Return a table."
+  (declare (ignore indent))
   (with-grout (*grout* stream)
     (grout-format "~a~%" (documentation cmd 'function))
     (let (table)
@@ -459,7 +460,12 @@ For more detail see the section ‘Differences from POSIX shells’ in docs/doc.
   (let ((cmd (get-command (string-downcase (symbol-name symbol)))))
     (when cmd
       (with-output-to-string (str)
-	(print-command-help cmd str)))))
+	(print-command-help cmd :stream str)))))
+
+(defmethod describe-object ((object command) stream)
+  (format stream "~s [~s]~%" (command-name object) (type-of object))
+  (print-command-help object :stream stream)
+  (call-next-method))
 
 (defbuiltin help ((subject help-subject :help "Subject to get help on."))
   "Show help on the subject. Without a subject show some subjects that are
