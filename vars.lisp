@@ -69,6 +69,8 @@ means every dumped executable."))
 
 (define-symbol-macro *input* (input))
 (define-symbol-macro *output* (output))
+(define-symbol-macro *i* (input))
+(define-symbol-macro *o* (output))
 
 (defvar *accepts* nil
   "What the next command in the pipeline accepts.")
