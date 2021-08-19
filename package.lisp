@@ -35,8 +35,8 @@ without any particular knowledge of it's Lisp programming features.
    #:*dir-list*
    #:*shell-path*
    #:*accepts*
-   #:*output* #:output
-   #:*input* #:input
+   #:*output* #:output #:*o*
+   #:*input* #:input #:*i*
    #:*lishrc*
    #:*version*
    #:*major-version* #:*minor-version* #:*build-version*
