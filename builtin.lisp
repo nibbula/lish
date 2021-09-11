@@ -1674,14 +1674,23 @@ option, it is as if --push was given."
 	      dir))
 	(dir (do-push))
 	(t ;; No args
-	 (loop :for d :in (load-dirs)
-	    :do
-	    (if (not (nos:file-exists d))
-		(progn
-		  (grout-set-color :red :black)
-		  (pr d)
-		  (grout-set-normal))
-		(pr d)))
+	 (typecase *input*
+	   (null
+	    ;; No input, so list it.
+	    (loop :for d :in (load-dirs)
+	     :do
+	     (if (not (nos:file-exists d))
+		 (progn
+		   (grout-set-color :red :black)
+		   (pr d)
+		   (grout-set-normal))
+		 (pr d))))
+	   ((or string pathname)
+	    (setf dir (list *input*))
+	    (do-push))
+	   (sequence
+	    (setf dir *input*)
+	    (do-push)))
 	 (setf *output* asdf:*central-registry*))))))
 
 #+quicklisp
