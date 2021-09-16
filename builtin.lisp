@@ -222,7 +222,10 @@ from stack."
     (format t "~{~a~#[~:; ~]~}" echo-list)
     (when (not no-newline)
       (terpri))
-    (setf *output* (if (not (consp *input*)) *input* echo-list))))
+    ;; pop the bubble
+    (setf *output* (if (olength-at-least-p 2 echo-list)
+		       echo-list
+		       (oelt echo-list 0)))))
 
 (defparameter *help-subjects*
   '("commands" "builtins" "external" "editor" "keys" "options" "syntax"
