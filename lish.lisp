@@ -2511,6 +2511,10 @@ by spaces."
   ;;(format t "Yo yo! ~s~%" (nos:lisp-args)) (finish-output)
   ;;(trace lish)
   ;;(trace !lish)
+  ;; No, this doesn't work:
+  ;; (asdf:initialize-output-translations)
+  (uiop:restore-image)
+
   (let* ((level-string (nos:environment-variable "LISH_LEVEL"))
 	 ;;(args-expr (when (cdr (nos:lisp-args))
 	 ;;  (shell-read (join-by-string (cdr (nos:lisp-args)) #\space
