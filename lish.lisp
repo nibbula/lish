@@ -2506,7 +2506,8 @@ by spaces."
 
 (defun shell-toplevel ()
   "For being invoked as a standalone shell."
-  (setf *standalone* t)
+  (setf *standalone* t
+	*default-lishrc* (default-lishrc))
   ;;(format t "Welcome to ~a ~a~%" *shell-name* *version*)
   ;;(format t "Yo yo! ~s~%" (nos:lisp-args)) (finish-output)
   ;;(trace lish)
@@ -2562,7 +2563,8 @@ by spaces."
 	  *junk-package* (make-package :lish-junk))
 
     ;; So the invoking user doesn't get the saving user's.
-    (setf *lishrc* nil)
+    (setf *lishrc* nil
+	  *default-lishrc* nil)
 
     ;; Save the build locale data in the image so we don't need it around at
     ;; runtime. @@@ Later it should be a option in build system, which locale
