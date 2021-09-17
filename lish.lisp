@@ -2553,16 +2553,22 @@ by spaces."
       ;; Turn on core compression if it's available
       (when (and smaller (has-feature :sb-core-compression))
 	(setf options '(:compression t))))
+
     ;; Clear the user packages
     (delete-package *lish-user-package*)
     (delete-package *junk-package*)
     (setf *lish-user-package* nil
 	  *lish-user-package* (make-user-package)
 	  *junk-package* (make-package :lish-junk))
+
+    ;; So the invoking user doesn't get the saving user's.
+    (setf *lishrc* nil)
+
     ;; Save the build locale data in the image so we don't need it around at
     ;; runtime. @@@ Later it should be a option in build system, which locale
     ;; if any, or all, should be saved in the image.
     (locale:ensure-locale)
+
     ;; Make sure ASDF is cleared.
     (asdf:clear-configuration)
     (setf asdf:*central-registry* nil)
