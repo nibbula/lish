@@ -1863,8 +1863,8 @@ process ID or a resume function designator. STATUS defaults to :RUNNING."
 			       :status status
 			       :resume-function thing)))
       (t
-       (if (and bt:*supports-threads-p*
-		(symbol-call :typep thing 'bt:thread))
+       (if (and (refer-to :bt '*supports-threads-p*)
+		(symbol-call :bt :threadp thing))
 	   (setf job (make-instance 'thread-job
 				    :id (find-id *shell*)
 				    :name name
