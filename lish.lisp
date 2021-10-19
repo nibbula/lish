@@ -1149,9 +1149,11 @@ This should be used rather than directly testing *ACCEPTS*."
   ;; (let ((types (cons first-type other-types)))
   (let ((types (append (list first-type) other-types)))
     (labels ((is-like (x type)
+	       ;; (format t "is-like ~s ~s~%" x type)
 	       (or (equal x type)
 		   #+clisp (ignore-errors (subtypep x type))
-		   #-clisp (subtypep x type)
+		   ;; #-clisp (subtypep x type)
+		   #-clisp (ignore-errors (subtypep x type))
 		   )))
       (typecase *accepts*
 	(cons
