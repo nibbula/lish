@@ -2555,7 +2555,11 @@ by spaces."
       (sb-ext:enable-debugger)
       ;; Turn on core compression if it's available
       (when (and smaller (has-feature :sb-core-compression))
-	(setf options '(:compression t))))
+	(setf options (nconc options '(:compression t))))
+
+      ;; So toplevel doesn't get any interference with the command line.
+      ;; Unfortuneately that means we can't change the damn "dynamic" space size.
+      (setf options (nconc options '(:save-runtime-options t))))
 
     ;; Clear the user packages
     (delete-package *lish-user-package*)
