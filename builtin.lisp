@@ -958,12 +958,32 @@ variables explicitly set in arguments are passed to the command."
 	  (process-times :self)
 	  (values children-u-sec children-u-ms children-s-sec children-s-ms)
 	  (process-times :children))
-    (format t "Self     User: ~a~32tSys: ~a~%"
-	    (print-time self-u-sec self-u-ms nil)
-	    (print-time self-s-sec self-s-ms nil))
-    (format t "Children User: ~a~32tSys: ~a~%"
-	    (print-time children-u-sec children-u-ms nil)
-	    (print-time children-s-sec children-s-ms nil))))
+    (labels ((label (s)
+	       (grout-write
+		(style:themed-string '(:program :label :style) s)
+		:escape nil :readably nil))
+	     (data (s)
+	       (grout-write
+		(style:themed-string '(:program :data :style) s)
+		:escape nil :readably nil)))
+    (with-grout ()
+      (label "    Self User: ")
+      (data (princ-to-string (print-time self-u-sec self-u-ms nil)))
+      (grout-format "~32t")
+      (label "System: ")
+      (data (princ-to-string (print-time self-s-sec self-s-ms nil)))
+      (grout-write #\newline :escape nil)
+      (label "Children User: ")
+      (data (princ-to-string (print-time children-u-sec children-u-ms nil)))
+      (grout-format "~32t")
+      (label "System: ")
+      (data (princ-to-string (print-time children-s-sec children-s-ms nil)))
+      (grout-write #\newline :escape nil)))
+    (setf *output*
+	  (list self-u-sec self-u-ms
+		self-s-sec self-s-ms
+		children-u-sec children-u-ms
+		children-s-sec children-s-ms))))
 
 (defbuiltin umask
     ((print-command boolean :short-arg #\p
