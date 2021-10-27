@@ -3,12 +3,9 @@
 ;;;
 
 ;; Here we define the commands that are built in to Lish.
-
-;; Most of these are really just for compatability with a POSIX shell, so
-;; perhaps on another operating system you might not need them.
-;; For example we might have a set of commands for an internet appliance
-;; like a router.
-;; @@@ Perhaps we should be able to load a built-in ‘personality’.
+;; Most of these are for familiarity and superficial compatability with a
+;; POSIX shell. You could get rid of them, or use different names, since most
+;; of their functionality is contained in Lisp functions.
 
 (in-package :lish)
 
@@ -458,12 +455,16 @@ For more detail see the section ‘Differences from POSIX shells’ in docs/doc.
       table)))
 
 ;; For use by other things. Like my "doc" command.
-;; This used to be (eql :command), but that was take by lispworks, so fuck it.
+;; This used to be (eql :command), but that was taken by lispworks, so fuck it.
 (defmethod documentation ((symbol symbol) (type (eql 'command)))
   (let ((cmd (get-command (string-downcase (symbol-name symbol)))))
     (when cmd
       (with-output-to-string (str)
 	(print-command-help cmd :stream str)))))
+
+(defmethod documentation ((command command) (type (eql 'command)))
+  (with-output-to-string (str)
+    (print-command-help command :stream str)))
 
 (defmethod describe-object ((object command) stream)
   (format stream "~s [~s]~%" (command-name object) (type-of object))
@@ -526,11 +527,11 @@ Shell options:~%")
   "Return the documentation string for the given shell command."
   (with-output-to-string (str)
     (format str "~a" (posix-synopsis b))
-    (when (documentation (command-function b) 'function)
-      (format str "~%~a" (documentation (command-function b) 'function)))
-#|    (when (command-loaded-from b)
-      (format str "~%Loaded from ~a" (command-loaded-from b))) |#
-    ))
+    (let ((doc (documentation (command-function b) 'function)))
+      (when doc
+	(format str "~%~a" doc)))))
+      ;; (when (command-loaded-from b)
+      ;; 	(format str "~%Loaded from ~a" (command-loaded-from b)))
 
 (defun set-alias (name expansion &key global (shell *shell*))
   "Define NAME to be an alias for EXPANSION.
@@ -1815,108 +1816,137 @@ things.")
     "This is the *doc-doc-doc* doc.")
 
   (defparameter *doc-doc-command-doc*
-    (s+ "Show documentation for something named by THING." #\newline
+    (s+ "Show documentation for something named by ‘thing’." #\newline
 	*doc-doc* #\newline
-	"Useful from the shell. The \"doc\" command also just calls describe if
-it can't find anything else.")
+	"The \"doc\" command also just calls ‘describe’ if it can't find anything else.")
     "Be serious now!"))
 
 (defun output-text (s)
   (syntax:format-comment-text (make-instance 'syntax-lisp:lisp-token :object s)
 			      (grout-stream *grout*)))
 
-(defun %doc (x &key (stream *standard-output*) (all t))
+(defun output-class (symbol)
+  "Print out documentation for ‘class’."
+  (let ((class (find-class symbol)))
+    (output-text (or (documentation class t) (documentation class 'type)))
+    (grout-print-table
+     (make-table-from
+      (loop :for s :in (mop:class-slots class)
+        :collect
+	  `(,(span-to-fat-string
+	      `(:fg-cyan ,(string-downcase (mop:slot-definition-name s))))
+	    ,(documentation s t)))
+      :columns '((:name "Slot") (:name "Documentation" :align :wrap))))))
+
+(defun %doc (thing &key (stream *standard-output*) (all t))
   #.*%doc-doc*
-  (when (stringp x)
-    (setf x (make-symbol x)))
-  (let ((did-one nil) (did-structure nil)
-	(p (ignore-conditions (type-error) (find-package x)))
-        (cols (or (and *terminal*
-		       (or (ignore-errors
+  (let* ((did '())
+	 (x (if (stringp thing) (make-symbol thing) thing))
+	 (p (ignore-conditions (type-error) (find-package x)))
+         (cols (or (and *terminal*
+			(or (ignore-errors
 			     (terminal-get-size *terminal*)
 			     (terminal-window-columns *terminal*))
-			   80))
-		  80)))
+			    80))
+		   80)))
     (with-grout (*grout* stream)
-      (dbugf :poo "1 *grout* = ~s stream = ~s~%" *grout* stream)
       (labels ((maybe-doc (obj type)
 		 (without-warning (documentation obj type)))
+	       (is-class (sym)
+		 (let ((c (ignore-errors (find-class sym))))
+		   (and c (typep c 'standard-class))))
 	       (print-doc (sym pkg doc-type &optional fake-type)
 		 (when (maybe-doc sym doc-type)
-		   (when did-one
+		   (when did
 		     (grout-princ #\newline))
-		   (if (and (eq doc-type 'function) (maybe-doc sym doc-type))
-		       (progn
-			 (when (and pkg (not (eq pkg (find-package :cl))))
-			   (grout-color :green :default
-					(format nil "~a " (package-name pkg)))
-			   (grout-color :green :default
-					(format nil "~:(~a~):~%"
-						(or fake-type doc-type))))
-			 (grout-format "~a~%" (function-help sym 0 :width cols)))
-		       (progn
-			 (grout-color :green :default
-				      (format nil "~:(~a~): "
-					      (or fake-type doc-type)))
-			 (when pkg
-			   (grout-color :green :default
-					(format nil "~a:" (package-name pkg))))
-			 (grout-color :green :default (format nil "~a~%" sym))))
-		   (if (eq doc-type :command)
-		       (grout-color :white :default
-				    (format nil "~a"
-					    (maybe-doc sym doc-type)))
-		       (progn
-			 (output-text (maybe-doc sym doc-type))
-			 ;;(grout-princ #\newline)
-			 ))
-		   (setf did-one t)))
+		   ;; Package and name
+		   (cond
+		     ;; Print function help for functions.
+		     ((and (eq doc-type 'function) (maybe-doc sym doc-type))
+		      (when (and pkg (not (eq pkg (find-package :cl))))
+			(grout-color :green :default
+				     (format nil "~a " (package-name pkg)))
+			(grout-color :green :default
+				     (format nil "~:(~a~):~%"
+					     (or fake-type doc-type))))
+		      (grout-format "~a~%" (function-help sym 0 :width cols)))
+		     (t
+		      (grout-color :green :default
+				   (format nil "~:(~a~): "
+					   (if (is-class sym)
+					       "Class"
+					       (or fake-type doc-type))))
+		      (when pkg
+			(grout-color :green :default
+				     (format nil "~a:" (package-name pkg))))
+		      (grout-color :green :default (format nil "~(~a~)~%" sym))))
+		   ;; The actual documentation
+		   (cond
+		     ((eq doc-type 'command)
+		      (grout-color :white :default
+				   (maybe-doc sym doc-type))
+		      (pushnew :command did))
+		     ((is-class sym)
+		      (output-class sym)
+		      (pushnew :class did))
+		     (t
+		      (output-text (maybe-doc sym doc-type))
+		      ;;(grout-princ #\newline)
+		      (pushnew (keywordify doc-type) did)))))
 	       (do-docs (sym pkg)
 		 (loop :for d :in *doc-types*
 		    :do
 		    ;; Don't print duplicate type documentation for structures,
 		    (when (and (eq d 'structure) (maybe-doc sym d))
-		      (setf did-structure t))
-		    (when (not (and (eq d 'type) did-structure))
+		      (pushnew :structure did))
+		    (when (not (and (eq d 'type) (find :structure did)))
 		      (print-doc sym pkg d)))))
 	;;(do-docs x nil)
-	(when (and (or (not did-one) all)
+	(when (and (or (not did) all)
 		   #+sbcl (not (symbolp x)) ; sbcl warns about this
 		   (maybe-doc x t))
 	  ;;(grout-color :white :default
 	  ;;       (format nil "~a~%" (maybe-doc x t)))
-	  (when did-one
+	  (when did
 	    (grout-princ #\newline))
 	  (output-text (maybe-doc x t))
-	  (setf did-one t))
+	  (push t did))
+
 	;; We have to check packages separately
 	(when (and p (maybe-doc p t))
-	  (when did-one
+	  (when did
 	    (grout-princ #\newline))
 	  (grout-color :green :default "Package:")
 	  (grout-princ #\newline)
 	  ;;(grout-color :white :default
 	  ;;	       (format nil "~%~a~%" (maybe-doc p t)))
 	  (output-text (maybe-doc p t))
-	  (setf did-one t))
+	  (push t did))
+
 	;; Check for the symbol name in other packages
-	(when (and (symbolp x) (or (not did-one) all))
+	(when (and (symbolp x) (or (not did) all))
 	  (loop :for s :in (find-all-symbols (symbol-name x))
 	     :do
 	     ;(when (not (eq (symbol-package s) (find-package :cl)))
 	     (do-docs s (symbol-package s))))
+
 	;; Check for the command symbol in other packages
 	;; (when (or (not did-one) all)
 	;;   (loop :for s :in (find-all-symbols (s+ "!" (symbol-name x)))
 	;;      :do
 	;;      ;;(do-docs s (symbol-package s))
 	;;      (print-doc s (symbol-package s) 'function 'command)))
-	(when (or (not did-one) all)
-	  (print-doc x nil :command))
+	(when (or did all)
+	  (let ((c (get-command (or (and (stringp thing) thing)
+				    (string-downcase x)))))
+	    (when c
+	      ;; (print-doc c nil 'command)
+	      (print-doc thing nil 'command)
+	      )))
 	;;(when (not did-one)
 	;; (grout-format "Nothing.~%"))
 	))
-    did-one))
+    did))
 
 ;; This is a macro just so we don't have to quote the argument.
 (defmacro doc (x)
@@ -1930,7 +1960,8 @@ it can't find anything else.")
     (t
      `(progn (format t "Nothing.~%") nil))))
 
-(defbuiltin doc ((thing object :required nil))
+(defbuiltin doc
+ ((thing object :required nil :help "What to get documentation for."))
   #.*doc-doc-command-doc*
   (if (not thing)
       (format t "~
@@ -1939,8 +1970,9 @@ Try typing \"doc doc\".
 ")
       (progn
 	;;(format t "Thing is a ~s with the value ~s.~%" (type-of thing) thing)
-	(when (not (%doc thing))
-	  (describe thing)))))
+	(when (not (setf *output* (%doc thing #| :stream *terminal* |#)))
+	  (describe thing))
+	*output*)))
 
 ;; This is just a convenient wrapper around defparameter. I'm not really sure
 ;; this is a "good thing", but it can be useful for interactive programming.
