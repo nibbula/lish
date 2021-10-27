@@ -13,8 +13,8 @@
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
-		   (compilation-speed 0)))
+;; (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+;; 		   (compilation-speed 0)))
 
 (define-condition unknown-command-error (shell-error cell-error)
   ((command-string
