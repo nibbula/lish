@@ -703,6 +703,8 @@ type, e.g.:
   (arg-convert ((arg arg-foo) (value zoo-type)))
 where ARG is the name of the argument and VALUE is the name of the
 value to be converted.
+
+See the documentation for ‘lish:argument’.
 "
   `(%defargtype ,name :lish-user (,@superclasses) ,@body))
 
