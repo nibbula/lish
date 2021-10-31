@@ -1469,6 +1469,17 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
        (setf args (cdr args))))
   *output*)
 
+;; Which which is which?
+;; (set-alias "which" "type -p") or maybe just "type"
+
+(defbuiltin which
+  ((all boolean :short-arg #\a
+    :help "Show all definitions of the name.")
+   (names string :repeating t
+    :help "Names to describe."))
+  "Describe which command is invoked."
+  (!type :all all :names names))
+
 (defun edit-opt (name &optional (value nil value-supplied-p))
   (read-from-string
    (rl :prompt (s+ name " := ")
