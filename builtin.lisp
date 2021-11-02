@@ -284,8 +284,10 @@ Some notable keys are:
  <Control-B>  Move the cursor back one character. Also the <Left Arrow> key.
  <Control-F>  Move the cursor forward one character. Also the <Right Arrow> key.
  <Control-Q>  Quote next character, like if you want to really type '?'.
- <F9>         Switch back and forth between LISH and the lisp REPL.
 ")
+;; This doesn't really work unless you start lish from inside a tiny-repl, so we
+;; probably shouldn't advertise it. It's relatively pointless anyway.
+;; <F9>         Switch back and forth between LISH and the lisp REPL.
 
 ;; @@@ I want this to be markdown or something. At least fit the paragraphs to
 ;; the width of the terminal.
@@ -339,12 +341,12 @@ Commands can be:
     The current value is: ~a.~%~%")
 
 (defparameter *differences-help*
-  "Lish is very different from a POSIX shell. The most notable differences are:
+  "Lish is different from a POSIX shell. The most notable differences are:
 
 - Parentheses switch to Lisp syntax, and don't mean run in sub-shell.
   Lisp inside parentheses is evaluated and substituted in the current line.
 - String quoting is done only with double quote \". Single quote ' and back
-  quote `, are not special to avoid confusion with Lisp.
+  quote `, are not special to avoid confusion with Lisp syntax.
 - The prefix VAR=value isn't supported. Use the ‘env’ command instead.
 - Redirection syntax is different, e.g \"2>&1\" doesn't work.
 - Commands can be Lish commands and Lisp functions, as well as executables
@@ -371,6 +373,7 @@ For more detail see the section ‘Differences from POSIX shells’ in docs/doc.
   ;;     ;; add spaces in front and clip to screen columns
   ;;     (format t "  ~a~%" (subseq l 0 (min (length l)
   ;; 					  (- (get-cols) 2)))))))
+  #|
   (let* ((prefix-size (loop :for a :in rows :maximize (length (car a))))
 	 (prefix-len (+ prefix-size 5))
 	 (prefix-string (make-string prefix-len :initial-element #\space)))
@@ -381,7 +384,15 @@ For more detail see the section ‘Differences from POSIX shells’ in docs/doc.
 	 (justify-text (substitute #\space #\newline b)
 		       :prefix prefix-string :start-column prefix-len
 		       :omit-first-prefix t :cols (get-cols)))
-       (terpri))))
+       (terpri)))
+  |#
+  (with-grout ()
+    (let ((table (make-table-from
+		  rows
+		  :columns '((:name "Name")
+			     (:name "Description" :align :wrap)))))
+      (grout-print-table table :print-titles nil)
+      table)))
   
 (defun command-list (type)
   "Return a list of commands of TYPE."
@@ -393,19 +404,27 @@ For more detail see the section ‘Differences from POSIX shells’ in docs/doc.
 
 (defun print-multiple-command-help (commands)
   (let ((rows
-	 (loop :with doc :and pos
-	    :for k :in commands :do
-	    (setf doc (documentation (command-function k) 'function)
-		  pos (position #\. doc))
+	 (loop
+	    :for k :in commands
 	    :collect
-	    (list
-	     (command-name k)
-	     ;; Only the first sentance, i.e. up to the first period,
-	     ;; without newlines.
-	     (substitute #\space #\newline
-			 (if pos
-			     (subseq doc 0 (1+ pos))
-			     doc))))))
+	    (etypecase k ;; @@@ make generic?
+	      (autoloaded-command
+	       (list (command-name k)
+		     (string-downcase (command-load-from k))
+		     ;; (documentation
+		     ;;  (command-function-name (command-name k)) 'function)
+		     ))
+	      (command
+	       (let* ((doc (documentation (command-function k) 'function))
+		      (pos (position #\. doc)))
+		 (list
+		  (command-name k)
+		  ;; Only the first sentance, i.e. up to the first period,
+		  ;; without newlines.
+		  (substitute #\space #\newline
+			      (if pos
+				  (subseq doc 0 (1+ pos))
+				  doc)))))))))
     (print-columnar-help rows)))
 
 ;; This has to make sure to be able to operate without a current shell or even,
@@ -482,13 +501,16 @@ available."
 	(cond
 	  ((eq subject-kw :builtins)
 	   (format t "Built-in commands:~%")
-	   (print-multiple-command-help (command-list 'builtin-command)))
+	   (setf *output*
+		 (print-multiple-command-help (command-list 'builtin-command))))
 	  ((eq subject-kw :commands)
 	   (format t "Defined commands:~%")
-	   (print-multiple-command-help (command-list 'shell-command)))
+	   (setf *output*
+		 (print-multiple-command-help (command-list 'shell-command))))
 	  ((eq subject-kw :external)
 	   (format t "Defined external commands:~%")
-	   (print-multiple-command-help (command-list 'external-command)))
+	   (setf *output*
+		 (print-multiple-command-help (command-list 'external-command))))
 	  ((eq subject-kw :editor) (format t *editor-help*))
 	  ((eq subject-kw :syntax) (format t *syntax-help*))
 	  ((eq subject-kw :differences) (format t *differences-help*))
@@ -496,10 +518,11 @@ available."
 	   (format t "~
 Options can be examined and changed with the ‘opt’ command.~%~
 Shell options:~%")
-	   (print-columnar-help
-	    (loop :for o :in (lish-options *shell*) :collect
-	       `(,(arg-name o)
-		  ,(substitute #\space #\newline (arg-help o))))))
+	   (setf *output*
+		 (print-columnar-help
+		  (loop :for o :in (lish-options *shell*) :collect
+			`(,(arg-name o)
+			  ,(substitute #\space #\newline (arg-help o)))))))
 	  ((eq subject-kw :keys)
 	   (format t "Here are the keys active in the editor:~%")
 	   (!bind :print-bindings t))
@@ -576,11 +599,19 @@ NAME is replaced by EXPANSION before any other evaluation."
      (expansion string :help "Text to expand to."))
   "Define NAME to expand to EXPANSION when starting a line."
   (if (not name)
-      (loop :for a :being :the :hash-keys
-	 :of (if global (lish-global-aliases *shell*) (lish-aliases *shell*))
-	 :do
-	 (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
-		 a (get-alias a :global global :shell *shell*)))
+      (let ((table
+	      (make-table-from
+	       (loop
+		 :for a :being :the :hash-keys
+                   :of (if global
+			   (lish-global-aliases *shell*)
+			   (lish-aliases *shell*))
+		 :collect (list a (get-alias a :global global :shell *shell*)))
+	       :columns '((:name "Alias") (:name "Expansion")))))
+	(omapn (_ (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
+			  (oelt _ 0) (oelt _ 1)))
+	       table)
+	(setf *output* table))
       (if (not expansion)
 	  (if edit
 	      (set-alias name (edit-alias name) :global global)
@@ -1515,17 +1546,30 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	(edit
 	 (format t "I don't know how to edit all the options at once yet.~%"))
 	(help
-	 (print-columnar-help 
-	  (loop :for o :in (lish-options *shell*) :collect
-	     `(,(arg-name o) ,(substitute #\space #\newline (arg-help o))))))
+	 (setf *output*
+	       (print-columnar-help
+		(loop :for o :in (lish-options *shell*) :collect
+		      `(,(arg-name o)
+			,(substitute #\space #\newline (arg-help o)))))))
 	(readable
 	 (loop :for o :in (lish-options *shell*) :do
 	    (format t "opt ~a ~w~%" (arg-name o) (arg-value o))))
 	(t
-	 (print-properties
-	  (loop :for o :in (lish-options *shell*)
-	     :collect (cons (arg-name o) (format nil "~s" (arg-value o))))
-	  :de-lispify nil :right-justify t)))))
+	 ;; (print-properties
+	 ;;  (loop :for o :in (lish-options *shell*)
+	 ;;     :collect (cons (arg-name o) (format nil "~s" (arg-value o))))
+	 ;;  :de-lispify nil :right-justify t)
+	 (with-grout ()
+	   (let ((table
+		   (make-table-from
+		    (loop :for o :in (lish-options *shell*)
+			  :collect (cons (arg-name o)
+					 (format nil "~s" (arg-value o))))
+		    :columns '((:name "Name" :align :right)
+			       (:name "Value" :align :wrap)))))
+	     (grout-print-table table :print-titles nil)
+	     (setf *output* table)))
+	 ))))
 #|
 (defbuiltin lpath
   ((command sub-command :default :list :help "What to do with the lpath."
@@ -1776,25 +1820,45 @@ option, it is as if --push was given."
 
 (defbuiltin autoload
   ((force boolean :short-arg #\f :help "Replace an existing command.")
-   (command-name string :optional nil
+   (list boolean :short-arg #\l :help "List autoloaded commands.")
+   (command-name string #| :optional nil |#
     :help "The name of the command to load.")
-   (where autoload-place :optional nil
+   (where autoload-place #| :optional nil |#
     :help "Where to load a command from. A keyword for an ASDF system, or a
 string or pathname designating a file.")
    (docstring string :help "A documentation string."))
   "Set a command to be automatically loaded."
-  (let ((old-command (get-command command-name)))
-    ;; If there's already a non-autoloaded command loaded, don't overwrite it.
-    (when (or (not old-command)
-	      (typep old-command 'autoloaded-command)
-	      force)
-      (let ((cmd (make-instance 'autoloaded-command
-				:name command-name
-				:load-from where)))
-	(pushnew command-name *command-list* :test #'equal)
-	(setf (documentation (command-function-name command-name) 'function)
-	      docstring)
-	(set-command command-name cmd)))))
+  (cond
+    (list
+     (with-grout ()
+       (let ((table
+	       (make-table-from
+		(loop :for k :in (command-list 'autoloaded-command)
+		  :collect
+		  (list (command-name k)
+			(string-downcase (command-load-from k))
+			(or
+			 (documentation
+			  (command-function-name (command-name k)) 'function)
+			 "")))
+		:columns '((:name "Name")
+			   (:name "Loaded from")
+			   (:name "Description" :align :wrap)))))
+	 (grout-print-table table :long-titles t)
+	 (setf *output* table))))
+    (t
+     (let ((old-command (get-command command-name)))
+       ;; If there's already a non-autoloaded command, don't overwrite it.
+       (when (or (not old-command)
+		 (typep old-command 'autoloaded-command)
+		 force)
+	 (let ((cmd (make-instance 'autoloaded-command
+				   :name command-name
+				   :load-from where)))
+	   (pushnew command-name *command-list* :test #'equal)
+	   (setf (documentation (command-function-name command-name) 'function)
+		 docstring)
+	   (set-command command-name cmd)))))))
 
 (defparameter *doc-types* '(compiler-macro function method-combination setf
 			    structure type variable)
@@ -1832,9 +1896,9 @@ things.")
 	"The \"doc\" command also just calls ‘describe’ if it can't find anything else.")
     "Be serious now!"))
 
-(defun output-text (s)
+(defun output-text (s &optional stream)
   (syntax:format-comment-text (make-instance 'syntax-lisp:lisp-token :object s)
-			      (grout-stream *grout*)))
+			      (or stream (grout-stream *grout*))))
 
 (defun output-class (symbol)
   "Print out documentation for ‘class’."
@@ -1846,7 +1910,10 @@ things.")
         :collect
 	  `(,(span-to-fat-string
 	      `(:fg-cyan ,(string-downcase (mop:slot-definition-name s))))
-	    ,(documentation s t)))
+	    ,(ostring-trim *whitespace*
+			   (with-output-to-fat-string (str)
+			     (let ((doc (documentation s t)))
+			       (or (and doc (output-text doc str)) ""))))))
       :columns '((:name "Slot") (:name "Documentation" :align :wrap))))))
 
 (defun %doc (thing &key (stream *standard-output*) (all t))
