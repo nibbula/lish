@@ -2012,15 +2012,18 @@ suspend itself."
 
 (defun lish-print (values)
   "Print the results of an evaluation. VALUES are a list of values to print."
-  (loop :with len = (length values) :and i = 0
-     :for v :in values
-     :do
-     ;; (format t "~s" v)
-     (format t "~w" v)
-     (if (and (> len 1) (< i (- len 1)))
-	 (format t " ;~%"))
-     (incf i)
-     :finally (format t "~&")))
+  (with-package *lish-user-package*
+    (loop :with len = (length values) :and i = 0
+       :for v :in values
+       :do
+       ;; (format t "~s" v)
+       (format t "~w" v)
+       (if (and (> len 1) (< i (- len 1)))
+	   (format t " ;~%"))
+       (incf i)
+       :finally (format t "~&"))))
+
+(defparameter *fuxor* nil)
 
 (defun lish-eval (sh expr state)
   "Evaluate the shell expressions in EXPR."
