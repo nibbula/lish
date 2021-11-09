@@ -19,13 +19,13 @@ fi
 if [ ! -n "$LISP" ] ; then
   LISPS="sbcl ccl lisp clisp ecl"
   for l in $LISPS ; do
-    if [ x`command -v $l` != x ] ; then
+    if [ x"`command -v $l`" != x ] ; then
       LISP=$l
       break;
     fi
   done
 fi
-if [ ! -n "$LISP" -o ! -n `command -v $LISP` ] ; then
+if [ ! -n "$LISP" -o ! -n "`command -v $LISP`" ] ; then
   echo "I can't find a Lisp to run. Please set the environment variable LISP to"
   echo "the name of an installed Common Lisp, and re-run this script."
   echo "For example: "
