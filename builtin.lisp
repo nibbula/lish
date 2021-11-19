@@ -1639,9 +1639,9 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
   ((system system-designator :optional nil
     :help "System designator to load.")
    (no-notes boolean :short-arg #\n
-    :help "True to suppress compiler notes on some implementations.")
+    :help "Suppress compiler notes on some implementations.")
    (no-warn boolean :short-arg #\w
-    :help "True to suppress compiler warnings on some implementations.")
+    :help "Suppress compiler warnings on some implementations.")
    (force boolean :short-arg #\f :help "Force reloading systems.")
    (force-all boolean :short-arg #\F
     :help "Force reloading all systems, even dependencies.")
