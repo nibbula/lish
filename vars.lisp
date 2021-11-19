@@ -50,18 +50,26 @@ means every dumped executable."))
   "The pipeline output object."
   %*output*)
 
+(defun export-input ()
+  "Let external processes access *input*."
+  (when (and (lish-export-pipe-results *shell*) %*input*)
+    (setf (nos:env "LISH_INPUT") (princ-to-string %*input*))))
+
+(defun export-output ()
+  "Let external processes access *output*."
+  (when (and (lish-export-pipe-results *shell*) %*output*)
+    (setf (nos:env "LISH_OUTPUT") (princ-to-string %*output*))))
+
 (defun set-input (value)
   "Set the pipeline input object to VALUE."
   (setf %*input* value)
-  (when (and (lish-export-pipe-results *shell*) %*input*)
-    (setf (nos:env "LISH_INPUT") (princ-to-string %*input*)))
+  (export-input)
   value)
 
 (defun set-output (value)
   "Set the pipeline output object to VALUE."
   (setf %*output* value)
-  (when (and (lish-export-pipe-results *shell*) %*output*)
-    (setf (nos:env "LISH_OUTPUT") (princ-to-string %*output*)))
+  (export-output)
   value)
 
 (defsetf input set-input)
@@ -71,6 +79,18 @@ means every dumped executable."))
 (define-symbol-macro *output* (output))
 (define-symbol-macro *i* (input))
 (define-symbol-macro *o* (output))
+
+(defmacro with-input ((x) &body body)
+  "Dynamicly rebind ‘*input*' to ‘x’."
+  `(let ((%*input* ,x))
+     (export-input)
+     ,@body))
+
+(defmacro with-output ((x) &body body)
+  "Dynamicly rebind ‘*output*' to ‘x’."
+  `(let ((%*output* ,x))
+     (export-output)
+     ,@body))
 
 (defvar *accepts* nil
   "What the next command in the pipeline accepts.")
