@@ -112,7 +112,7 @@
 
 (defmethod list-all-jobs ((type (eql 'system-job)))
   ;; @@@ This is underwhelming. We probably should use the OS specific
-  ;; system-procces-list, but of course that create more problems.
+  ;; system-procces-list, but of course that creates more problems.
   (mapcar (_ (make-instance 'system-job
 			    :id (os-process-id _)
 			    :name (os-process-name _)
