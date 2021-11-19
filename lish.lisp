@@ -1301,15 +1301,17 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	(with-first-value-to-output (apply func parenless-args)))))
 
 (defmacro maybe-do-in-background ((bg-p name args) &body body)
-  (with-names (thunk)
+  (with-names (thunk string-name args-val)
     `(flet ((,thunk () (progn ,@body)))
        (if (and ,bg-p bt:*supports-threads-p*)
 	   (progn
-	     (let ((nn (prin1-to-string ,name))
-		   (aa ,args))		; so we only eval once
+	     (let ((,string-name (prin1-to-string ,name))
+		   (,args-val ,args))
 	       (setf (lish-last-background-job *shell*)
-		     (add-job nn (or (and aa (shell-words-to-string aa)) "")
-			      (bt:make-thread #',thunk :name nn)))))
+		     (add-job ,string-name
+			      (or (and ,args-val
+				       (shell-words-to-string ,args-val)) "")
+			      (bt:make-thread #',thunk :name ,string-name)))))
 	   (progn
 	     (funcall #',thunk))))))
 
