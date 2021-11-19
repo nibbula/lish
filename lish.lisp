@@ -2304,6 +2304,7 @@ if we aren't already inside one."
 	       terminal-type
 	       ;;(init-file (or *lishrc* *default-lishrc*))
 	       (init-file (pick-an-rc-file))
+	       prompt
 	       command)
   "Lish is a LIsp SHell.
 Type the “help” command for more documentation.
@@ -2347,6 +2348,9 @@ Arguments:
 
     ;; Load the startup file.
     (load-rc-file init-file)
+
+    (when prompt
+      (setf (lish-prompt sh) prompt))
 
     ;; Perhaps do a single command and exit.
     (when command
