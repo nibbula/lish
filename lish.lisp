@@ -1283,14 +1283,19 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 	      (progn
 		(with-first-value-to-output
 		    (if (context-pipe-plus *context*)
-			(let ((curried (_ (apply func `(,@parenless-args ,_)))))
+			(let ((curried
+				(_ (with-input (_)
+				     (apply func `(,@parenless-args ,_))))))
 			  ;; @@@ maybe there's faster way to do this?
 			  (apply #'omap curried (list *input*)))
 			(apply func `(,@parenless-args ,*input*)))))
 	      (progn
 		(with-first-value-to-output
 		    (if (context-pipe-plus *context*)
-			(omap func *input*)
+			(let ((wrapper
+				(_ (with-input (_)
+				     (funcall func _)))))
+			  (omap wrapper *input*))
 			(apply func (list *input*)))))))
 	;; no *input* stuffing
 	(with-first-value-to-output (apply func parenless-args)))))
@@ -1307,6 +1312,17 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 			      (bt:make-thread #',thunk :name nn)))))
 	   (progn
 	     (funcall #',thunk))))))
+
+(defun eval-lisp-expr (expr)
+  "A wrapper to eval that does the right thing for an invidual expression as an
+element in a pipeline."
+  (let ((- expr))
+    (if (context-pipe-plus *context*)
+      (let ((wrapper
+	      (_ (with-input (_)
+		   (eval expr)))))
+	(omap wrapper *input*))
+      (eval expr))))
 
 (defun call-thing (thing args context &optional parenless)
   "Call a command or function with the given POSIX style arguments.
@@ -1340,7 +1356,7 @@ CALL-PARENLESS."
 		   (t
 		    (maybe-do-in-background (bg thing args)
 		      (let ((- thing))
-			(eval thing)))))))
+			(eval-lisp-expr thing)))))))
 	(if out-pipe
 	    (let ((out-str (make-stretchy-string 20)))
 	      (values
@@ -1599,7 +1615,7 @@ probably fail, but perhaps in similar way to other shells."
 	   (if (and (shell-word-p first-word)
 		    (shell-word-eval first-word))
 	       (call-thing cmd nil context)
-	       (values (list (eval cmd)) nil t)))
+	       (values (list (eval-lisp-expr cmd) nil t))))
 	 ;; @@@ How can we evaluate the words after the first and return all
 	 ;; their possibly multiple values?
 	 ;; (loop :for w :in (shell-expr-words expr)
@@ -1708,12 +1724,12 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		     #\space))
 		   :context context)
 		  (with-package *lish-user-package*
-		    (values (multiple-value-list (eval expr)) nil t))))
+		    (values (multiple-value-list (eval-lisp-expr expr)) nil t))))
 	     ((stringp expr)
 	      (shell-eval (shell-read expr) :context context))
 	     (t
 	      (with-package *lish-user-package*
-		(values (multiple-value-list (eval expr)) nil t)))))
+		(values (multiple-value-list (eval-lisp-expr expr)) nil t)))))
 	  ((zerop (length (shell-expr-words expr)))
 	   ;; Quick return when no words
 	   (return-from shell-eval (values nil nil nil)))
