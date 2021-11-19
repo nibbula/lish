@@ -131,29 +131,37 @@ from stack."
   ((long boolean :short-arg #\l :help "Show the longer output.")
    (all boolean :short-arg #\a :help "Show all (or at least maybe more) jobs."))
   "Lists spawned processes that are active."
-  (flet ((print-job (j)
+  (flet ((job-row (j)
 	   (with-slots (id name command-line status) j
-	     (if long
-		 (typecase j
-		   (lisp-job
-		    (format t "~3d ~10a ~20a ~:[~;~a ~]~a~%"
-			    id (job-type-name j) name long
-			    (job-resume-function j) command-line))
-		   (system-job
-		    (format t "~3d ~10a ~20a ~:(~a~) ~:[~;~a ~]~a~%"
-			    id (job-type-name j) name status long (job-pid j)
-			    command-line))
-		   (t
-		    (format t "~3d ~10a ~20a ~:(~a~) ~a~%"
-			    id (job-type-name j) name status command-line)))
-		 (format t "~3d ~10a ~20a ~:(~a~) ~a~%"
-			 id (job-type-name j) name status command-line)))))
-    (loop :for j :in (lish-jobs *shell*)
-       :do
-	 (print-job j))
-    (when all
-      ;; (mapc (_ (mapc #'print-job (list-all-jobs _))) *job-types*))))
-      (mapc (_ (mapc #'print-job (list-all-jobs _))) '(lisp-job thread-job)))))
+	     (let ((result
+		     (list id (job-type-name j) name command-line))
+		   (extra
+		     (when long
+		       (typecase j
+			 (lisp-job
+			  (job-resume-function j))
+			 (system-job
+			  (s+ status " " (job-pid j)))))))
+	       (if extra
+		   (nconc result (list extra))
+		   result)))))
+    (let ((table
+	    (make-table-from
+	     (loop :for j :in (if all
+				  `(,@(lish-jobs *shell*)
+				    ,@(list-all-jobs 'lisp-job)
+				    ,@(list-all-jobs 'thread-job))
+				  (lish-jobs *shell*))
+		   :collect (job-row j))
+	     :columns
+	     `((:name "ID" :type number)
+	       (:name "Type")
+	       (:name "Name")
+	       (:name "Command")
+	       ,(when long '(:name "Extra"))))))
+      (with-grout ()
+	(grout-print-table table :print-titles nil))
+      (setf *output* table))))
 
 (defbuiltin history
   ((clear boolean :short-arg #\c
