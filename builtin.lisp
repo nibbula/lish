@@ -601,10 +601,10 @@ NAME is replaced by EXPANSION before any other evaluation."
 		  "")))
 
 (defbuiltin alias
-    ((global    boolean :short-arg #\g :help "True to define a global alias.")
-     (edit	boolean :short-arg #\e :help "True to edit the alias's value.")
-     (name      string :help "Name of the alias.")
-     (expansion string :help "Text to expand to."))
+  ((global    boolean :short-arg #\g :help "True to define a global alias.")
+   (edit      boolean :short-arg #\e :help "True to edit the alias's value.")
+   (name      string :help "Name of the alias.")
+   (expansion string :rest t :help "Text to expand to."))
   "Define NAME to expand to EXPANSION when starting a line."
   (if (not name)
       (let ((table
@@ -625,7 +625,8 @@ NAME is replaced by EXPANSION before any other evaluation."
 	      (set-alias name (edit-alias name) :global global)
 	      (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
 		      name (get-alias name :global global :shell *shell*)))
-	  (set-alias name expansion :global global :shell *shell*))))
+	  (set-alias name (join-by-string expansion " ")
+		     :global global :shell *shell*))))
 
 (defbuiltin unalias
   ((global boolean :short-arg #\g :help "True to define a global alias.")
