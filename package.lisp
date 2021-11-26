@@ -36,6 +36,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:*accepts*
    #:*output* #:output #:*o*
    #:*input* #:input #:*i*
+   #:with-output #:with-input
    #:*lishrc*
    #:*version*
    #:*major-version* #:*minor-version* #:*build-version*
