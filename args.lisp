@@ -4,8 +4,8 @@
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
-		   (compilation-speed 0)))
+;; (declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
+;; 		   (compilation-speed 0)))
 
 (defclass argument ()
   ((name
@@ -355,7 +355,7 @@
 (defclass arg-date (argument) () (:documentation "A date."))
 (defmethod convert-arg ((arg arg-date) (value string) &optional quoted)
   (declare (ignore arg quoted))
-  ;; @@@ This could be better.
+  ;; @@@ This could be better when we have a date parser.
   value)
 
 (defclass arg-pathname (arg-string) ()
@@ -412,7 +412,9 @@
 
 (defun arg-choice-compare (choice value)
   "Return true if VALUE as a string is equal to CHOICE."
-  (equal choice (princ-to-string value)))
+  ;; (equal choice (princ-to-string value))
+  (string-equal choice (princ-to-string value))
+  )
 
 (defclass arg-choice (argument)
   ((choices
