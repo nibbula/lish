@@ -1340,19 +1340,20 @@ bound during command.
 If PARENLESS is set, it's the text of rest of the line to be fed to
 CALL-PARENLESS."
   (with-slots (in-pipe out-pipe environement) context
-    (let ((command-p (typep thing 'command))
+    (let ((command-p (typep thing 'base-command))
 	  (bg (context-background context)))
       (labels ((runky (thing args)
 		 (cond
+		   ((typep thing 'autoloaded-command)
+		    (let ((*context* context))
+		      ;; The args can't be converted yet.
+		      (maybe-do-in-background (bg (command-name thing) args)
+		        (invoke-command thing args))))
 		   (command-p
-		     (let ((lisp-args (posix-to-lisp-args thing args))
-			   (cmd-func (symbol-function (command-function thing)))
-			   (*context* context))
-		       (if (> (length lisp-args) 0)
-			   (maybe-do-in-background (bg (command-name thing) args)
-			     (apply cmd-func lisp-args))
-			   (maybe-do-in-background (bg (command-name thing) args)
-                             (funcall cmd-func)))))
+		    (let ((lisp-args (posix-to-lisp-args thing args))
+			  (*context* context))
+		      (maybe-do-in-background (bg (command-name thing) args)
+		        (invoke-command thing lisp-args))))
 		   (parenless
 		    (call-parenless thing parenless context))
 		   (t
@@ -1534,12 +1535,9 @@ probably fail, but perhaps in similar way to other shells."
 		     :context context
 		     :no-expansions t))
 	;; Lish command
-	((typep command 'internal-command)
-	 (run-hooks *pre-command-hook* cmd :command)
-	 (multiple-value-prog1
-	     (call-thing command (subseq (shell-expr-words expanded-expr) 1)
-			 context)
-	   (run-hooks *post-command-hook* cmd :command)))
+	((typep command '(or internal-command autoloaded-command))
+	 (call-thing command (subseq (shell-expr-words expanded-expr) 1)
+		     context))
 	;; external command
 	((typep command 'external-command)
 	 (run-hooks *pre-command-hook* cmd :command)
@@ -1547,16 +1545,6 @@ probably fail, but perhaps in similar way to other shells."
 	 ;;     (call-thing command (subseq expanded-words 1) context)
 	 ;;   (run-hooks *post-command-hook* cmd :command)))
 	 (sys-cmd))
-	((typep command 'autoloaded-command)
-	 (setf command (load-lisp-command-from
-			(command-name command)
-			(command-load-from command)
-			:silent (lish-autoload-quietly sh)))
-	 (run-hooks *pre-command-hook* cmd :command)
-	 (multiple-value-prog1
-	     (call-thing command (subseq (shell-expr-words expanded-expr) 1)
-			 context)
-	   (run-hooks *post-command-hook* cmd :command)))
 	((functionp cmd)
 	 ;; (format t "CHOWZA ~s~%" (rest-of-the-line expr))
 	 (run-fun cmd (rest-of-the-line expr)))
@@ -1570,12 +1558,8 @@ probably fail, but perhaps in similar way to other shells."
 	      (in-lisp-path cmd)
 	      (setf command (load-lisp-command
 			     cmd :silent (lish-autoload-quietly sh))))
-	 ;; now try it as a command
-	 (run-hooks *pre-command-hook* cmd :command)
-	 (multiple-value-prog1
-	     (call-thing command (subseq (shell-expr-words expanded-expr) 1)
-			 context)
-	   (run-hooks *post-command-hook* cmd :command)))
+	 (call-thing command (subseq (shell-expr-words expanded-expr) 1)
+	  	     context))
 	((stringp cmd)
 	 ;; If we can find a command in the path, try it first.
 	 (cond

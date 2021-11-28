@@ -171,12 +171,12 @@
   ;; 	'("name" "expansion" "extra" "junk")
   ;; 	'("name" "expansion"))
 
-  (vivi "alias" "" '())
-  (vivi "alias" "name" '(:name "name"))
-  (vivi "alias" "name expansion" '(:name "name" :expansion "expansion"))
+  (vivi "alias" "" '(:expansion nil))
+  (vivi "alias" "name" '(:name "name":expansion nil))
+  (vivi "alias" "name expansion" '(:name "name" :expansion ("expansion")))
   (vivi "alias"
-  	"name expansion extra junk" ;; Is this really right?
-	'(:name "name" :expansion "expansion"))
+	"name expansion extra junk"
+	'(:name "name" :expansion ("expansion" "extra" "junk")))
 
   (vivi "bind" "" '())
   (vivi "bind" "-p" '(:print-bindings t))

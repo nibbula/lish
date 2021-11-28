@@ -1215,20 +1215,20 @@ drastic thing to do to a running Lisp system."
   ())
 
 (defbuiltin bind
-    (("print-bindings"		 boolean      :short-arg #\p
-      :help "Print key bindings.")
-     ("print-readable-bindings"	 boolean      :short-arg #\P
-      :help "Print key bindings in a machine readable way.")
-     ("query"			 function     :short-arg #\q
-      :help "Ask what key invokes a function.")
-     ("remove-function-bindings" function     :short-arg #\u
-      :help "Remove the binding for FUNCTION.")
-     ("remove-key-binding"	 key-sequence :short-arg #\r
-      :help "Remove the binding for a KEY-SEQUENCE.")
-     ("key-sequence"		 key-sequence
-      :help "The key sequence to bind.")
-     ("function-name"		 function
-      :help "The function to bind the key sequence to."))
+  (("print-bindings"		 boolean      :short-arg #\p
+    :help "Print key bindings.")
+   ("print-readable-bindings"	 boolean      :short-arg #\P
+    :help "Print key bindings in a machine readable way.")
+   ("query"			 function     :short-arg #\q
+    :help "Ask what key invokes a function.")
+   ("remove-function-bindings" function	      :short-arg #\u
+    :help "Remove the binding for FUNCTION.")
+   ("remove-key-binding"	 key-sequence :short-arg #\r
+    :help "Remove the binding for a KEY-SEQUENCE.")
+   ("key-sequence"		 key-sequence
+    :help "The key sequence to bind.")
+   ("function-name"		 function
+    :help "The function to bind the key sequence to."))
   "Manipulate key bindings."
   (when (> (count t (list print-bindings print-readable-bindings query
 			  remove-function-bindings remove-key-binding)) 1)
@@ -1536,6 +1536,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
    (help boolean :short-arg #\h :help "True to show help for the option.")
    (name  option :help "Option to set.")
    (value object :help "Value to set option to." :use-supplied-flag t))
+  :no-help t
   "Examine or set shell options. Type 'help options' for descriptions."
   (when (and help edit)
     (error "Please supply only one of --help or --edit."))

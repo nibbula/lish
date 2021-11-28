@@ -49,6 +49,9 @@
   (:documentation "The command's argument list.")
   (:method ((command base-command)) nil))
 
+(defgeneric invoke-command (command args)
+  (:documentation "Invoke the command."))
+
 (defclass command (base-command)
   ((function
     :accessor command-function    :initarg :function
@@ -65,6 +68,9 @@
     :initform nil :type symbol
     :documentation
     "Argument name to pass all keyword arguments as. NIL if we don't need it.")
+   (auto-help
+    :initarg :auto-help :accessor command-auto-help :initform t :type boolean
+    :documentation "Automatically handle help arguments.")
    (accepts
     :initarg :accepts :accessor command-accepts :initform :unspecified
     :documentation
@@ -99,15 +105,33 @@
 
 ;; Command class hierarchy:
 ;;
-;;  command
-;;    internal-command
-;;      shell-command
-;;      builtin-command
-;;    external-command
+;;  base-command
+;;    command
+;;      internal-command
+;;        shell-command
+;;        builtin-command
+;;      external-command
+;;    autoloaded-command
 
 (defclass internal-command (command)
   ()
   (:documentation "An command implemented in the shell."))
+
+(defmethod invoke-command ((command internal-command) args)
+  "Invoke an internal command that has a command function."
+  (run-hooks *pre-command-hook* command :command)
+  ;; @@@ This idea could be expanded upon. We could probably move some the
+  ;; functionality from lish.lisp to invoke-command methods.
+  (multiple-value-bind (done new-args) (process-auto-args command args)
+    (when done
+      ;; If it was handled, return without actually calling the command.
+      (return-from invoke-command (values)))
+    (setf args new-args))
+  (multiple-value-prog1
+      (if args
+	  (apply (command-function command) args)
+	  (funcall (command-function command)))
+    (run-hooks *post-command-hook* command :command)))
 
 (defclass shell-command (internal-command)
   ()
@@ -188,6 +212,24 @@ we want to use it for something in the future."
   "Given a lambda list return a list of variable names to ignore."
   (lambda-list-vars args :all-p t))
 
+(defun process-auto-args (command args)
+  "Process automatic arguments for ‘command’. Return the if we should return
+without invoking the normal command."
+  (when (command-auto-help command)
+    (let ((h (getf args :help 'zerpy)))
+      (when (not (eq h 'zerpy))		; If :help is in args,
+	(setf args (remf args :help))	; remove it,
+	(when h				; and if it's true,
+	  (print-command-help command)	; print it.
+	  (return-from process-auto-args (values t args))))))
+  ;; Should we complain if an auto :help arg was removed?
+  (values nil args))
+
+(defun remove-auto-args (command args)
+  "Remove any automatic arguments from ‘arg’ for ‘command’ and return them."
+  (when (and (command-auto-help command) (not (null args)))
+    (remf args :help)))
+
 ;; There should be little distinction between a user defined command and
 ;; "built-in" command, except perhaps for a warning if you redefine a
 ;; pre-defined command, and the fact that things defined in the shell are
@@ -234,8 +276,14 @@ we want to use it for something in the future."
 ;; now that we don't have any non-keyword arguments.
 ;; Someday get rid of :KEYS-AS.
 
-(defparameter *special-body-tags* #(:accepts :keys-as :args-as)
+(defparameter *special-body-tags* #(:accepts :keys-as :args-as :no-help)
   "Keywords with special meanings appearing first in the command body.")
+
+;; This defines a function with the appropriate Lisp argument list.
+;; At eval time, which is usually load time, it makes an shell argument list,
+;; a command instance with the argument list, and adds the command to the
+;; command table. A temporary argument list is made at compile time to
+;; figure out the Lisp args.
 
 (defmacro %defcommand (name type do-defun (&rest arglist) &body body)
   "See the documentation for DEFCOMMAND."
@@ -244,7 +292,9 @@ we want to use it for something in the future."
 	(accepts :unspecified)
 	(my-fixed-body body)
 	(fixed-arglist arglist)
-	pass-keys-as params ignorables default-keys rest-var defun-clause)
+	command-arglist
+	pass-keys-as params ignorables default-keys rest-var defun-clause
+	(auto-help t))
     ;; Pull out special body tags:
     (loop :with tag
        :while (setf tag (find (car my-fixed-body) *special-body-tags*)) :do
@@ -254,11 +304,25 @@ we want to use it for something in the future."
 		my-fixed-body (cddr my-fixed-body)))
 	 ((:keys-as :args-as)
 	  (setf pass-keys-as (setf rest-var (cadr my-fixed-body))
+		my-fixed-body (cddr my-fixed-body)))
+	 (:no-help
+	  (setf auto-help nil
 		my-fixed-body (cddr my-fixed-body)))))
-    (setf params (command-to-lisp-args (make-argument-list arglist t)
-				       :pass-keys-as pass-keys-as)
+    ;; If there's already a help arg, don't add one.
+    (when (find 'help arglist :key #'car :test #'string=)
+      (setf auto-help nil))
+    (when auto-help
+      (setf fixed-arglist
+	    (append fixed-arglist
+		    (list
+		     '(help boolean :long-arg "help" :help "Show the help.")))))
+    (setf params
+	  ;; We use arglist instead of fixed-arglist, becuase the auto command
+	  ;; args (like :help) should be removed before the function is called.
+	  (command-to-lisp-args (make-argument-list arglist t)
+				:pass-keys-as pass-keys-as)
 	  ignorables
-	  (when (and params pass-keys-as)
+	  (when (and params (or pass-keys-as auto-help))
 	    `((declare (ignorable ,@(ignorable-filter params)))))
 	  ;; Set the &rest parameter from the defaulted args.
 	  default-keys
@@ -281,12 +345,12 @@ we want to use it for something in the future."
 		`((defun ,func-name ()
 		    ,@doc-and-decls
 		    ,@fixed-body)))))
-    (setf fixed-arglist (loop :for a :in arglist
-			   :do (check-argument a)
-			   :collect
-			   `(make-instance
-			     ',(new-argument-type-class (second a))
-			     ,@(transform-arg a))))
+    (setf command-arglist (loop :for a :in fixed-arglist
+			    :do (check-argument a)
+			    :collect
+			    `(make-instance
+			      ',(new-argument-type-class (second a))
+			      ,@(transform-arg a))))
     `(progn
        ,@defun-clause
        (pushnew ,name-string lish::*command-list* :test #'equal)
@@ -296,11 +360,11 @@ we want to use it for something in the future."
 		     :name ,name-string
 		     :loaded-from *load-pathname*
 		     :accepts ',accepts
+		     :auto-help ,auto-help
 		     :pass-keys-as
 		     ,(and pass-keys-as `(quote ,pass-keys-as))
 		     ;;:arglist (make-argument-list ',arglist)
-		     :arglist (list ,@fixed-arglist)
-		     )))))
+		     :arglist (list ,@command-arglist))))))
 
 (defmacro defcommand (name (&rest arglist) &body body)
   "Define a command for the shell.
@@ -466,6 +530,27 @@ NIL on failure. The Lisp path is most likely the ASDF path."
     ;; 				(command-name o)
     ;; 				(format stream "<unnamed>"))))))
     (format stream "from ~s" (command-load-from o))))
+
+(defmethod invoke-command ((command autoloaded-command) args)
+  (let ((loaded-command (load-lisp-command-from
+			 (command-name command)
+			 (command-load-from command)
+			 :silent (lish-autoload-quietly *shell*))))
+    (typecase loaded-command
+      (autoloaded-command
+       (error "Autoloading ~a from ~a failed. Probably because the command ~
+               wasn't defined in the system."
+	      (command-name command)
+	      (command-load-from command)))
+      (null
+       (error "Autoloading ~a from ~a failed. Probably becuase the system is ~
+               missing."
+	      (command-name command)
+	      (command-load-from command)))
+      (command
+       ;; We can only convert the args AFTER we load the command.
+       (let ((lisp-args (posix-to-lisp-args loaded-command args)))
+	 (invoke-command loaded-command lisp-args))))))
 
 ;; (defun load-external-command (command)
 ;;   "Try to load an external command definition."
