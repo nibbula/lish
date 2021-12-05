@@ -278,7 +278,8 @@ expression in a separagte thread, if threads are supported."
      (open thing :direction :input))
     (string
      (if (nos:file-exists thing)
-	 (open thing :direction :input)
+	 ;; (open thing :direction :input)
+	 (open (quote-filename thing) :direction :input)
 	 (make-string-input-stream thing)))
     #|
     @@@ finish bi-valent-streams or os-streams?
