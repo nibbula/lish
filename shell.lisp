@@ -235,7 +235,7 @@ number ignore it that many times before exiting."
 
 (defoption auto-cd boolean
   :help "True to treat a directroy as a command to change to that directory."
-  :default t)
+  :default nil)
 
 (defoption history-style choice
   :help "Style of history to use. Simple stores just text lines. Fancy stores
