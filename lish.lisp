@@ -142,6 +142,11 @@
     (shell-word (shell-word-quoted word))
     (t nil)))
 
+(defun in-word (word position)
+  "Return true if ‘position’ is in shell-word ‘word’."
+  (and (>= position (shell-word-start word))
+       (<= position (shell-word-end word))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Job control
 

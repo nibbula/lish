@@ -498,7 +498,7 @@ literally in shell syntax."
        (keywordp (first (first (shell-expr-words expr))))
        (>= pos (length (shell-expr-line expr)))))
 
-(defun in-command-position-p (expr word-num)
+(defun in-command-position-p (expr word-num pos)
   (or
    ;; first word in a line
    (= word-num 0)
@@ -506,7 +506,9 @@ literally in shell syntax."
    (and (= (length (shell-expr-words expr)) 2)
 	(consp (first (shell-expr-words expr)))
 	(keywordp (first (first (shell-expr-words expr))))
-	(= word-num 1))))
+	(= word-num 1)
+	(or (in-word (elt (shell-expr-words expr) 1) pos)
+	    (> pos (length (shell-expr-line expr)))))))
 
 (defun try-command (command-name)
   "See if we can dig up the dirt on a command named COMMAND.
@@ -667,7 +669,7 @@ Sorry you'll have to figure it out yourself."
 		      (1+ (shell-word-start shell-word))))
 	     ;; first word, when not starting with directory chars
 	     ((and
-	       (in-command-position-p exp word-num)
+	       (in-command-position-p exp word-num position)
 	       (not (position (aref word 0) "/.~")))
 	      (dbugf 'completion "first word, non path : jinky~%")
 	      ;; (get-backward-word-symbol :symbol string position))
@@ -821,8 +823,8 @@ complete, and call the appropriate completion function."
 			       (+ (shell-word-start shell-word) 2)))
 	     ;; first word, when not starting with directory chars
 	     ((and
-	       (in-command-position-p exp word-num)
-	       (not (position (aref word 0) "/.~")))
+	       (in-command-position-p exp word-num pos)
+	       (not (find (aref word 0) "/.~")))
 	      (dbugf 'completion "first word, non path : jinky~%")
 	      ;; try commands
 	      (let ((result 
