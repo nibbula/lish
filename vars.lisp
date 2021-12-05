@@ -36,6 +36,8 @@ means every dumped executable."))
 (defvar *shell* nil
   "The current shell instance.")
 
+;; Pipeline input and output values
+
 (defvar %*input* nil
   "The output of the previous command in pipeline.")
 
@@ -156,12 +158,6 @@ means every dumped executable."))
   "The result of the shell lexer. A sequence of words and their start and ~
 end points in the original string."
   words					; sequence of objects
- #|
-  word-start				; sequence of word start positions
-  word-end				; sequence of word end positions
-  word-quoted				; sequence of booleans
-  word-eval				; sequence of booleans
-|#
   line)					; the original string
 
 (defstruct shell-word
