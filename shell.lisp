@@ -65,6 +65,9 @@
     :initform nil
     :documentation
     "The last job run in background, or NIL if there wasn't one.")
+   (wait-for
+    :initarg :wait-for :accessor shell-wait-for :initform nil
+    :documentation "Jobs to wait for.")
    (saved-signals
     :initarg :saved-signals :accessor shell-saved-signals :initform nil
     :documentation
@@ -148,13 +151,16 @@
 (defsetf option %set-option
   "Set a shell option.")
 
-(defmacro defoption (name &rest arg)
+(defmacro defoption (name (&key omit-setter) &rest arg)
   "Define a shell option named NAME, with the properties in arg. The syntax
 is like Lish arguments, e.g.:
   (defoption \"foo\" type :help \"Make sure to foo.\" :short-arg #\\f)"
   (let* ((sym (symbolify (s+ "LISH-" name)))
 	 (setter (symbolify (s+ "SET-" sym)))
-	 (name-string (string-downcase name)))
+	 (name-string (string-downcase name))
+	 (setter-def (when (not omit-setter)
+		       `((defmethod ,setter (value (sh shell))
+			   (setf (arg-value (find-option sh ',name)) value))))))
     `(progn
        ;; Access options as if they were in the shell object.
        (defgeneric ,sym (shell)
@@ -162,9 +168,8 @@ is like Lish arguments, e.g.:
        (defmethod ,sym ((sh shell)) (get-option sh ,name-string))
        (defgeneric ,setter (value shell)
 	 (:documentation ,(s+ "Set the value of " name-string ".")))
+       ,@setter-def
        ;; Make a separate setter so it can be easily overridden.
-       (defmethod ,setter (value (sh shell))
-	 (setf (arg-value (find-option sh ',name)) value))
        (defgeneric (setf ,sym) (value shell)
 	 (:documentation ,(s+ "Set the value of " name-string ".")))
        (defmethod (setf ,sym) (value (sh shell))
@@ -174,7 +179,7 @@ is like Lish arguments, e.g.:
 
 (setf *options* nil)
 
-(defoption prompt object
+(defoption prompt () object
   :help "Normal prompt. Output if there is no prompt function. Output
 with SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
 those functions for more detail about prompt formatting."
@@ -182,62 +187,62 @@ those functions for more detail about prompt formatting."
   :default
   '((:magenta "%u") (:green "@") (:cyan "%h") " " (:white "%w") (:red "%$") " "))
 
-(defoption prompt-function function
+(defoption prompt-function () function
   :help "Function which takes a SHELL and returns a string to output as the
 prompt."
 ;;  :default make-prompt	       ; N.B.: #'make-prompt doesn't work here
   )
 
-(defoption right-prompt object
+(defoption right-prompt () object
   :help "Prompt for the right side of the input line. Output with
 SYMBOLIC-PROMPT-TO-STRING and FORMAT-PROMPT. See the documentation for
 those functions for more detail about prompt formatting."
   :default nil)
 
-(defoption sub-prompt string
+(defoption sub-prompt () string
   :help "String to print when prompting for more input."
   :default "- ")	; @@@ maybe we need sub-prompt-char & sub-prompt-func?
 
-(defoption ignore-eof integer
+(defoption ignore-eof () integer
   :help "If true, prevent the EOF (^D) character from exiting the shell. If a 
 number ignore it that many times before exiting."
   :default nil)
 
-(defoption debug boolean
+(defoption debug () boolean
   :help "True to enter the debugger when there is an error."
   :default nil)
 
-(defoption collect-stats boolean
+(defoption collect-stats () boolean
   :help "True to collect statistics on commands."
   :default nil)
 
-(defoption autoload-from-asdf boolean
+(defoption autoload-from-asdf () boolean
   :help
   "True to try to load unknown commands from an ASDF system of the same name."
   :default t)
 
-(defoption autoload-quietly boolean
+(defoption autoload-quietly () boolean
   :help
   "True to suppress output from autoloading."
   :default t)
 
-(defoption history-expansion boolean
+(defoption history-expansion () boolean
   :help "True if !<integer> should expand to a history item."
   :default nil)
 
-(defoption expand-braces boolean
+(defoption expand-braces () boolean
   :help "True to expand braces in shell commands."
   :default t)
 
-(defoption colorize boolean
+(defoption colorize () boolean
   :help "True to colorize the command line."
   :default t)
 
-(defoption auto-cd boolean
+(defoption auto-cd () boolean
   :help "True to treat a directroy as a command to change to that directory."
   :default nil)
 
-(defoption history-style choice
+(defoption history-style () choice
   :help "Style of history to use. Simple stores just text lines. Fancy stores
 more information, such as the date."
   :choices '("simple" "fancy")
@@ -253,7 +258,7 @@ more information, such as the date."
     (set-option sh 'history-style value)
     (init-history sh)))
 
-(defoption history-format choice
+(defoption history-format () choice
   :help "Style of history to use."
   :choices '("database" "text-file")
   ;; :default #.(if (getf rl-config::*config* :use-sqlite)
@@ -272,14 +277,14 @@ more information, such as the date."
     (init-history sh)))
 
 ;; @@@ This is trouble.
-;; (defoption history-save-values boolean
+;; (defoption history-save-values () boolean
 ;;   :help "True to save the result values of expressions in the history."
 ;;   :default nil)
 
-(defoption command-glob boolean
+(defoption command-glob () boolean
   :help "Let Lish commands do their own globbing.")
 
-(defoption auto-suggest boolean
+(defoption auto-suggest (:omit-setter t) boolean
   :help "True to make suggestions for the rest of the line."
   :default t)
 
@@ -289,7 +294,7 @@ more information, such as the date."
     ;; There isn't always an editor.
     (setf (line-editor-auto-suggest-p (lish-editor sh)) value)))
 
-(defoption partial-line-indicator object
+(defoption partial-line-indicator (:omit-setter t) object
   :help "A string to put at the end of partial lines before the prompt, or NIL
 not to indicate partial lines."
   :default (span-to-fat-string '(:standout "%")))
@@ -299,10 +304,10 @@ not to indicate partial lines."
   (when (lish-editor sh)
     (setf (rl::partial-line-indicator (lish-editor sh)) value)))
 
-(defoption export-pipe-results boolean
+(defoption export-pipe-results () boolean
   :help "True to export LISH_INPUT and LISH_OUTPUT to sub-processes.")
 
-(defoption auto-report-time integer
+(defoption auto-report-time () integer
   :help "If a job takes longer than this number of seconds, report timing
 statistics."
   :default -1)
