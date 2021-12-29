@@ -2557,6 +2557,7 @@ by spaces."
 (defun make-standalone (&key (name #-windows "lish" #+windows "lish.exe")
 			     (smaller t))
   "Make a lish executable."
+  #-sbcl (declare (ignore smaller))
   ;; (update-version)
   (let (options)
     #+sbcl
