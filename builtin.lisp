@@ -1748,7 +1748,7 @@ option, it is as if --push was given."
       (when (> (count t `(,push ,add ,remove)) 1)
 	(error "Please specidify only one of push, add, or remove."))
       (when (and (or push add remove) (not dir))
-	(error "~:(~a) requires a directory." (or push add remove)))
+	(error "~:(~a~) requires a directory." (or push add remove)))
       (cond
 	(push (do-push))
 	(add
