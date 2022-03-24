@@ -16,10 +16,45 @@ If you want to build with a custom QuickLisp installation, set the environment
 variable LISH_QUICKLISP to the directory where it's installed.
 ")
 
+(defparameter *proxy-host* "localhost"
+  "The hostname for the proxy.")
+
+(defparameter *proxy-port* 8080
+  "The TCP port for the proxy.")
+
+(defun proxy-url ()
+  "Return the proxy URL."
+  (format nil "http://~a:~a" *proxy-host* *proxy-port*))
+
 (defun install-quicklisp ()
   (load "build/quicklisp.lisp")
-  (funcall (find-symbol "INSTALL" :quicklisp-quickstart)))
+  (handler-case
+      (cond
+	((sf-getenv "LISH_QL_PROXY")
+	 (if (zerop (length (sf-getenv "LISH_QL_PROXY")))
+	     (progn
+	       (warn "!!!!! INSECURE QUICKLISP INSTALL !!!!!!")
+	       (funcall (find-symbol "INSTALL" :quicklisp-quickstart)))
+	     (funcall (find-symbol "INSTALL" :quicklisp-quickstart)
+		      :proxy (sf-getenv "LISH_QL_PROXY"))))
+	(t
+	 (funcall (find-symbol "INSTALL" :quicklisp-quickstart)
+		  :proxy (proxy-url))))
+    (error (c)
+      (print c)
+      (fail "~
+We failed to install QuickLisp.
+This is probably because you don't have a proxy set up. Installing Quicklisp
+without a proxy is insecure. You can either set up a proxy on the default URL,
+which is ~s, For example, with the mitmproxy command:
+  $ mitmproxy --listen-host localhost -p 8080 -M \"/^http:/https:\"
+Or, if you don't want to use the default proxy, set LISH_QL_PROXY to a
+different one, or if you REALLY want to do it insecurely set LISH_QL_PROXY
+to empty.
 
+Note that:
+~s" (proxy-url) *not-strictly-necessary*))))
+  
 (when (not (find-package :quicklisp))
   (if (sf-getenv "LISH_QUICKLISP")
       (handler-case
