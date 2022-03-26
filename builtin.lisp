@@ -1737,7 +1737,8 @@ option, it is as if --push was given."
 				      nos:*directory-separator*)))
 		 (setf result (s+ result nos:*directory-separator*)))
 	       (when (and (not (nos:file-exists result)) (not remove))
-		 (warn "Adding a non-existent directory to the Lisp path."))
+		 (warn "Adding a non-existent directory to the Lisp path: ~a"
+		       result))
 	       result))
 	   (do-push ()
 	     (map nil (_ (let ((fixed-dir (fix-dir _)))
