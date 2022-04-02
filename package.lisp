@@ -38,6 +38,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:*input* #:input #:*i*
    #:with-output #:with-input
    #:*lishrc*
+   #:*use-bracketed-paste*
    #:*version*
    #:*major-version* #:*minor-version* #:*build-version*
    ;; hooks @@@ maybe should be made into options?

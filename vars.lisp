@@ -137,6 +137,9 @@ means every dumped executable."))
 (defvar *lishrc* nil
   "Pathname of the start up file.")
 
+(defvar *use-bracketed-paste* t
+  "True to use safer pasting in terminals that support it.")
+
 ;; I really have some reservations about including this. It's somewhat
 ;; serendipitous that it works out this way, and it is highly efficient
 ;; keystroke-wise, but seems like an unorthogonal hackish trick.

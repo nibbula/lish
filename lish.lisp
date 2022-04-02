@@ -2378,6 +2378,9 @@ Arguments:
 
 	(ensure-theme)
 
+	(when *use-bracketed-paste*
+	  (dlib-i:setup-bracketed-paste))
+
 	;; Make a customized line editor
 	(setf (lish-editor sh)
 	      (make-instance 'rl:line-editor
