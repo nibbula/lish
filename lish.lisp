@@ -2290,7 +2290,7 @@ if we aren't already inside one."
 
 (defun lish (&key debug terminal-name
 	       ;;(terminal-type (pick-a-terminal-type))
-	       terminal-type
+	       (terminal-type :crunch)
 	       ;;(init-file (or *lishrc* *default-lishrc*))
 	       (init-file (pick-an-rc-file))
 	       prompt
