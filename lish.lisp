@@ -2499,9 +2499,15 @@ Arguments:
    (terminal-type choice :short-arg #\t
     :choice-func (lambda () (mapcar #'string-downcase (terminal-types)))
     :help "Terminal type.")
-   (debug boolean :short-arg #\d :help "True to turn on debugging."))
+   (debug boolean :short-arg #\d :help "True to turn on debugging.")
+   ;; We have to do non-auto-help because so it works from shell-toplevel.
+   (help boolean :long-arg "help" :help "Show the help."))
   :args-as args
   "Lisp Shell"
+  (when help
+    (print-command-help (get-command "lish"))
+    (return-from !lish 0))
+  (remf args :help)
   (when (and greeting (not command))
     (format t "Welcome to ~a ~a~%" *shell-name* *version*))
   (remf args :greeting)
