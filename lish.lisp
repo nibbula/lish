@@ -2555,14 +2555,25 @@ by spaces."
     ;; whatever it is on Windows or whatever O/S.
     #+sbcl (setf sb-impl::*default-external-format*
 		 (or *saved-default-external-format* :utf-8))
-    ;; (with-new-terminal ()
-      (if (cdr (nos:lisp-args))
-	  (apply #'!lish
-		 `(,@(posix-to-lisp-args (get-command "lish")
-					 (wordify-list (cdr (nos:lisp-args))))
-		     :greeting t :terminal-type :crunch))
-	  (!lish :greeting t :terminal-type :crunch))
-      ;; )
+    (let ((args (nos:lisp-args)))
+      (cond
+	;; When not invoked as *shell-name*, try to run it as a command.
+	;; So you can do the busybox thing and make a link farm.
+	((and args (not (equalp (nos:basename (car args)) *shell-name*))
+	      ;; @@@ We could check if the command exists, but we don't
+	      ;; have a shell yet.
+	      ;; (command-type *shell* (first args))
+	      )
+	 (lish :command (join-by-string
+			 (cons (nos:basename (car args)) (cdr args))
+			 " ") :terminal-type :crunch))
+	((cdr args) ;; Some args
+	 (apply #'!lish
+		`(,@(posix-to-lisp-args (get-command "lish")
+					(wordify-list (cdr args)))
+		  :greeting t :terminal-type :crunch)))
+	(t ;; No args
+	 (!lish :greeting t :terminal-type :crunch))))
     (nos:exit-lisp)))
 
 (defun make-standalone (&key (name #-windows "lish" #+windows "lish.exe")
