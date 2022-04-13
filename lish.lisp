@@ -2103,11 +2103,12 @@ suspend itself."
 	#'(lambda (c)
 	    (if (lish-debug *shell*)
 		(invoke-debugger c)
-		(format t "Saving history failed. ~
-                           Turn on debug if you want.~%~a~%" c)))))
+		(progn
+		  (format t "Saving history failed. ~
+                             Turn on debug if you want.~%~a~%" c)
+		  (abort))))))
     (history-store-save (lish-history-store sh) (history-style sh)
 			:update update)))
-
 
 (defun load-history (sh &key update)
   (with-simple-restart (continue
@@ -2147,9 +2148,10 @@ suspend itself."
 
 (defun finish-history (sh)
   "Save the history finish using the history store."
-  (when (lish-history-store sh) ;; @@@ 
-    (save-history sh)
-    (history-store-done (lish-history-store sh) (history-style sh))))
+  (when (lish-history-store sh) ;; @@@
+    (with-simple-restart (abort "Abort finishing lish history.")
+      (save-history sh)
+      (history-store-done (lish-history-store sh) (history-style sh)))))
 
 (defmacro with-error-handling ((state) &body body)
   (with-names (results just-print-the-error condition)
