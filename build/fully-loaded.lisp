@@ -7,6 +7,7 @@
   (push (truename "../image/") asdf:*central-registry*)
   (loop :for s :in '("pager" "puca" "char-picker" "pick-list" "tree-viewer"
 		     #+linux "view-html" ;; @@@ cl+ssl fails on mac & windows
+		     "view-image" "view-org" "view-lisp" "dired"
 		     )
        ;; :do (asdf:load-system s :verbose nil))
      :do (ql:quickload s :verbose nil))
@@ -25,6 +26,9 @@
     (loop :for s :in systems
        ;; :do (asdf:load-system s :verbose nil)))
        :do (ql:quickload s :verbose nil)))
+
+  ;; view-image is useless if it can't view any image types.
+  (dlib:symbol-call :image :load-known-formats)
 
   ;; Make sure the magic backend is loaded.
   (magic:ensure-database))
