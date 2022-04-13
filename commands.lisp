@@ -610,16 +610,13 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 
 
 #|
-  @@@ Perhaps we could make this whole thing simpler by just specifying
-  @@@ that all command functions take only keyword arguments, and if you
-  @@@ want a lispy-er interface, make it call a different function.
-  @@@ In other words, how useful is it to have simple/nice command functions,
-  @@@ conviently usable from Lisp, since a Lisp API to the command's
-  @@@ functionality will likely be more complicated and/or better served by a
-  @@@ separate function. ???
-  @@@
-  @@@ ^^^^ DONE!
+  We used to alllow non-keyword arguments for command functions, but this turns
+  out to be much more complicated for the small benefit of a slightly nicer
+  interface when calling the Lisp version of the command. We now only use
+  keywords, so rest of this whole comment is only useful if we want to go back
+  to that.
 
+  XXX-- Start of obsolete comment --XXX
   The rules for converting POSIX arguments to lambda lists are fairly
   complicated. Here we try to examine some of the possiblities. We use a
   letter to denote the category of argument:
