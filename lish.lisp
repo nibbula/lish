@@ -303,10 +303,10 @@
     ("SHLVL"    nil "Shell level"		  	 *lish-level*)
     ("COLUMNS"  nil "Terminal character columns"
      ,#'(lambda () (terminal-window-columns
-	      (rl:line-editor-terminal (lish-editor *shell*)))))
+		    (rl:line-editor-terminal (lish-editor *shell*)))))
     ("ROWS"     nil "Terminal character rows"
      ,#'(lambda () (terminal-window-rows
-	      (rl:line-editor-terminal (lish-editor *shell*)))))
+		    (rl:line-editor-terminal (lish-editor *shell*)))))
     ("LINES"    nil "Terminal character rows"
      ,#'(lambda () (terminal-window-rows
 		    (rl:line-editor-terminal (lish-editor *shell*)))))
@@ -2385,7 +2385,7 @@ Arguments:
 
 	;; Make a customized line editor
 	(setf (lish-editor sh)
-	      (make-instance 'rl:line-editor
+	      (make-instance 'lish-line-editor ;; 'rl:line-editor
 			     :non-word-chars *shell-non-word-chars*
 			     :completion-func #'shell-complete
 			     :history-context *history-context*

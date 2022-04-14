@@ -8,6 +8,15 @@
   "Number indicating the depth of lish recursion. Corresponds to the ~
 LISH_LEVEL environment variable.")
 
+;; This is mostly so we can override some editor commands.
+(defclass lish-line-editor (line-editor)
+  ()
+  (:documentation "A line editor for lish."))
+
+(defsingle-method inator:redraw ((e lish-line-editor))
+  (setf (rl::prompt-string e) (safety-prompt *shell*))
+  (redraw-command e))
+
 (defun fixed-homedir ()
   "(user-homedir-pathname) with a trailing slash removed if there was one."
   (let ((h (safe-namestring (truename (user-homedir-pathname)))))
