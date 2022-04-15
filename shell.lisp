@@ -24,6 +24,10 @@
     :initarg :exit-values
     :accessor lish-exit-values
     :documentation "List of values to return to the caller.")
+   (interactive-p
+    :initarg :interactive :accessor shell-interactive-p :initform t
+    :type boolean
+    :documentation "True if the shell repeatedly prompts the user.")
    (aliases
     :accessor lish-aliases
     :documentation "Hash table of aliases.")

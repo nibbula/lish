@@ -1994,7 +1994,7 @@ suspend itself."
       (t
        (setf ! last-command
 	     last-command (copy-seq this-command))
-       ;; This is THE read of the REPL.
+       ;; This is the read of the REPL.
        (shell-read (setf this-command
 			 (if pre-str
 			     (s+ pre-str #\newline str)
@@ -2051,7 +2051,9 @@ suspend itself."
        (setf pre-str nil
 	     *input* nil
 	     *output* nil)
-       (format t "~%")			; <<<<
+       ;; @@@ This one is the trouble
+       (when (shell-interactive-p sh)
+	 (format t "~%"))		; <<<<
        (force-output)
        (when (catch 'interactive-interrupt
 	       (multiple-value-bind (vals stream show-vals)
@@ -2231,7 +2233,7 @@ suspend itself."
 ;; These with-* macros break shell initialization up into pieces so we can
 ;; do non-interactive commands, especially the various ! functions, without
 ;; repeating ourselves, and so we can call the ! functions when not already in
-; an interactive shell.
+;; an interactive shell.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defmacro with-job-signals (() &body body)
@@ -2360,10 +2362,11 @@ Arguments:
       ;; 	(return-from lish (if (lish-exit-values sh)
       ;; 			      (values-list (lish-exit-values sh))
       ;; 			      result))))
+      (setf (shell-interactive-p sh) nil)
       (return-from lish
 	(with-shell-command ()
 	  (lish-eval sh (typecase command
-			  (list command)
+			  ((or list shell-expr) command)
 			  (t (shell-read command)))
 		     (make-read-state)))))
 
@@ -2555,18 +2558,33 @@ by spaces."
     ;; whatever it is on Windows or whatever O/S.
     #+sbcl (setf sb-impl::*default-external-format*
 		 (or *saved-default-external-format* :utf-8))
-    (let ((args (nos:lisp-args)))
+    (let* ((args (nos:lisp-args))
+	   (command (nos:basename (car args))))
       (cond
 	;; When not invoked as *shell-name*, try to run it as a command.
 	;; So you can do the busybox thing and make a link farm.
-	((and args (not (equalp (nos:basename (car args)) *shell-name*))
-	      ;; @@@ We could check if the command exists, but we don't
-	      ;; have a shell yet.
-	      ;; (command-type *shell* (first args))
-	      )
-	 (lish :command (join-by-string
-			 (cons (nos:basename (car args)) (cdr args))
-			 " ") :terminal-type :crunch))
+	((and args (not (equalp command *shell-name*)))
+	 (cond
+	   ;; @@@ This seems expensive, but we have to check so it won't
+	   ;; recurse.
+	   ((with-new-shell ()
+	      (not (member (command-type *shell* (first args))
+			   '(:external-command :file))))
+	    (if (and *lish-level* (> *lish-level* 7))
+		(format t "We're ~s levels deep. Something probably went ~
+                           wrong, so I'm giving up.~%~
+                           The command was ~s.~%" *lish-level* args)
+		;; (lish :command (expr-from-args
+		;; 		     (cons (nos:basename (car args)) (cdr args)))
+		;; 	   :terminal-type :crunch :debug nil)
+		(with-new-shell ()
+		  (setf (shell-interactive-p *shell*) nil)
+		  (with-shell-command ()
+		    (lish-eval *shell*
+			       (expr-from-args (cons command (cdr args)))
+			       (make-read-state))))))
+	   (t (format t "Sorry, this ~a doesn't have a ~s command in it.~%"
+		      *shell-name* command))))
 	((cdr args) ;; Some args
 	 (apply #'!lish
 		`(,@(posix-to-lisp-args (get-command "lish")
