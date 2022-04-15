@@ -2269,17 +2269,17 @@ suspend ^Z and quit ^\, and setting sub-process jobs control signals."
   (defmacro with-shell-command (() &body body)
     "Evaluate the BODY as a non-interactive shell command."
     (with-names (result)
-    `(let (,result)
-       (catch 'interactive-interrupt
-	 (ensure-theme)
-	 (unwind-protect
-	      (with-job-signals ()
-		(run-hooks *enter-shell-hook*)
-		(setf ,result (progn ,@body)))
-	   (run-hooks *exit-shell-hook*)))
-       (if (lish-exit-values *shell*)
-	   (values-list (lish-exit-values *shell*))
-	   ,result))))
+      `(let (,result)
+	 (catch 'interactive-interrupt
+	   (ensure-theme)
+	   (unwind-protect
+		(with-job-signals ()
+		  (run-hooks *enter-shell-hook*)
+		  (setf ,result (progn ,@body)))
+	     (run-hooks *exit-shell-hook*)))
+	 (if (lish-exit-values *shell*)
+	     (values-list (lish-exit-values *shell*))
+	     ,result))))
 
   (defmacro with-shell (() &body body)
     "Evaluate the body as a non-interactive shell command, making a new shell
@@ -2567,9 +2567,9 @@ by spaces."
 	 (cond
 	   ;; @@@ This seems expensive, but we have to check so it won't
 	   ;; recurse.
-	   ((with-new-shell ()
-	      (not (member (command-type *shell* (first args))
-			   '(:external-command :file))))
+	   ((ignore-errors (with-new-shell ()
+			     (not (member (command-type *shell* (first args))
+					  '(:external-command :file)))))
 	    (if (and *lish-level* (> *lish-level* 7))
 		(format t "We're ~s levels deep. Something probably went ~
                            wrong, so I'm giving up.~%~
@@ -2577,12 +2577,15 @@ by spaces."
 		;; (lish :command (expr-from-args
 		;; 		     (cons (nos:basename (car args)) (cdr args)))
 		;; 	   :terminal-type :crunch :debug nil)
-		(with-new-shell ()
+		(with-new-shell (:debug nil)
 		  (setf (shell-interactive-p *shell*) nil)
-		  (with-shell-command ()
-		    (lish-eval *shell*
-			       (expr-from-args (cons command (cdr args)))
-			       (make-read-state))))))
+		  (let ((state (make-read-state)))
+		    (with-simple-restart (abort "Abort the command.")
+		      (with-error-handling (state)
+			(with-shell-command ()
+			  (lish-eval *shell*
+				     (expr-from-args (cons command (cdr args)))
+				     state))))))))
 	   (t (format t "Sorry, this ~a doesn't have a ~s command in it.~%"
 		      *shell-name* command))))
 	((cdr args) ;; Some args
