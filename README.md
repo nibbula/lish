@@ -1,4 +1,4 @@
-#### `lish` may someday be a lisp shell.
+#### `lish` may someday be a Lisp shell.
 
 If you really want to try it, have sbcl around, and:
 
