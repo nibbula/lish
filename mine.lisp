@@ -47,9 +47,6 @@
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
-		   (compilation-speed 0)))
-
 (defvar *command-sections* '("man1" "man6" "man8")
   "Normal sections where commands live.")
 
