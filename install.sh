@@ -12,7 +12,7 @@
 # totally different.
 #
 # @@@ Someday convert to lish, since we at least should have the lish executable
-# and be able to use that even it doesn't have los!
+# and be able to use that even if it doesn't have los!
 
 fail()
 {
