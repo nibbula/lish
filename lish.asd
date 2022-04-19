@@ -12,14 +12,17 @@
     :source-control	:git
     :long-description   "Lish is a Lisp shell. Don't hold your breath."
     :entry-point	"lish:shell-toplevel"
-    :depends-on (:dlib :opsys :dlib-misc :stretchy :char-util :glob
-		 :table :table-print :reader-ext :dlib-interactive :completion
-		 :keymap :terminal :terminal-ansi :rl
-		 :fatchar :fatchar-io :magic :theme :style :collections
-		 :ostring :ochar :grout :utf8b-stream :dtime :locale
-		 #+use-re :re
-		 #-use-re :cl-ppcre
-		 :chipz :bordeaux-threads #|:agnostic-lizard|#)
+    :depends-on
+    (;; Things in yew
+     :dlib :opsys :dlib-misc :stretchy :char-util :glob
+     :table :table-print :reader-ext :dlib-interactive :completion
+     :keymap :terminal :terminal-ansi :rl
+     :fatchar :fatchar-io :magic :theme :style :collections
+     :ostring :ochar :grout :utf8b-stream :dtime :locale
+     ;; Things in not in yew
+      #+use-re :re
+      #-use-re :cl-ppcre
+     :chipz :bordeaux-threads #|:agnostic-lizard|#)
     :components
     ((:file "package")
      (:file "vars"	:depends-on ("package"))

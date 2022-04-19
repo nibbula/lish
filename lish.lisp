@@ -6,10 +6,6 @@
 
 (in-package :lish)
 
-;; (declaim (optimize (debug 3)))
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
-		   (compilation-speed 0)))
-
 ;; The "result" argument is not for the caller, but rather so we can detect
 ;; cycles in the package inheritance graph.
 (defun flattened-package-use-list (package &optional result)
@@ -60,23 +56,23 @@
 ;; Get rid of this is if it's unnecessary.
 (defun modified-context (context
 			 &key
-			   (in-pipe nil in-pipe-p)
-			   (out-pipe nil out-pipe-p)
+			   (in-pipe     nil in-pipe-p)
+			   (out-pipe    nil out-pipe-p)
 			   (environment nil environment-p)
-			   (flipped-io nil flipped-io-p)
-			   (pipe-plus nil pipe-plus-p)
-			   (pipe-dot nil pipe-dot-p)
-			   (background nil background-p))
+			   (flipped-io  nil flipped-io-p)
+			   (pipe-plus   nil pipe-plus-p)
+			   (pipe-dot    nil pipe-dot-p)
+			   (background  nil background-p))
   "Return a new context based on CONTEXT, with the given slots."
   (if (not context)
       (make-context 
-       :in-pipe in-pipe
-       :out-pipe out-pipe
+       :in-pipe     in-pipe
+       :out-pipe    out-pipe
        :environment environment
-       :flipped-io flipped-io
-       :pipe-plus pipe-plus
-       :pipe-dot pipe-dot
-       :background background)
+       :flipped-io  flipped-io
+       :pipe-plus   pipe-plus
+       :pipe-dot    pipe-dot
+       :background  background)
       (let ((c (copy-structure context)))
 	(when in-pipe-p     (setf (context-in-pipe     c) in-pipe))
 	(when out-pipe-p    (setf (context-out-pipe    c) out-pipe))
@@ -86,10 +82,6 @@
 	(when pipe-dot-p    (setf (context-pipe-dot    c) pipe-dot))
 	(when background-p  (setf (context-background  c) background))
 	c)))
-
-;; (defstruct lisp-expression
-;;   "Nothing fancy. Just a wrapper for a lisp value for now."
-;;   object)
 
 (defun %find-shell-word (expr position &optional (word-num 0))
   (loop
@@ -2538,10 +2530,6 @@ by spaces."
   "For being invoked as a standalone shell."
   (setf *standalone* t
 	*default-lishrc* (default-lishrc))
-  ;;(format t "Welcome to ~a ~a~%" *shell-name* *version*)
-  ;;(format t "Yo yo! ~s~%" (nos:lisp-args)) (finish-output)
-  ;;(trace lish)
-  ;;(trace !lish)
   ;; No, this doesn't work:
   ;; (asdf:initialize-output-translations)
   (uiop:restore-image)
