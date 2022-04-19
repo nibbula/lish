@@ -2362,6 +2362,10 @@ Arguments:
 			  (t (shell-read command)))
 		     (make-read-state)))))
 
+    ;; Use our debugger unless we're told not to or it's not loaded.
+    (when (and (not *dont-deblarg*) (find-package :deblarg))
+      (symbol-call :deblarg :activate :quietly t))
+
     ;; Figure out the terminal type.
     (setf terminal-type (or terminal-type
 			    (and *terminal*

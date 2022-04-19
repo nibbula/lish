@@ -140,6 +140,9 @@ means every dumped executable."))
 (defvar *use-bracketed-paste* t
   "True to use safer pasting in terminals that support it.")
 
+(defvar *dont-deblarg* nil
+  "True to not activate our debugger even if it's loaded.")
+
 ;; I really have some reservations about including this. It's somewhat
 ;; serendipitous that it works out this way, and it is highly efficient
 ;; keystroke-wise, but seems like an unorthogonal hackish trick.
