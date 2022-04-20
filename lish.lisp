@@ -1737,7 +1737,9 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	      (values vals out-stream show-vals))
 	     (:and      (eval-compound (successful vals) nil))
 	     (:or       (eval-compound (not (successful vals)) nil))
-	     (:sequence (eval-compound t nil))
+	     (:sequence
+	      (setf pipe-dot t) ;; don't pass *output* for sequences
+	      (eval-compound t nil))
 	     (:redirect-to
 	      (run-with-output-to
 	       (word-word (elt (shell-expr-words expr) 1))
