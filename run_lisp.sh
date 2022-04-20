@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 # This is just to find and start a Lisp, to run a Lisp based script.
 
@@ -30,7 +30,7 @@ if [ ! -n "$LISP" -o ! -n "`command -v $LISP`" ] ; then
   echo "the name of an installed Common Lisp, and re-run this script."
   echo "For example: "
   echo
-  echo "LISP=/usr/bin/sbcl sh build.sh"
+  echo "LISP=/usr/bin/sbcl sh ./build.sh"
   echo
   exit 1
 fi

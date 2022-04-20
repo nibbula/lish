@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 #
 # build.sh - Build Lish
 #
@@ -27,6 +27,7 @@ fail()
   echo "\\-------------------------------------------------------------------/"
 }
 
-${SHELL:-sh} ./run_lisp.sh "build/build-lish.lisp" || fail
+#${SHELL:-sh} ./run_lisp.sh "build/build-lish.lisp" || fail
+/usr/bin/env sh ./run_lisp.sh "build/build-lish.lisp" || fail
 
 exit 0
