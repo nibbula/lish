@@ -2528,6 +2528,15 @@ by spaces."
      :collect (make-shell-word :word w :start pos :end (+ pos (length w)))
      :do (incf pos (1+ (length w)))))
 
+(defun is-this-shell (command)
+  "Return true if command probably names this shell."
+  (let ((start 0))
+    ;; Called as a login shell on unix, with starting dash.
+    #+unix (when (char= (char command 0) #\-)
+	     (incf start))
+    (and command (stringp command)
+	 (string-equal command *shell-name* :start1 start))))
+
 (defvar *saved-default-external-format* nil)
 
 (defun shell-toplevel ()
@@ -2555,7 +2564,7 @@ by spaces."
       (cond
 	;; When not invoked as *shell-name*, try to run it as a command.
 	;; So you can do the busybox thing and make a link farm.
-	((and args (not (equalp command *shell-name*)))
+	((and args (not (is-this-shell command)))
 	 (cond
 	   ;; @@@ This seems expensive, but we have to check so it won't
 	   ;; recurse.
