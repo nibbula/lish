@@ -4,9 +4,6 @@
 
 (in-package :lish)
 
-(declaim (optimize (speed 0) (safety 3) (debug 3) (space 0)
-		   (compilation-speed 0)))
-
 ;; (defun quoted-start (str pos)
 ;;   "Check if we are inside a shell quoted string and return it's starting
 ;;  position."
