@@ -132,6 +132,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:command-output-list
    #:with-streamlike-input
    #:with-shell
+   #:run-with-env
    ;; magic punctuation
    #:!  #:!?  #:!!  #:!$  #:!$$  #:!@  #:!_  #:!-
    #:!= #:!?= #:!!= #:!$= #:!$$= #:!@= #:!_= #:!-=

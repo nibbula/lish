@@ -337,6 +337,12 @@ stream, or NIL if we can't."
 ;; 	  (close stream)
 ;; 	  nil))))
 
+(defun run-with-env (env-alist &rest args)
+  "Run a shell command with environement variables as specified in ‘env-alist’."
+  (with-shell ()
+    (shell-eval (possibly-read args)
+		:context (modified-context *context* :environment env-alist))))
+
 ;; I'm not really sure about these. I have a hard time remembering them,
 ;; and I worry they'll look like Perl.
 ;;
