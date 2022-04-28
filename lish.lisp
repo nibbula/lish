@@ -2537,7 +2537,9 @@ by spaces."
     #+unix (when (char= (char command 0) #\-)
 	     (incf start))
     (and command (stringp command)
-	 (string-equal command *shell-name* :start1 start))))
+	 (command-test (lambda (cmd path)
+			 (string-equal path cmd :start1 start))
+		       *shell-name* command))))
 
 (defvar *saved-default-external-format* nil)
 
