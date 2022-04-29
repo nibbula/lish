@@ -2543,8 +2543,18 @@ by spaces."
 
 (defvar *saved-default-external-format* nil)
 
+;; If you want to invoke lish commands from another shell or another program,
+;; you can make a "link farm", which is a directory in your path which has
+;; links to the shell as the command names you want to invoke. Since lish/los
+;; commands are intentionally not very compatible with POSIX, it's advisable
+;; that unless you're in a setup that won't be using any POSIX shell scripts,
+;; to link commands that are also POSIX commands, as "lish-<command>", and then
+;; make aliases in the other shell to invoke them.
+
 (defun shell-toplevel ()
-  "For being invoked as a standalone shell."
+  "Invoked the standalone shell. If we're not invoked as our known shell name,
+try to run the command that we're invoked as, or the command we're
+invoked as with a (s+ *shell-name* “-”) stripped off."
   (setf *standalone* t
 	*default-lishrc* (default-lishrc))
   ;; No, this doesn't work:
@@ -2564,24 +2574,24 @@ by spaces."
     #+sbcl (setf sb-impl::*default-external-format*
 		 (or *saved-default-external-format* :utf-8))
     (let* ((args (nos:lisp-args))
-	   (command (nos:basename (car args))))
+	   (command
+	     (remove-prefix (nos:basename (car args))
+			    (s+ (string-downcase *shell-name*) #\-))))
       (cond
 	;; When not invoked as *shell-name*, try to run it as a command.
-	;; So you can do the busybox thing and make a link farm.
+	;; So you can do the link farm thing.
 	((and args (not (is-this-shell command)))
 	 (cond
-	   ;; @@@ This seems expensive, but we have to check so it won't
-	   ;; recurse.
+	   ;; @@@ This seems expensive, but we have to check that we won't
+	   ;; invoke it as an external command to prevent unwanted recursion.
 	   ((ignore-errors (with-new-shell ()
-			     (not (member (command-type *shell* (first args))
+			     ;; (not (member (command-type *shell* (first args))
+			     (not (member (command-type *shell* command)
 					  '(:external-command :file)))))
 	    (if (and *lish-level* (> *lish-level* 7))
 		(format t "We're ~s levels deep. Something probably went ~
                            wrong, so I'm giving up.~%~
                            The command was ~s.~%" *lish-level* args)
-		;; (lish :command (expr-from-args
-		;; 		     (cons (nos:basename (car args)) (cdr args)))
-		;; 	   :terminal-type :crunch :debug nil)
 		(with-new-shell (:debug nil)
 		  (setf (shell-interactive-p *shell*) nil)
 		  (let ((state (make-read-state)))
@@ -2594,11 +2604,13 @@ by spaces."
 	   (t (format t "Sorry, this ~a doesn't have a ~s command in it.~%"
 		      *shell-name* command))))
 	((cdr args) ;; Some args
+	 ;; Invoke as if we were invoking the lish command from in the shell.
 	 (apply #'!lish
 		`(,@(posix-to-lisp-args (get-command "lish")
 					(wordify-list (cdr args)))
 		  :greeting t :terminal-type :crunch)))
 	(t ;; No args
+	 ;; Interactive
 	 (!lish :greeting t :terminal-type :crunch))))
     (nos:exit-lisp)))
 
