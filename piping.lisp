@@ -7,9 +7,6 @@
 
 (in-package :lish)
 
-;; (declaim (optimize (speed 0) (safety 3) (debug 3) (space 1)
-;; 		   (compilation-speed 0)))
-
 (defun lisp-args-to-command (args &key (auto-space nil))
   "Turn the arguments into a string of arguments for a system command. String
 arguments are concatenated together. Symbols are downcased and turned into
@@ -144,6 +141,7 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
      :while (setf l (read-line (or stream *standard-input*) nil nil))
      :collect l))
 
+;; @@@ trying to make it work with binary streams?
 ;; (defun map-output-lines (func command &key binary)
 ;;   "Return a list of the results of calling the function FUNC with each output
 ;; line of COMMAND. COMMAND should probably be a string, and FUNC should take one
@@ -589,5 +587,47 @@ like $(command) in bash."
 	  (progn
 	    (close stream)
 	    nil)))))
+
+(defun glob+ (pattern &optional type-chars)
+  "Glob for files of a specific type indicated by ‘type-chars’.
+Information about the type characters can be found in uos::*file-type-data* on
+posix."
+  #+unix
+  (flet ((char-to-key (char)
+	   "Convert a file type character into a keyword."
+	   (let ((i (find char opsys-unix::*file-type-data*
+			  :key #'opsys-unix::file-type-info-char)))
+	     ;; I guess it's better to fail on unknown letters
+	     ;; (when i
+	     ;;   (opsys-unix::file-type-info-symbol i))
+	     (if i
+		 (opsys-unix::file-type-info-symbol i)
+		 (error "Unknown file type character ~s" char))))
+	 (of-type (file type)
+	   (eq (ignore-errors ;; @@@ too broad
+		(uos:file-type-symbol
+		 (uos:file-status-mode
+		  (uos:lstat file))))
+	       type)))
+    (typecase type-chars
+      (character
+       (let ((type-key (char-to-key type-chars)))
+	 (glob pattern :test (_ (of-type _ type-key)))))
+      ((or cons vector)
+       (let ((type-keys
+	       (omapcan-as 'list (_ (let ((r (char-to-key _)))
+				      (when r (list r))))
+			   type-chars)))
+	 (glob pattern :test
+	       (_ (find-if (lambda (type) (of-type _ type)) type-keys)))))
+      (null
+       ;; Just do a normal glob if type-chars aren't provided.
+       (glob pattern))
+      (t
+       (error "glob+ unknown type ~a for type-chars ~s" (type-of type-chars)
+	      type-chars))))
+  ;; @@@ we should be able on windows too
+  #-unix (declare (ignore type-chars))
+  #-unix (glob pattern))
 
 ;; EOF
