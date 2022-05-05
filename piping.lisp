@@ -354,7 +354,7 @@ stream, or NIL if we can't."
 
 (defun !? (&rest args)
   "Evaluate the shell command, converting Unix shell result code into boolean.
-This means the 0 is T and anything else is NIL."
+This means that 0 is T and anything else is NIL."
   (with-shell ()
     (let ((result
 	   (shell-eval (shell-read (lisp-args-to-command args)))))
