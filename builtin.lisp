@@ -9,9 +9,6 @@
 
 (in-package :lish)
 
-;; (declaim (optimize (speed 0) (safety 3) (debug 3) (space 1)
-;; 		   (compilation-speed 0)))
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Command definitions
 
@@ -570,14 +567,14 @@ NAME is replaced by EXPANSION before any other evaluation."
   (setf (gethash name
 		 (if global
 		     (lish-global-aliases shell)
-		     (lish-aliases shell)))
+		     (shell-aliases shell)))
 	expansion))
 
 (defun unset-alias (name &key global (shell *shell*))
   "Remove the definition of NAME as an alias."
   (remhash name (if global
 		    (lish-global-aliases shell)
-		    (lish-aliases shell))))
+		    (shell-aliases shell))))
 
 (defun get-alias (name &key global (shell *shell*))
   "Return the alias definition of ‘NAME’, or NIL if there isn't one.
@@ -585,11 +582,11 @@ NAME is replaced by EXPANSION before any other evaluation."
 - GLOBAL  Return the 'global' alias."
   (if global
       (gethash name (lish-global-aliases shell))
-      (gethash name (lish-aliases shell))))
+      (gethash name (shell-aliases shell))))
 
 (defun alias (name)
   "Return the alias definition of NAME, or NIL if there isn't one."
-  (gethash name (lish-aliases *shell*)))
+  (gethash name (shell-aliases *shell*)))
 
 (defsetf alias set-alias
  "Set the alias definition.")
@@ -613,7 +610,7 @@ NAME is replaced by EXPANSION before any other evaluation."
 		 :for a :being :the :hash-keys
                    :of (if global
 			   (lish-global-aliases *shell*)
-			   (lish-aliases *shell*))
+			   (shell-aliases *shell*))
 		 :collect (list a (get-alias a :global global :shell *shell*)))
 	       :columns '((:name "Alias") (:name "Expansion")))))
 	(omapn (_ (format t "alias ~a ~:[is not defined~;~:*~w~]~%"
@@ -637,8 +634,8 @@ NAME is replaced by EXPANSION before any other evaluation."
 (defbuiltin exit ((values string :repeating t :help "Values to return."))
   "Exit from the shell. Optionally return values."
   (when values
-    (setf (lish-exit-values *shell*) (loop :for v :in values :collect v)))
-  (setf (lish-exit-flag *shell*) t))
+    (setf (shell-exit-values *shell*) (loop :for v :in values :collect v)))
+  (setf (shell-exit-flag *shell*) t))
 
 ;; Override an implementations quit function, so that we only exit one level
 ;; of the shell, not the whole Lisp system.
@@ -1430,7 +1427,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 (defun describe-command (cmd)
   (let (x)
     (cond
-      ((setf x (gethash cmd (lish-aliases *shell*)))
+      ((setf x (gethash cmd (shell-aliases *shell*)))
        (when x
 	 (format t "~a is aliased to ~a~%" cmd x)))
       ((setf x (gethash cmd (lish-global-aliases *shell*)))
@@ -1467,7 +1464,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	    (when paths
 	      (format t "~a~%" (setf *output* (first paths))))))
 	 (all
-	  (let ((x (gethash n (lish-aliases *shell*))))
+	  (let ((x (gethash n (shell-aliases *shell*))))
 	    (when x
 	      (format t "~a is aliased to ~a~%" n x)
 	      (push x *output*)

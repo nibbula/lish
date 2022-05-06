@@ -15,18 +15,18 @@
 (defclass shell ()
   ((exit-flag
     :initarg :exit-flag
-    :accessor lish-exit-flag
+    :accessor shell-exit-flag
     :documentation "Set to true to exit the shell.")
    (exit-values
     :initarg :exit-values
-    :accessor lish-exit-values
+    :accessor shell-exit-values
     :documentation "List of values to return to the caller.")
    (interactive-p
     :initarg :interactive :accessor shell-interactive-p :initform t
     :type boolean
     :documentation "True if the shell repeatedly prompts the user.")
    (aliases
-    :accessor lish-aliases
+    :accessor shell-aliases
     :documentation "Hash table of aliases.")
    (global-aliases
     :accessor lish-global-aliases

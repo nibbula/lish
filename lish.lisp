@@ -1104,7 +1104,7 @@ into a shell-expr with shell-read."
 
 (defun resolve-command (command &optional seen)
   "Try to figure out what the command really is, for testing accepts."
-  (let ((alias (gethash command (lish-aliases *shell*)))
+  (let ((alias (gethash command (shell-aliases *shell*)))
 	word)
     (if alias
 	(progn
@@ -1204,7 +1204,7 @@ expansion in the alias expansion."
   (if (zerop (length (shell-expr-words expr)))
       expr
       (let* ((cmd (nth-expr-word 0 expr))
-	     (alias (gethash cmd (lish-aliases sh))))
+	     (alias (gethash cmd (shell-aliases sh))))
 	(if alias
 	    (lisp-exp-eval (expand-alias alias expr))
 	    expr))))
@@ -1239,7 +1239,7 @@ consulting the file system."
 	 (builtin-command			  :builtin-command)
 	 (shell-command				  :shell-command)
 	 (t					  :command)))
-      ((gethash command (lish-aliases sh))        :alias)
+      ((gethash command (shell-aliases sh))       :alias)
       ((gethash command (lish-global-aliases sh)) :global-alias)
       ;; @@@ A loadable system isn't really a command, rather a potential
       ;; command, so maybe it shouldn't be in here?
@@ -1491,7 +1491,7 @@ probably fail, but perhaps in similar way to other shells."
   (let* (;(words (shell-expr-words expr))
 	 (cmd (word-word (nth-expr-word 0 expr)))
 	 (command (get-command cmd))
-	 (alias (gethash cmd (lish-aliases sh)))
+	 (alias (gethash cmd (shell-aliases sh)))
 	 (expanded-expr (lisp-exp-eval expr))
 	 result result-stream)
     ;; These are in order of precedence, so:
@@ -2271,8 +2271,8 @@ suspend ^Z and quit ^\, and setting sub-process jobs control signals."
 		  (run-hooks *enter-shell-hook*)
 		  (setf ,result (progn ,@body)))
 	     (run-hooks *exit-shell-hook*)))
-	 (if (lish-exit-values *shell*)
-	     (values-list (lish-exit-values *shell*))
+	 (if (shell-exit-values *shell*)
+	     (values-list (shell-exit-values *shell*))
 	     ,result))))
 
   (defmacro with-shell (() &body body)
@@ -2353,8 +2353,8 @@ Arguments:
       ;; 				  (make-read-state)))
       ;; 	  (stop-job-control saved-sigs)
       ;; 	  (run-hooks *exit-shell-hook*))
-      ;; 	(return-from lish (if (lish-exit-values sh)
-      ;; 			      (values-list (lish-exit-values sh))
+      ;; 	(return-from lish (if (shell-exit-values sh)
+      ;; 			      (values-list (shell-exit-values sh))
       ;; 			      result))))
       (setf (shell-interactive-p sh) nil)
       (return-from lish
@@ -2409,11 +2409,11 @@ Arguments:
 	      :and lvl = *lish-level*
 	      :and eof-count = 0
 	      :and retry = nil
-	      :if (lish-exit-flag sh)
+	      :if (shell-exit-flag sh)
 	        :if (confirm-quit)
-		  :return (values-list (lish-exit-values sh))
+		  :return (values-list (shell-exit-values sh))
 		:else
-		   :do (setf (lish-exit-flag sh) nil)
+		   :do (setf (shell-exit-flag sh) nil)
 		:end
 	      :end
 	      :do
@@ -2470,9 +2470,9 @@ Arguments:
 
     (finish-history sh)
 
-    (when (lish-exit-flag sh)
-      (return-from lish (when (lish-exit-values sh)
-			  (values-list (lish-exit-values sh)))))
+    (when (shell-exit-flag sh)
+      (return-from lish (when (shell-exit-values sh)
+			  (values-list (shell-exit-values sh)))))
     (format t "*EOF*~%")
     ;; Well, let's hope that this will clear the EOF on *standard-input*
     (clear-input *standard-input*))))

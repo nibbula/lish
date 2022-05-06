@@ -79,7 +79,7 @@ facility. Usually it's a universal-time, or an alist of (<thing> . <time>).")
 		(sort
 		 (remove-duplicates
 		  (append
-		   (loop :for k :being :the :hash-keys :of (lish-aliases shell)
+		   (loop :for k :being :the :hash-keys :of (shell-aliases shell)
 		      :collect k)
 		   (loop :for k :being :the :hash-keys :of (lish-commands)
 		      :do (spin)

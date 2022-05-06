@@ -73,7 +73,8 @@ without any particular knowledge of it's Lisp programming features.")
    #:make-prompt
    ;; shell object
    #:shell
-   #:lish-aliases
+   #:shell-interactive-p
+   #:shell-aliases
    #:lish-editor
    #:lish-keymap
    #:lish-old-pwd
