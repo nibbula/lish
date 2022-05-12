@@ -2520,6 +2520,8 @@ Arguments:
   (when (not init-file-supplied-p)
     (setf init-file (when (not no-init-file) (pick-an-rc-file))))
   (remf args :no-init-file)
+  (when no-init-file
+    (setf (getf args :init-file) nil))
   (apply #'lish args))
 
 (defun wordify-list (word-list)
