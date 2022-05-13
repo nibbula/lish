@@ -73,13 +73,11 @@ disable-sharpsign-dollar-reader."
     (set-dispatch-macro-character #\# #\$ #'sharpsign-dollar-reader)))
 
 ;; I gave in and added ^L.
-;; @@@ This should probably use some unicode definition of space, like in
-;; sb-unicode:whitespace-p
-(defparameter *whitespace* #(#\space #\newline #\tab #\return #\page)
+(defparameter *shell-whitespace* #(#\space #\tab #\newline #\return #\page)
   "Word separators for lish.")
 
 (defun contains-whitespace-p (s)
-  (position-if #'(lambda (x) (position x *whitespace*)) s))
+  (position-if #'(lambda (x) (position x *shell-whitespace*)) s))
 
 (defparameter *reader-quote-char*
   ;; I don't think #\\ should be in here.
@@ -385,7 +383,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 	    (setf string-quote t)
 	    (incf i))
 	   ;; whitespace
-	   ((position c *whitespace*)
+	   ((position c *shell-whitespace*)
 	    (finish-word)
 	    (incf i))
 	   ;; comment
