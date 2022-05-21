@@ -1673,7 +1673,19 @@ Arguments:
 			    (pick-a-terminal-type)))
     (with-terminal (terminal-type *terminal* :device-name terminal-name
 				  :start-at-current-line t)
-      (let (#|(*standard-output* *terminal*) not ready for this |#)
+      ;; We can't just use a terminal-crunch as *standard-output* because
+      ;; it won't know about output from other programs or other streams,
+      ;; but since the lower level terminals are are something like
+      ;; "immediate mode" maybe they should work? The point is to get
+      ;; color output for fat-strings.
+      (let ((*standard-output*
+	      ;; We can't use typecase because the terminal types don't
+	      ;; have to be loaded.
+	      (case (keywordify (type-of *terminal*))
+		(:terminal-crunch (terminal-wrapped-terminal *terminal*))
+		((:terminal-ansi :terminal-dumb :terminal-dumb-color)
+		 *terminal*)
+		(t *standard-output*))))
 	(setf (tt-input-mode) :line)
 
 	(ensure-theme)
