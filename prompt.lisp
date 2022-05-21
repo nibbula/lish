@@ -393,6 +393,14 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
   "Make the color of string be a gradient from ‘start-color’ to ‘end-color’.
 Only effect characters from ‘start’ to ‘end’. ‘which’ is either :fg or :bg to
 indicate which color to affect, and defaults to :bg."
+  (setf string
+	(typecase string
+	  ((or fat-string fatchar-string) string)
+	  (string (string-to-fat-string string))
+	  (t
+	   (error "Gradientize should be passes a string or a fat-string, ~
+                   not a ~s." (type-of string)))))
+
   (when (not end)
     (setf end (olength string)))
 
