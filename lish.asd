@@ -35,8 +35,11 @@
      (:file "complete"  :depends-on ("package" "vars" "args" "commands"))
      (:file "prompt"    :depends-on ("package" "vars" "args" "commands"
 				     "shell"))
-     (:file "lish"   	:depends-on ("package" "vars" "types" "args" "jobs"
+     (:file "expand"   	:depends-on ("package" "vars" "types" "args" "jobs"
 				     "commands" "shell" "prompt" "complete"))
+     (:file "lish"   	:depends-on ("package" "vars" "types" "args" "jobs"
+				     "commands" "shell" "prompt" "complete"
+				     "expand"))
      (:file "piping"	:depends-on ("package" "vars" "args" "commands"
 				     "shell" "lish"))
      (:file "builtin"   :depends-on ("package" "vars" "args" "jobs" "commands"
