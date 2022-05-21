@@ -27,13 +27,51 @@ the end and didn't get a close quote, the third value is true.~
        (incf i))
     (values v i (not end-quote))))
 
+(defmacro define-reader-macro (char name (&optional
+					    (stream-arg 'stream)
+					    (char-arg 'subchar)
+					    (param-arg 'arg))
+			       &body body)
+  "Define a “dispatch” level reader macro function for sharpsign #\# and ‘char’,
+named ‘name’. The function will have arguments called ‘stream’, ‘subchar’ and
+‘arg’, which are the reader stream, the dispatch sub-character, and the infix
+parameter, as in the CL standard.
+
+Defines functions to enable and disable it in the current readtable, and enable
+it for the rest of file. Defines a variable to save the current function,
+if any."
+  (let ((func-name (symbolify (format nil "~@:(~a~)-READER" name)))
+	(save-var-name (symbolify (s+ "*SAVED-" name "-FUNC*"))))
+    `(progn
+       (defvar ,save-var-name nil)
+
+       (defun ,func-name (,stream-arg ,char-arg ,param-arg)
+	 ,@body)
+
+       (defun ,(symbolify (s+ "ENABLE-" func-name)) ()
+	 (when (not ,save-var-name)
+	   (setf ,save-var-name (get-dispatch-macro-character #\# ,char)))
+	 (set-dispatch-macro-character #\# ,char #',func-name))
+
+       (defun ,(symbolify (s+ "DISABLE-" func-name)) ()
+	 (when ,save-var-name
+	   (set-dispatch-macro-character #\# ,char ,save-var-name)))
+
+       (defmacro ,(symbolify (s+ "FILE-ENABLE-" func-name)) ()
+	 '(eval-when (:compile-toplevel :load-toplevel :execute)
+	   ;; It works to just set it because when a file is finished loading
+	   ;; the *readtable* is restored.
+	   (setf *readtable* (copy-readtable))
+	   (set-dispatch-macro-character #\# ,char #',func-name))))))
+
 ;; XXX This is horribly wrong, since it doesn't actually respect the syntax.
 ;; To do it right, we probably have to modify shell-read to not actually read
 ;; but just accumulate characters. Also, to be balanced, we give up the ability
 ;; to have a shell varibale ‘$#’, but that's okay since we don't want such a
 ;; thing. Also, we don't get lexical scope, but with full parsing we could by
 ;; doing something like: #$ foo ,var bar $# => (! "foo " var " bar")
-(defun sharp-dollar-reader (stream subchar arg)
+(define-reader-macro #\$ sharp-dollar (stream subchar arg)
+  "Read a command in Lish syntax."
   (declare (ignore subchar arg))
   (when (not *read-suppress*)
     (list
@@ -47,6 +85,7 @@ the end and didn't get a close quote, the third value is true.~
 	    (setf c (read-char stream)))
        (read-char stream))))) ;; read the final #
 
+#|
 (defvar *saved-readtable* nil
   "Save a copy of the starting readtable so we can go back to it.")
 
@@ -71,6 +110,23 @@ disable-sharpsign-dollar-reader."
     ;; *readtable* is restored.
     (setf *readtable* (copy-readtable))
     (set-dispatch-macro-character #\# #\$ #'sharpsign-dollar-reader)))
+|#
+
+;; I'm not sure if I would ever use this.
+
+(define-reader-macro #\h sharp-h (stream subchar arg)
+  "Read a “here” document until a line starting with the given token.
+The token should probably be a string."
+  (declare (ignore subchar arg))
+  (when (not *read-suppress*)
+    (let ((token (princ-to-string
+		  (read-from-string (read-line stream t nil t)))))
+      (with-output-to-string (s)
+	(loop :with line = (read-line stream t nil t)
+	  :while (not (begins-with token line))
+	  :do
+	    (write-line line s)
+	    (setf line (read-line stream t nil t)))))))
 
 ;; I gave in and added ^L.
 (defparameter *shell-whitespace* #(#\space #\tab #\newline #\return #\page)
