@@ -128,7 +128,7 @@
       (if args
 	  (apply (command-function command) args)
 	  (funcall (command-function command)))
-    (run-hooks *post-command-hook* command :command)))
+    (post-command command :command)))
 
 (defclass shell-command (internal-command)
   ()

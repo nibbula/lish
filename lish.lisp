@@ -616,6 +616,11 @@ element in a pipeline."
 	(omap wrapper *input*))
       (eval expr))))
 
+(defun post-command (name type)
+  "Things to do after a command."
+  (run-hooks *post-command-hook* name type)
+  (finish-output))
+
 (defun call-thing (thing args context &optional parenless)
   "Call a command or function with the given POSIX style arguments.
 THING is a COMMAND object or a function/callable symbol.
@@ -794,10 +799,10 @@ probably fail, but perhaps in similar way to other shells."
 	     (run-hooks *pre-command-hook* cmd :system-command)
 	     (setf (values result result-stream)
 		   (do-system-command expanded-expr context))
-	     (run-hooks *post-command-hook* cmd :system-command)
+	     (post-command cmd :system-command)
 	     (when (not result)
 	       (format t "Command failed.~%"))
-	     (force-output)	   ; @@@ is this really a good place for this?
+	     ;; (finish-output)	   ; @@@ is this really a good place for this?
 	     (values result result-stream nil))
 	   (rest-of-the-line (expr)
 	     "Return the rest of the line after the first word."
@@ -815,7 +820,8 @@ probably fail, but perhaps in similar way to other shells."
 	     (values-list
 	      (let ((vals (multiple-value-list
 			   (call-thing func '() context line))))
-		(run-hooks *post-command-hook* cmd :function)
+		(post-command cmd :function)
+		;;(finish-output)   ; @@@ is this really a good place for this?
 		vals))))
       (cond
 	;; Alias
@@ -831,9 +837,6 @@ probably fail, but perhaps in similar way to other shells."
 	;; external command
 	((typep command 'external-command)
 	 (run-hooks *pre-command-hook* cmd :command)
-	 ;; (multiple-value-prog1
-	 ;;     (call-thing command (subseq expanded-words 1) context)
-	 ;;   (run-hooks *post-command-hook* cmd :command)))
 	 (sys-cmd))
 	((functionp cmd)
 	 ;; (format t "CHOWZA ~s~%" (rest-of-the-line expr))
@@ -891,7 +894,7 @@ probably fail, but perhaps in similar way to other shells."
 	   (if (and (shell-word-p first-word)
 		    (shell-word-eval first-word))
 	       (call-thing cmd nil context)
-	       (values (list (eval-lisp-expr cmd) nil t))))
+		 (values (list (eval-lisp-expr cmd) nil t))))
 	 ;; @@@ How can we evaluate the words after the first and return all
 	 ;; their possibly multiple values?
 	 ;; (loop :for w :in (shell-expr-words expr)
@@ -980,6 +983,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			  flipped-io t))
 		(multiple-value-bind (result-values output show-p)
 		    (call-thing expr nil *context*)
+		  (post-command expr :expression)
 		  (setf (output) (car result-values))
 		  (values result-values output show-p))))
 	     ((consp expr)
