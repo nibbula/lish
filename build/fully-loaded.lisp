@@ -7,7 +7,8 @@
   (push (truename "../image/") asdf:*central-registry*)
   (loop :for s :in '("pager" "puca" "char-picker" "pick-list" "tree-viewer"
 		     #+linux "view-html" ;; @@@ cl+ssl fails on mac & windows
-		     "view-table" "view-image" "view-org" "view-lisp" "dired"
+		     "view-table" "print-table" "view-tree" "view-image"
+		     "view-org" "view-lisp" "dired"
 		     )
        ;; :do (asdf:load-system s :verbose nil))
      :do (ql:quickload s :verbose nil))
