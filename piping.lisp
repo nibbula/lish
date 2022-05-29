@@ -341,9 +341,6 @@ stream, or NIL if we can't."
     (shell-eval (possibly-read args)
 		:context (modified-context *context* :environment env-alist))))
 
-;; I'm not really sure about these. I have a hard time remembering them,
-;; and I worry they'll look like Perl.
-;;
 ;; Most of the ! functions are wrapped in with-shell so they should be able to
 ;; be used outside of an interactive shell.
 
@@ -352,13 +349,24 @@ stream, or NIL if we can't."
   (with-shell ()
     (shell-eval (shell-read (lisp-args-to-command args)))))
 
+(defun unix-truthy (value)
+  "If the result is number, 0 is T and anything else is NIL.
+If the result isn't a number, only NIL is false, as usual."
+  (cond
+    ((numberp value)
+     (zerop value))
+    (t (and value t))))
+
 (defun !? (&rest args)
-  "Evaluate the shell command, converting Unix shell result code into boolean.
-This means that 0 is T and anything else is NIL."
+  "Evaluate the shell command, converting a Unix shell result code into boolean.
+This means that if the result is number, 0 is T and anything else is NIL.
+If the result isn't a number, only NIL is false, as usual."
   (with-shell ()
-    (let ((result
-	   (shell-eval (shell-read (lisp-args-to-command args)))))
-      (and (numberp result) (zerop result)))))
+    (let ((result (shell-eval (shell-read (lisp-args-to-command args)))))
+      (cond
+	((numberp result)
+	 (zerop result))
+	(t (and result t))))))
 
 (defun !$ (&rest command)
   "Return lines output from command as a string of words. This is basically
@@ -432,16 +440,18 @@ instead of having to deal with string quoting, like:
       (run-with-output-to str (lisp-args-to-command command)))))
 
 (defun !and (&rest commands)
-  "Run commands until one fails."
-  (declare (ignore commands))
-  ;; @@@
-  )
+  "Run commands until one fails. Return the last result."
+  (let (result)
+    (loop :for c :in commands
+	  :while (unix-truthy (setf result (shell-eval (shell-read c)))))
+    result))
 
 (defun !or (&rest commands)
-  "Run commands if previous command succeeded."
-  (declare (ignore commands))
-  ;; @@@
-  )
+  "Run commands until one succeeds. Return the last result."
+  (let (result)
+    (loop :for c :in commands
+	  :until (unix-truthy (setf result (shell-eval (shell-read c)))))
+    result))
 
 ;; (defun !bg (&rest commands)
 ;;   "Run commands in the background."
