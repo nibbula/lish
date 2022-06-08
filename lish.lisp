@@ -1095,7 +1095,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			   (eql expr *continue-symbol*)
 			   (not expression-start-line))
 		  (setf expression-start-line line-number))
-		(setf line (s+ line #\newline new-line)))
+		(setf line (s+ line +newline-string+ new-line)))
 	     (when (and expr (not (eql expr *continue-symbol*)))
 	       (setf expression-start-line nil))
 	     (shell-eval expr))
@@ -1288,7 +1288,7 @@ suspend itself."
        ;; This is the read of the REPL.
        (shell-read (setf this-command
 			 (if pre-str
-			     (s+ pre-str #\newline str)
+			     (s+ pre-str +newline-string+ str)
 			     str)))))))
 
 #+(or)
