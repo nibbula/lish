@@ -349,19 +349,20 @@ without invoking the normal command."
 			      ',(new-argument-type-class (second a))
 			      ,@(transform-arg a))))
     `(progn
-       ,@defun-clause
-       (pushnew ,name-string lish::*command-list* :test #'equal)
-       (set-command ,name-string
-		    (make-instance
-		     ',type
-		     :name ,name-string
-		     :loaded-from *load-pathname*
-		     :accepts ',accepts
-		     :auto-help ,auto-help
-		     :pass-keys-as
-		     ,(and pass-keys-as `(quote ,pass-keys-as))
-		     ;;:arglist (make-argument-list ',arglist)
-		     :arglist (list ,@command-arglist))))))
+       (when (find-package :lish) ;; Protect against loading without the shell.
+	 ,@defun-clause
+	 (pushnew ,name-string lish::*command-list* :test #'equal)
+	 (set-command ,name-string
+		      (make-instance
+		       ',type
+		       :name ,name-string
+		       :loaded-from *load-pathname*
+		       :accepts ',accepts
+		       :auto-help ,auto-help
+		       :pass-keys-as
+		       ,(and pass-keys-as `(quote ,pass-keys-as))
+		       ;;:arglist (make-argument-list ',arglist)
+		       :arglist (list ,@command-arglist)))))))
 
 (defmacro defcommand (name (&rest arglist) &body body)
   "Define a command for the shell.
