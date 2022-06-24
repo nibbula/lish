@@ -19,7 +19,7 @@ variable LISH_QUICKLISP to the directory where it's installed.
 (defparameter *proxy-host* "localhost"
   "The hostname for the proxy.")
 
-(defparameter *proxy-port* 8080
+(defparameter *proxy-port* 8024
   "The TCP port for the proxy.")
 
 (defun proxy-url ()
@@ -47,7 +47,7 @@ We failed to install QuickLisp.
 This is probably because you don't have a proxy set up. Installing Quicklisp
 without a proxy is insecure. You can either set up a proxy on the default URL,
 which is ~s, For example, with the mitmproxy command:
-  $ mitmproxy --listen-host localhost -p 8080 -M \"/^http:/https:\"
+  $ mitmproxy --listen-host localhost -p 8024 -M \"/^http:/https:\"
 Or, if you don't want to use the default proxy, set LISH_QL_PROXY to a
 different one, or if you REALLY want to do it insecurely set LISH_QL_PROXY
 to empty.
