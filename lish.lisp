@@ -1593,12 +1593,13 @@ if we aren't already inside one."
   "Lish is a LIsp SHell.
 Type the “help” command for more documentation.
 Arguments:
-  DEBUG         - True to turn on entering the debugger on errors.
-  TERMINAL-NAME - Device name of the terminal.
-  TERMINAL-TYPE - Type of terminal to read from. Defaults from
+  debug         - True to turn on entering the debugger on errors.
+  terminal-name - Device name of the terminal.
+  terminal-type - Type of terminal to read from. Defaults from
                    pick-a-terminal-type and so *default-terminal-type*.
-  INIT-FILE     - File to load on startup or *default-lishrc* if not given.
-  COMMAND       - A command to evaluate and exit."
+  terminal      - A terminal to use. Ignores terminal-name and terminal-type.
+  init-file     - File to load on startup or *default-lishrc* if not given.
+  command       - A command to evaluate and exit."
   ;; (let* ((*shell* (make-instance 'shell :debug debug))
   ;; 	 (sh *shell*)		; shorthand
   ;; 	 (state (make-read-state))
