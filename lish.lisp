@@ -1586,6 +1586,7 @@ if we aren't already inside one."
 (defun lish (&key debug terminal-name
 	       ;;(terminal-type (pick-a-terminal-type))
 	       (terminal-type :crunch)
+	       (terminal *terminal*)
 	       ;;(init-file (or *lishrc* *default-lishrc*))
 	       (init-file (pick-an-rc-file))
 	       prompt
@@ -1616,6 +1617,7 @@ Arguments:
     (let* ((sh *shell*)		; shorthand
 	   (state (make-read-state))
 	   (*lishrc* init-file) ;; So it's inherited by sub-shells.
+	   (*terminal* (or terminal *terminal*))
 	   !)
       (setf (lish-debug *shell*) debug)	; @@@ the arg to make-instance doesn't
 
@@ -1630,12 +1632,6 @@ Arguments:
     ;; Set the recursion level for system processes.
     (setf (nos:environment-variable "LISH_LEVEL")
 	  (format nil "~d" lish::*lish-level*))
-
-    ;; Load the startup file.
-    (load-rc-file init-file)
-
-    (when prompt
-      (setf (lish-prompt sh) prompt))
 
     ;; Perhaps do a single command and exit.
     (when command
@@ -1654,6 +1650,13 @@ Arguments:
       ;; 	(return-from lish (if (shell-exit-values sh)
       ;; 			      (values-list (shell-exit-values sh))
       ;; 			      result))))
+
+      ;; Load the startup file.
+      (load-rc-file init-file)
+
+      (when prompt
+	(setf (lish-prompt sh) prompt))
+
       (setf (shell-interactive-p sh) nil)
       (return-from lish
 	(with-shell-command ()
@@ -1667,12 +1670,16 @@ Arguments:
       (symbol-call :deblarg :activate :quietly t))
 
     ;; Figure out the terminal type.
-    (setf terminal-type (or terminal-type
-			    (and *terminal*
-				 (find-terminal-type-for-class
-				  (type-of *terminal*)))
-			    (pick-a-terminal-type)))
-    (with-terminal (terminal-type *terminal* :device-name terminal-name
+    (setf terminal-type
+	  (if terminal
+	      (type-of terminal)
+	      (or terminal-type
+		  (and *terminal*
+		       (find-terminal-type-for-class
+			(type-of *terminal*)))
+		  (pick-a-terminal-type))))
+    (with-terminal (terminal-type *terminal*
+				  :device-name terminal-name
 				  :start-at-current-line t)
       ;; We can't just use a terminal-crunch as *standard-output* because
       ;; it won't know about output from other programs or other streams,
@@ -1684,12 +1691,17 @@ Arguments:
 	      ;; have to be loaded.
 	      (case (keywordify (type-of *terminal*))
 		(:terminal-crunch (terminal-wrapped-terminal *terminal*))
-		((:terminal-ansi :terminal-dumb :terminal-dumb-color)
-		 *terminal*)
-		(t *standard-output*))))
+		(:null *standard-output*)
+		(t *terminal*))))
 	(setf (tt-input-mode) :line)
 
 	(ensure-theme)
+
+	;; Load the startup file.
+	(load-rc-file init-file)
+
+	(when prompt
+	  (setf (lish-prompt sh) prompt))
 
 	(when *use-bracketed-paste*
 	  (dlib-i:setup-bracketed-paste))
