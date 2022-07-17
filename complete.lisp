@@ -163,9 +163,12 @@ name, so they don't get interpreted by the shell.")
 literally in shell syntax."
   (let ((result string))
     (flet ((possibly-quote (c)
-	     (when (position c result)
-	       (setf result (join-by-string (split-sequence c result)
-					    (s+ #\\ c))))))
+	     (when (oposition c result)
+	       (setf result (join-by (typecase string
+				       (string 'string)
+				       (fat-string 'fat-string))
+				     (osplit c result)
+				     (s+ #\\ c))))))
       (loop :for c :across *quote-needing-chars* :do ;
 	 (possibly-quote c))
       result)))
