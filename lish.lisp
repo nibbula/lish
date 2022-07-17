@@ -1584,8 +1584,7 @@ if we aren't already inside one."
 	     ,@body)))))
 
 (defun lish (&key debug terminal-name
-	       ;;(terminal-type (pick-a-terminal-type))
-	       (terminal-type :crunch)
+	       terminal-type
 	       (terminal *terminal*)
 	       ;;(init-file (or *lishrc* *default-lishrc*))
 	       (init-file (pick-an-rc-file))
