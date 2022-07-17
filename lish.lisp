@@ -281,8 +281,8 @@
   (let (#| start end |# skip)
     (labels ((write-thing (w)
 	       (typecase w
-		 (string (princ (quotify w) stream))
-		 (character (print w stream))
+		 ((or string fat-string) (princ (quotify w) stream))
+		 ((or character fatchar) (princ w stream))
 		 (cons
 		  (let ((s (compound-tag-string (car w))))
 		    (if (and s (shell-expr-p (second w)))
