@@ -145,6 +145,7 @@ strings."
 		(ql:quickload :tiny-repl :verbose nil) ~
 		(ql:quickload :deblarg :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
+	        (load \"build/build-deinit.lisp\" :verbose nil) ~
 		(lish:make-standalone :smaller t)"))
     (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
@@ -160,6 +161,7 @@ strings."
 		(ql:quickload :deblarg :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
 		(load \"build/fully-loaded.lisp\" :verbose nil) ~
+	        (load \"build/build-deinit.lisp\" :verbose nil) ~
 		(lish:make-standalone :smaller t)"))
     (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
@@ -196,6 +198,7 @@ strings."
 		(push (truename \"./\") asdf:*central-registry*) ~
 		(ql:quickload :dlib :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
+	        (load \"build/build-deinit.lisp\" :verbose nil) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
 		(setf asdf:*central-registry* ~
@@ -223,6 +226,7 @@ strings."
 		(push (truename \"./\") asdf:*central-registry*) ~
 		(ql:quickload :dlib :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
+	        (load \"build/build-deinit.lisp\" :verbose nil) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
 		(setf asdf:*central-registry* ~

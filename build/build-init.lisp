@@ -1,6 +1,6 @@
-;;
-;; build-init.lisp - Initialization for built Lish.
-;;
+;;;
+;;; build-init.lisp - Initialization for built Lish.
+;;;
 
 (defpackage :build-init
   (:documentation "Initialization for built Lish.")
@@ -59,7 +59,14 @@
                         enough version of ASDF, so you will probably see ~
                         useless warnings.~%")))))
 
+;; We really want to set debug up so that we can get function arguments.
+;; This will porbably be turned back off in build-deinit.lisp.
+(defparameter *saved-debug-quality* nil)
+(let ((debug (cadr (assoc 'debug (uiop:get-optimization-settings)))))
+  (when (< debug 2)
+    (setf *saved-debug-quality* debug)
+    (proclaim `(optimize (debug 2)))))
+
 (in-package :cl-user)
-(delete-package :build-init)
 
 ;; EOF
