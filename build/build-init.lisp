@@ -14,7 +14,7 @@
 (msg "[Build initializing...]")
 
 (defun fail (message &rest args)
-  (format t "~&/~v,,,va~%~~%BUILD FAILURE:~%~?~%~&\\~v,,,va~%"
+  (format t "~&/~v,,,va~%~%BUILD FAILURE:~%~?~%~&\\~v,,,va~%"
 	  40 #\- #\- message args 40 #\- #\-)
   (exit-lisp :code 1))
 
