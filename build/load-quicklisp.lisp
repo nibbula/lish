@@ -53,7 +53,7 @@ different one, or if you REALLY want to do it insecurely set LISH_QL_PROXY
 to empty.
 
 Note that:
-~a~%" (proxy-url) *not-strictly-necessary*))))
+~a" (proxy-url) *not-strictly-necessary*))))
   
 (when (not (find-package :quicklisp))
   (if (sf-getenv "LISH_QUICKLISP")
