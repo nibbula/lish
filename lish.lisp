@@ -1828,13 +1828,19 @@ Arguments:
     :help "Terminal type.")
    (debug boolean :short-arg #\d :help "True to turn on debugging.")
    ;; We have to do non-auto-help because so it works from shell-toplevel.
+   (version boolean :long-arg "version" :help "Print the version and exit.")
    (help boolean :long-arg "help" :help "Show the help."))
   :args-as args
   "Lisp Shell"
-  (when help
-    (print-command-help (get-command "lish"))
-    (return-from !lish 0))
+  (cond
+    (help
+     (print-command-help (get-command "lish"))
+     (return-from !lish 0))
+    (version
+     (format t "~a~%" *version*)
+     (return-from !lish 0)))
   (remf args :help)
+  (remf args :version)
   (when (and greeting (not command))
     (format t "Welcome to ~a ~a~%" *shell-name* *version*))
   (remf args :greeting)
