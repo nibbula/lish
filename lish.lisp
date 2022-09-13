@@ -292,7 +292,9 @@
 			  (shell-expr-words (second w)))
 			 s
 			 (shell-words-to-string (rest w)))
-			(write w :stream stream :readably t :case :downcase))))))
+			(write w :stream stream :readably t :case :downcase))))
+		 (t ;; @@@ is this reasonable?
+		  (princ w stream))))
 	     (write-it (w &optional space)
 	       (setf skip nil)
 	       ;; @@@ This whole literal-line thing is dubious because
@@ -658,7 +660,7 @@ CALL-PARENLESS."
 	(if out-pipe
 	    (let ((out-str (make-stretchy-string 20)))
 	      (values
-	       ;; @@@ This totally stupid
+	       ;; @@@ This is totally stupid
 	       (list (with-output-to-string (*standard-output* out-str)
 		       (if in-pipe
 			   (let ((*standard-input* in-pipe))
