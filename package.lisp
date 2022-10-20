@@ -168,6 +168,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:accepts
    #:get-accepts
    #:twiddlify
+   #:unix-truthy
    ))
 
 ;; EOF
