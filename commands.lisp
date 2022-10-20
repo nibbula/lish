@@ -273,7 +273,9 @@ without invoking the normal command."
 ;; now that we don't have any non-keyword arguments.
 ;; Someday get rid of :KEYS-AS.
 
-(defparameter *special-body-tags* #(:accepts :keys-as :args-as :no-help)
+;; @@@@ add a :handlers tag to bind argument error handlers
+(defparameter *special-body-tags*
+  #(:accepts :keys-as :args-as :no-help :handlers) ;; @@@@@@
   "Keywords with special meanings appearing first in the command body.")
 
 ;; This defines a function with the appropriate Lisp argument list.
