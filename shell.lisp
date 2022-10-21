@@ -133,7 +133,8 @@
 
 (defun set-option (sh name value)
   "Set the option named NAME, for shell SH, to VALUE."
-  (funcall (symbolify (s+ "SET-" *option-accessor-prefix* name)) value sh))
+  (funcall (symbolify (s+ "SET-" *option-accessor-prefix* name) :package :lish)
+	   value sh))
 
 (defun get-option (sh name)
   "Get the option named NAME, for shell SH."

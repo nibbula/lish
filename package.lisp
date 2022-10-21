@@ -50,6 +50,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:make-standalone
    ;; shell options
    #:option
+   ;; @@@ maybe we don't really need to export all this junk
    #:lish-prompt                   #:set-lish-prompt
    #:lish-prompt-function          #:set-lish-prompt-function
    #:lish-right-prompt             #:set-lish-right-prompt
