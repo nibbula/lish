@@ -143,6 +143,7 @@
 ;; convert to just using (option name) and (setf (option name))
 
 (defun option (name)
+  "Accessor for the value of the option named ‘name’, for the current ‘*shell*’."
   (arg-value (find-option *shell* name)))
 
 (defun %set-option (name value)
@@ -150,7 +151,7 @@
   value)
 
 (defsetf option %set-option
-  "Set a shell option.")
+  "Set a shell option for the current ‘*shell*’.")
 
 (defmacro defoption (name (&key omit-setter) &rest arg)
   "Define a shell option named NAME, with the properties in arg. The syntax
