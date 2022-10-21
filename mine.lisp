@@ -209,6 +209,7 @@ a known compression suffix, then the stream is appropriately decompressed."
 	contents start end usage str (no-nl-count 0) c cc len style
 	arg-count)
     (when (and (or (equal "x-executable" (magic:content-type-name type))
+		   (equal "x-pie-executable" (magic:content-type-name type))
 		   (equal "x-sharedlib" (magic:content-type-name type)))
 	       (equal "application" (magic:content-type-category type)))
       (with-open-file (stream file :element-type '(unsigned-byte 8))
