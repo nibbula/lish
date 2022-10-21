@@ -313,9 +313,8 @@ not to indicate partial lines."
 statistics."
   :default -1)
 
-;;; @@@ Shouldn't this be in the shell object?
-;;; @@@ But it doesn't do anything right now anyway.
-(defvar *shell-path* '()
-  "List of directories to autoload commands from.")
+(defoption command-mining () boolean
+  :help "True to dig through various places to find external command usage."
+  :default t)
 
 ;; EOF
