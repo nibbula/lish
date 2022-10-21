@@ -45,6 +45,9 @@ if [ ! -w "$destination" ]; then
     if type sudo > /dev/null ; then
       echo "Trying sudo"
       try_sudo=sudo
+    elif type doas > /dev/null ; then
+      echo "Trying doas"
+      try_sudo=doas
     elif type su > /dev/null ; then
       echo "Trying su"
       try_sudo=su
@@ -63,6 +66,15 @@ if [ ! -d "$destination" ]; then
     fail "Can't make the destination. Maybe you need root?"
   echo "OK"
 fi
+
+new_name="${destination}/${program_name}"
+if [ -f "${new_name}" ] ; then
+  printf "Trying to rename current $program_name in $destination..."
+  $try_sudo mv "${new_name}" "${new_name}_bak" || \
+    fail "Couldn't rename ${new_name} to ${new_name}_bak. Maybe you need root?"
+  echo "OK"
+fi
+
 printf "Copying $program_name to $destination..."
 $try_sudo cp "$program_name" "$destination" || \
   fail "Couldn't copy $program_name to $destination. Maybe you need root?"
