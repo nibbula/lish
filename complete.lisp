@@ -534,7 +534,8 @@ Uses the first available of:
 				:silent (lish-autoload-quietly *shell*))
 	     (get-command command-name))
 	;;(and (load-external-command command) (get-command command))
-	(and (mine-command command-name :quietly t)
+	(and (option "command-mining")
+	     (mine-command command-name :quietly t)
 	     (get-command command-name)))))))
 
 (defun first-command-of (word)
