@@ -32,7 +32,6 @@ without any particular knowledge of it's Lisp programming features.")
    #:*shell*
    #:*old-pwd*
    #:*dir-list*
-   #:*shell-path*
    #:*accepts*
    #:*output* #:output #:*o*
    #:*input* #:input #:*i*
