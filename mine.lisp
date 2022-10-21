@@ -59,8 +59,7 @@
 (defmacro with-possibly-compressed-file ((stream-var filename) &body body)
   "Evaluate the BODY with STREAM-VAR open on FILENAME. If FILENAME has
 a known compression suffix, then the stream is appropriately decompressed."
-  (let ((in-stream (gensym "wpcf-in-stream"))
-	(method    (gensym "wpcf-method")))
+  (with-names (in-stream method)
     `(let (,method)
        (if (setf ,method
 		 (cadr (find-if
