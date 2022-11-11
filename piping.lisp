@@ -165,9 +165,9 @@ or a list to be converted by LISP-ARGS-TO-COMMAND."
 ;; 	(close stream)))))
 
 (defun map-output-lines (func command)
-  "Return a list of the results of calling the function FUNC with each output
-line of COMMAND. COMMAND should probably be a string, and FUNC should take one
-string as an argument."
+  "Return a list of the results of calling the function ‘func’ with each output
+line of ‘command’. ‘command’ should probably be a string, and ‘func’ should take
+one string as an argument."
   (let (vals stream)
     (unwind-protect
 	 (progn
@@ -576,7 +576,7 @@ like $(command) in bash."
 	 (run-with-output-to str (expr-from-args command))))))))
 
 (defun !_= (&rest args)
-  "Run a command with the separate verbatim arguments, without shell syntax."
+  "Return a list of the lines of output from the command."
   (with-shell ()
     (command-output-list (expr-from-args args))))
 
