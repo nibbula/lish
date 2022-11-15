@@ -1,18 +1,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Try to load QuickLisp, if it's not alread loaded.
+;; Try to load Quicklisp, if it's not alread loaded.
 
 (defparameter *quicklisp-fail*
-  "Perhaps try installing a new QuickLisp by following the instructions at:
+  "Perhaps try installing a new Quicklisp by following the instructions at:
 https://www.quicklisp.org/beta/")
 
 (defparameter *not-strictly-necessary*
-  "QuickLisp is not strictly necessary, but if you don't have it, you will have
+  "Quicklisp is not strictly necessary, but if you don't have it, you will have
 to make sure all the dependencies are availible to be loaded by ASDF.
 
-Since you don't seem to have a QuickLisp installation in ~/quicklisp,
+Since you don't seem to have a Quicklisp installation in ~/quicklisp,
 we are taking the liberty of installing one for you. I'm sorry.
 
-If you want to build with a custom QuickLisp installation, set the environment
+If you want to build with a custom Quicklisp installation, set the environment
 variable LISH_QUICKLISP to the directory where it's installed.
 ")
 
@@ -43,7 +43,7 @@ variable LISH_QUICKLISP to the directory where it's installed.
     (error (c)
       (print c)
       (fail "~
-We failed to install QuickLisp.
+We failed to install Quicklisp.
 This is probably because you don't have a proxy set up. Installing Quicklisp
 without a proxy is insecure. You can either set up a proxy on the default URL,
 which is ~s, For example, with the mitmproxy command:
@@ -62,7 +62,7 @@ Note that:
 	(error (c)
 	  (print c)
 	  (fail "LISH_QUICKLISP is set to ~s.~%~
-                 We failed to load the custom QuickLisp. ~a~a"
+                 We failed to load the custom Quicklisp. ~a~a"
 		*quicklisp-fail* *not-strictly-necessary*)))
       (let ((quicklisp-init (merge-pathnames "quicklisp/setup.lisp" *home*)))
 	(if (probe-file quicklisp-init)
@@ -73,7 +73,7 @@ Note that:
 		(error (c)
 		  (print c)
 		  (format t "~&/~v,,,va~%~
-                             We failed to load QuickLisp from ~s.~%~a~%~a~
+                             We failed to load Quicklisp from ~s.~%~a~%~a~
                              ~&\\~v,,,va~%"
 			  40 #\- #\-
 			  quicklisp-init
@@ -82,6 +82,6 @@ Note that:
 			  40 #\- #\-)
 		  (return nil))))
 	    (progn
-	      (format t "QuickLisp was not found at ~s.~%~a" quicklisp-init
+	      (format t "Quicklisp was not found at ~s.~%~a" quicklisp-init
 		      *not-strictly-necessary*)
 	      (install-quicklisp))))))
