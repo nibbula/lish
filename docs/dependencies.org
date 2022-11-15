@@ -11,7 +11,10 @@ Lish Dependencies                                        -*- org -*-
     https://common-lisp.net/project/ecl/
 ** Quicklisp
    https://www.quicklisp.org/beta/
+   Quicklisp is not strictly necessary, but without it you will have to
+   arrange for the dependencies to be loadable by ASDF some other way.
 ** Lisp software not in quicklisp:
+   Which is contained in the ‘yew’ monorepo.
 *** https://github.com/nibbula/yew.git
 **** dlib
 **** stretchy
@@ -69,15 +72,38 @@ Lish Dependencies                                        -*- org -*-
       - babel
     - trivial-gray-streams
     - cl-ppcre
+      - cl-unicode
     - cl-base64
     - chipz
     - bordeaux-threads
 *** with los?
     - eclector
-    - closer-mop
-    - acclimation
-    - cl-unicode
+      - closer-mop
+      - acclimation
     - flexi-streams
+*** with tools
+    - plump
+      - trivial-indent
+      - documentation-utils
+      - array-utils
+    - puri
+    - drakma
+      - split-sequence
+      - usocket
+      - trivial-garbage
+      - cl+ssl
+      - chunga
+    - lparallel
+    - cl-jpeg
+    - png-read
+      - iterate
+    - zpng
+      - salza
+    - skippy
+    - retrospectiff
+      - opticl-core
+      - ieee-floats
+      - deflate
 
   Once lish is loaded you can see the real dependencies with the view-lisp
   command.
