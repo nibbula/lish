@@ -1861,8 +1861,8 @@ by spaces."
      :collect (make-shell-word :word w :start pos :end (+ pos (length w)))
      :do (incf pos (1+ (length w)))))
 
-(defun is-this-shell (command)
-  "Return true if command probably names this shell."
+(defun is-this-shell (command &optional (name *shell-name*))
+  "Return true if ‘command’ probably names this shell."
   (let ((start 0))
     ;; Called as a login shell on unix, with starting dash.
     #+unix (when (char= (char command 0) #\-)
@@ -1870,7 +1870,7 @@ by spaces."
     (and command (stringp command)
 	 (command-test (lambda (cmd path)
 			 (string-equal path cmd :start1 start))
-		       *shell-name* command))))
+		       name command))))
 
 (defvar *saved-default-external-format* nil)
 
