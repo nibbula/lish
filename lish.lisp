@@ -1389,7 +1389,7 @@ suspend itself."
 (defun ensure-theme ()
   "Make sure a theme is set."
   (when (not theme:*theme*)
-    (setf theme:*theme* (theme:default-theme))))
+    (setf theme:*theme* (theme-default:default-theme))))
 
 (defun save-history (sh &key update)
   "Save the history."

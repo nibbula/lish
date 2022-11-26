@@ -17,7 +17,7 @@
      :dlib :opsys :dlib-misc :stretchy :char-util :glob
      :table :table-print :reader-ext :dlib-interactive :completion
      :keymap :terminal :terminal-ansi :rl
-     :fatchar :fatchar-io :magic :theme :style :collections
+     :fatchar :fatchar-io :magic :theme :theme-default :style :collections
      :ostring :ochar :grout :utf8b-stream :dtime :locale
      ;; Things in not in yew
       #+use-re :re
