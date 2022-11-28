@@ -171,39 +171,57 @@ from stack."
     :help "Append the history to the history file.")
    (read-not-read boolean :short-arg #\n
     :help "Read history items not already read from the history file.")
+   ;; @@@ I think I'd lke it if it would only apply only for that command,
+   ;; but that probably involves changes to the history-store protocol.
    (filename pathname :short-arg #\f
-    :help "Use PATHNAME as the history file.")
+    :help "Use ‘pathname’ as the history file. If given with other commands,
+then the pathname is changed before the command.")
    (show-times boolean :short-arg #\t
     :help "Show history times.")
    (delete integer :short-arg #\d
     :help "Delete the numbered history entry.")
    (table boolean :short-arg #\T
-    :help "True to return a table of the history."))
+    :help "True to return a table of the history.")
+   (yes boolean :short-arg #\y :help "Don't warn for destructive operations.")
+   (dedup boolean :short-arg #\D :help "Remove duplicates."))
   "Show a list of the previously entered commands."
   ;; Check argument conflicts
-  (cond ;; @@@ Could this kind of thing be done automatically?
-    ((and clear (or write read append read-not-read filename show-times delete))
+  (cond
+    ;; @@@ Could this kind of thing be done automatically?
+    ;; Yes, it totally could with the grammer based argument parser.
+    ((and clear (or write read append read-not-read filename show-times dedup
+		    delete))
      (error "CLEAR should not be given with any other arguments."))
-    ((and delete (or write read append read-not-read filename show-times clear))
+    ((and delete (or write read append read-not-read filename show-times dedup
+		     clear))
      (error "DELETE should not be given with any other arguments."))
+    ((and dedup (or write read append read-not-read filename show-times clear
+		    delete))
+     (error "DEDUP should not be given with any other arguments."))
     ((> (count t `(,write ,read ,append ,read-not-read)) 1)
      (error
       "Only one of WRITE, READ, APPEND, or READ-NOT-READ should be given."))
     ((and filename (not (or read write append read-not-read)))
      (error
       "FILENAME is only useful with READ, WRITE, APPEND, or READ-NOT-READ.")))
+  ;; Set the file name before other commands.
+  (when filename
+    (setf (history-store-file-name (lish-history-store *shell*))
+	  filename))
   (cond
     (clear
-     (rl:history-clear :lish))
+     (when (or yes (yes-or-no-p "Are you sure you want to erase history?"))
+       (rl:history-clear :lish)))
+    (dedup
+     (when (or yes (yes-or-no-p
+		    "Are you sure you want to remove duplicates from history?"))
+       (rl:history-dedup :lish)))
     ;; @@@ It might be nice if we could say what happend, like how many
     ;; history items were saved or loaded.
     (write         (save-history *shell*))
     (read          (load-history *shell*))
     (append        (save-history *shell* :update t))
     (read-not-read (load-history *shell* :update t))
-    (filename
-     (setf (history-store-file-name (lish-history-store *shell*))
-	   filename))
     (delete (format t "Sorry, delete is not implemented yet.~%"))
     (table (setf *output* (rl:history-table :context :lish)))
     (t (rl:show-history :context :lish :show-time show-times
@@ -1562,10 +1580,6 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 	 (loop :for o :in (lish-options *shell*) :do
 	    (format t "opt ~a ~w~%" (arg-name o) (arg-value o))))
 	(t
-	 ;; (print-properties
-	 ;;  (loop :for o :in (lish-options *shell*)
-	 ;;     :collect (cons (arg-name o) (format nil "~s" (arg-value o))))
-	 ;;  :de-lispify nil :right-justify t)
 	 (with-grout ()
 	   (let ((table
 		   (make-table-from
@@ -1575,8 +1589,7 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
 		    :columns '((:name "Name" :align :right)
 			       (:name "Value" :align :wrap)))))
 	     (grout-print-table table :print-titles nil)
-	     (setf *output* table)))
-	 ))))
+	     (setf *output* table)))))))
 #|
 (defbuiltin lpath
   ((command sub-command :default :list :help "What to do with the lpath."
