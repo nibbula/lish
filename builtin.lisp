@@ -247,168 +247,7 @@ then the pathname is changed before the command.")
 		       echo-list
 		       (oelt echo-list 0)))))
 
-(defparameter *help-subjects*
-  '("commands" "builtins" "external" "editor" "keys" "options" "syntax"
-    "startup" "differences")
-  "Subjects we have help about.")
-
-(defun help-choices ()
-  "Return a list of choices for a help subject."
-  (concatenate
-   'list *help-subjects*
-   (mapcar #'(lambda (x)
-	       (or (and (symbolp x) (string-downcase (symbol-name x)))
-		   (and (stringp x) x)
-		   x))
-	   *command-list*)))
-
-(define-builtin-arg-type help-subject (arg-choice)
-  "Something which we can get help on."
-  ()
-  (:default-initargs
-   :choice-func
-      #+clisp 'help-choices		; I'm not sure why.
-      #-clisp #'help-choices))
-
-(defparameter *basic-help*
-"~
-Lish version ~a help:
-  This is Lish, a command line shell with Lisp.
-  A brief summary of what to type:
-
-  command [arg*...]   Run a program in your path with the given ARGs.
-  ([expressions]...)  Evaluate Lisp expressions.
-  help [subject]      Show help on the subject.
-  exit                Exit the shell.
-
-Further help is available on these subjects:
-
-  help builtins       Show help on built-in commands.
-  help editor         Show help on the line editor.
-  help keys           Show help on key bindings.
-  help options	      Show help on shell options.
-  help syntax         Show help on shell syntax.
-  help startup        Show help on what happens when the shell starts.
-  help differences    Show help on differences from other shells.
-  help commands       Show help on added commands.
-  help external       Show help on external commands.
-  help <command>      Show help for the command.
-")
-
-(defparameter *editor-help*
-"You can use some Emacs-like commands to edit the command line.
-
-Some notable keys are:
- <Tab>        Try to complete the word in front of the cursor. Twice for more.
- ?            Show what input is expected. List possibilities.
- <Control-D>  Quit, when on an empty line, or delete the following character.
- <Control-P>  Previous history line. Also the <Up Arrow> key.
- <Control-N>  Next history line. Also the <Down Arrow> key.
- <Control-B>  Move the cursor back one character. Also the <Left Arrow> key.
- <Control-F>  Move the cursor forward one character. Also the <Right Arrow> key.
- <Control-Q>  Quote next character, like if you want to really type '?'.
-")
-;; This doesn't really work unless you start lish from inside a tiny-repl, so we
-;; probably shouldn't advertise it. It's relatively pointless anyway.
-;; <F9>         Switch back and forth between LISH and the lisp REPL.
-
-;; @@@ I want this to be markdown or something. At least fit the paragraphs to
-;; the width of the terminal.
-(defparameter *syntax-help*
-"The syntax is a combination of POSIX shell and Lisp, hopefully in a way that
-is familiar and not too surprising to those who know either.
-It is vaguely like:
-  ; comment
-  command [arg...]
-  command \"string\" ,*lisp-object* (lisp-code) $ENV_VAR
-  command *.glob ?ooba[rz]
-  command word\\ with\\ spaces \"string \\\" with a double quote\"
-  command | command | ...
-  command < file-name
-  command > file-name
-  ([lisp expressions...])
-
-Basically, inside parentheses you get Lisp reader syntax. Outside parentheses,
-you get a very simplified shell syntax with Lisp strings and comments.
-Some typical shell expansions are done in command arguments, such as shell
-globbing with *,?,and [], environment variable expansions with $VAR, and
-home directory expansions with ~~user. Pipeline and redirections should work
-nearly as expected.
-
-Commands can be:
-  - System executables in your standard PATH
-  - Built-in or later defined commands, defined with DEFCOMMAND
-  - Names of systems in your ASDF \"path\" which are expected to define a
-    command with the same name as the system, which is then invoked.
-  - Lisp functions or methods
-")
-
-(defparameter *startup-help*
-  "Here's what the shell does when starting:
-
-  - Increment the *lish-level* and LISH_LEVEL.
-  - Update the LISH-USER package with symbols from CL-USER.
-  - Load the startup commands file, which comes from one of:
-      - The value passed to the shell with the :init-file keyword
-      - The value of *lishrc*
-      - The standard place for configuration files:
-        (opsys:path-append (opsys:config-dir \"lish\") \"lishrc\")
-        which is: ~s
-      - The value of *default-lishrc*,
-        which is: ~s
-    The current value is: ~s
-  - Make sure *theme* is set, using the (default-theme) if necessary.
-  - Make a new line editor, which might make a new *terminal*. See the
-    documentation for RL for details.
-  - Evaluate the *enter-shell-hook* functions.
-    The current value is: ~a.~%~%")
-
-(defparameter *differences-help*
-  "Lish is different from a POSIX shell. The most notable differences are:
-
-- Parentheses switch to Lisp syntax, and don't mean run in sub-shell.
-  Lisp inside parentheses is evaluated and substituted in the current line.
-- String quoting is done only with double quote \". Single quote ' and back
-  quote `, are not special to avoid confusion with Lisp syntax.
-- The prefix VAR=value isn't supported. Use the ‘env’ command instead.
-- Redirection syntax is different, e.g \"2>&1\" doesn't work.
-- Commands can be Lish commands and Lisp functions, as well as executables
-  in your PATH. Lish commands can be searched for and automatically loaded
-  from ASDF places, manipulated by the ‘ldirs’ command.
-- Most scripting related shell commands are missing, e.g. if, test, case.
-  Scripting parameter expansion like $1 $* ${} are missing. Use Lisp instead.
-- Shell expansions are different. Many expansions can be done by Lish functions
-  starting with ! , such as (!_ \"ss\") expands to a list of strings of the
-  lines of output, (!? \"grep fuse /proc/filesystems\") returns a boolean status.
-  Comma can be used to substitute a Lisp value, e.g. \"echo ,*package*\".
-- Comments start with ; not #
-
-For more detail see the section ‘Differences from POSIX shells’ in docs/doc.org
-")
-
 (defun print-columnar-help (rows)
-  ;; (with-input-from-string
-  ;;     (in-str (with-output-to-string (str)
-  ;; 		(nice-print-table
-  ;; 		 rows nil :trailing-spaces nil
-  ;; 		 :stream str)))
-  ;;   (with-lines (l in-str)
-  ;;     ;; add spaces in front and clip to screen columns
-  ;;     (format t "  ~a~%" (subseq l 0 (min (length l)
-  ;; 					  (- (get-cols) 2)))))))
-  #|
-  (let* ((prefix-size (loop :for a :in rows :maximize (length (car a))))
-	 (prefix-len (+ prefix-size 5))
-	 (prefix-string (make-string prefix-len :initial-element #\space)))
-    (loop :for (a b) :in rows
-       :do
-       (format t "  ~v,a : " prefix-size a)
-       (when b
-	 (justify-text (substitute #\space #\newline b)
-		       :prefix prefix-string :start-column prefix-len
-		       :omit-first-prefix t :cols (get-cols)))
-       (terpri)))
-  |#
   (with-grout ()
     (let ((table (make-table-from
 		  rows
@@ -513,61 +352,265 @@ For more detail see the section ‘Differences from POSIX shells’ in docs/doc.
   (print-command-help object :stream stream)
   (call-next-method))
 
-(defbuiltin help ((subject help-subject :help "Subject to get help on."))
-  "Show help on the subject. Without a subject show some subjects that are
-available."
-  (if (not subject)
-      (progn
-	(format t *basic-help* *version*))
-      ;; topics
-      (let ((subject-kw (keywordify subject)))
-	(cond
-	  ((eq subject-kw :builtins)
-	   (format t "Built-in commands:~%")
-	   (setf *output*
-		 (print-multiple-command-help (command-list 'builtin-command))))
-	  ((eq subject-kw :commands)
-	   (format t "Defined commands:~%")
-	   (setf *output*
-		 (print-multiple-command-help (command-list 'shell-command))))
-	  ((eq subject-kw :external)
-	   (format t "Defined external commands:~%")
-	   (setf *output*
-		 (print-multiple-command-help (command-list 'external-command))))
-	  ((eq subject-kw :editor) (format t *editor-help*))
-	  ((eq subject-kw :syntax) (format t *syntax-help*))
-	  ((eq subject-kw :differences) (format t *differences-help*))
-	  ((eq subject-kw :options)
-	   (format t "~
+(defvar *help-table* nil
+  "Hash table of help functions.")
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun help-function-name (subject)
+    "Return the help function for ‘subject’."
+    (symbolify (s+ "help-" subject)))
+
+  (defun help-table ()
+    ;; Allow shells to have a customized help table.
+    (or (and *shell* (shell-help-table *shell*))
+	*help-table*
+	(setf *help-table*
+	      (make-hash-table :size 16 :test 'equalp))))
+
+  (defmacro defhelp (subject () &body body)
+   "Define a help subject for ‘subject-name’, which can be invoked by the ‘help’
+command. You should provide a docstring in the body which will be the subject
+description. The body should output the help to *standard-output*."
+    (let ((func-name (help-function-name subject)))
+      `(progn
+	 (defun ,func-name ()
+	   ,@body)
+	 (setf (gethash (string ',subject) (help-table))
+	       (function ,func-name)
+	       )))))
+
+(defparameter *basic-help*
+"~
+Lish version ~a help:
+  This is Lish, a command line shell with Lisp.
+  A brief summary of what to type:
+
+  command [arg*...]   Run a program in your path with the given ARGs.
+  ([expressions]...)  Evaluate Lisp expressions.
+  help [subject]      Show help on the subject.
+  exit                Exit the shell.
+
+Further help is available on these subjects:
+")
+
+(defhelp "" ()
+  "Basic help."
+  (format t *basic-help* *version*)
+  (let ((table
+	  (make-table-from
+	   (loop :for s :in (remove "" (help-subjects) :test #'equal)
+		 :collect (list s (help-subject-description s)))
+	   :columns
+	   '((:name "Subject"     :format "  ~va")
+	     (:name "Description" :format "  ~va")))))
+    (with-grout ()
+      (grout-print-table table :print-titles nil))
+    (setf *output* table)))
+
+(defhelp builtins ()
+  "Built-in commands."
+  (format t "Built-in commands:~%")
+  (setf *output*
+	(print-multiple-command-help (command-list 'builtin-command))))
+
+(defhelp commands ()
+  "Defined commands."
+  (format t "Defined commands:~%")
+  (setf *output*
+	(print-multiple-command-help (command-list 'shell-command))))
+
+(defhelp external ()
+  "Defined external commands."
+  (format t "Defined external commands:~%")
+  (setf *output*
+	(print-multiple-command-help (command-list 'external-command))))
+
+(defparameter *editor-help*
+"You can use some Emacs-like commands to edit the command line.
+
+Some notable keys are:
+ <Tab>        Try to complete the word in front of the cursor. Twice for more.
+ ?            Show what input is expected. List possibilities.
+ <Control-D>  Quit, when on an empty line, or delete the following character.
+ <Control-P>  Previous history line. Also the <Up Arrow> key.
+ <Control-N>  Next history line. Also the <Down Arrow> key.
+ <Control-B>  Move the cursor back one character. Also the <Left Arrow> key.
+ <Control-F>  Move the cursor forward one character. Also the <Right Arrow> key.
+ <Control-Q>  Quote next character, like if you want to really type '?'.
+")
+;; This doesn't really work unless you start lish from inside a tiny-repl, so we
+;; probably shouldn't advertise it. It's relatively pointless anyway.
+;; <F9>         Switch back and forth between LISH and the lisp REPL.
+
+(defhelp editor ()
+  "The line editor."
+  (format t *editor-help*))
+
+;; @@@ I want this to be markdown or something. At least fit the paragraphs to
+;; the width of the terminal.
+(defparameter *syntax-help*
+"The syntax is a combination of POSIX shell and Lisp, hopefully in a way that
+is familiar and not too surprising to those who know either.
+It is vaguely like:
+  ; comment
+  command [arg...]
+  command \"string\" ,*lisp-object* (lisp-code) $ENV_VAR
+  command *.glob ?ooba[rz]
+  command word\\ with\\ spaces \"string \\\" with a double quote\"
+  command | command | ...
+  command < file-name
+  command > file-name
+  ([lisp expressions...])
+
+Basically, inside parentheses you get Lisp reader syntax. Outside parentheses,
+you get a very simplified shell syntax with Lisp strings and comments.
+Some typical shell expansions are done in command arguments, such as shell
+globbing with *,?,and [], environment variable expansions with $VAR, and
+home directory expansions with ~~user. Pipeline and redirections should work
+nearly as expected.
+
+Commands can be:
+  - System executables in your standard PATH
+  - Built-in or later defined commands, defined with DEFCOMMAND
+  - Names of systems in your ASDF \"path\" which are expected to define a
+    command with the same name as the system, which is then invoked.
+  - Lisp functions or methods
+")
+
+(defhelp syntax ()
+  "Shell syntax."
+  (format t *syntax-help*))
+
+(defparameter *differences-help*
+  "Lish is different from a POSIX shell. The most notable differences are:
+
+- Parentheses switch to Lisp syntax, and don't mean run in sub-shell.
+  Lisp inside parentheses is evaluated and substituted in the current line.
+- String quoting is done only with double quote \". Single quote ' and back
+  quote `, are not special to avoid confusion with Lisp syntax.
+- The prefix VAR=value isn't supported. Use the ‘env’ command instead.
+- Redirection syntax is different, e.g \"2>&1\" doesn't work.
+- Commands can be Lish commands and Lisp functions, as well as executables
+  in your PATH. Lish commands can be searched for and automatically loaded
+  from ASDF places, manipulated by the ‘ldirs’ command.
+- Most scripting related shell commands are missing, e.g. if, test, case.
+  Scripting parameter expansion like $1 $* ${} are missing. Use Lisp instead.
+- Shell expansions are different. Many expansions can be done by Lish functions
+  starting with ! , such as (!_ \"ss\") expands to a list of strings of the
+  lines of output, (!? \"grep fuse /proc/filesystems\") returns a boolean status.
+  Comma can be used to substitute a Lisp value, e.g. \"echo ,*package*\".
+- Comments start with ; not #
+
+For more detail see the section ‘Differences from POSIX shells’ in docs/doc.org
+")
+
+(defhelp differences ()
+  "Differences from other ehells."
+  (format t *differences-help*))
+
+(defhelp options ()
+  "Shell options."
+  (format t "~
 Options can be examined and changed with the ‘opt’ command.~%~
 Shell options:~%")
-	   (setf *output*
-		 (print-columnar-help
-		  (loop :for o :in (lish-options *shell*) :collect
-			`(,(arg-name o)
-			  ,(substitute #\space #\newline (arg-help o)))))))
-	  ((eq subject-kw :keys)
-	   (format t "Here are the keys active in the editor:~%")
-	   (!bind :print-bindings t))
-	  ((eq subject-kw :startup)
-	   (format t *startup-help*
-		   (opsys:path-append (opsys:config-dir "lish") "lishrc")
-		   *default-lishrc*
-		   *lishrc*
-		   *enter-shell-hook*))
-	  (t ;; Try a specific command
-	   (let* ((cmd  (get-command subject))
-		  (symb (intern (string-upcase subject) :lish))
-		  (doc  (when cmd (documentation cmd 'function)))
-		  (fdoc (when (fboundp symb)
-			  (documentation (symbol-function symb) 'function))))
-	     ;; (print-values* (subject cmd symb doc fdoc))
-	     (cond
-	       (doc  (setf *output* (print-command-help cmd)))
-	       (fdoc (format t "Lisp function:~%~a~%" fdoc))
-	       (cmd  (format t "Sorry, there's no help for \"~a\".~%" subject))
-	       (t    (format t "I don't know about the subject \"~a\"~%"
-			     subject)))))))))
+  (setf *output*
+	(print-columnar-help
+	 (loop :for o :in (lish-options *shell*) :collect
+		  `(,(arg-name o)
+		    ,(substitute #\space #\newline (arg-help o)))))))
+
+(defhelp keys ()
+  "Key bindings."
+  (format t "Here are the keys active in the editor:~%")
+  (!bind :print-bindings t))
+
+(defparameter *startup-help*
+  "Here's what the shell does when starting:
+
+  - Increment the *lish-level* and LISH_LEVEL.
+  - Update the LISH-USER package with symbols from CL-USER.
+  - Load the startup commands file, which comes from one of:
+      - The value passed to the shell with the :init-file keyword
+      - The value of *lishrc*
+      - The standard place for configuration files:
+        (opsys:path-append (opsys:config-dir \"lish\") \"lishrc\")
+        which is: ~s
+      - The value of *default-lishrc*,
+        which is: ~s
+    The current value is: ~s
+  - Make sure *theme* is set, using the (default-theme) if necessary.
+  - Make a new line editor, which might make a new *terminal*. See the
+    documentation for RL for details.
+  - Evaluate the *enter-shell-hook* functions.
+    The current value is: ~a.~%~%")
+
+(defhelp startup ()
+  "What happens when the shell starts."
+  (format t *startup-help*
+	  (opsys:path-append (opsys:config-dir "lish") "lishrc")
+	  *default-lishrc*
+	  *lishrc*
+	  *enter-shell-hook*))
+
+(defun help-subjects ()
+  "Return a list of help subjects."
+  (sort (omap-as 'list (_ (string-downcase (oelt _ 0))) (help-table)) #'string<))
+
+(defun help-function (subject)
+  "Return the help function for for ‘subject’, or NIL if it isn't defined."
+  (gethash (string subject) (help-table)))
+
+(defun help-subject-description (subject)
+  "Return the description of help subject ‘subject’."
+  ;; (documentation (help-function-name subject) 'function))
+  (documentation (help-function subject) 'function))
+
+(defun help-on (subject)
+  "Print help on ‘subject’."
+  (let ((func (help-function subject)))
+    (if func
+	(funcall func)
+	(format t "I don't know about the subject \"~a\"~%" subject))))
+
+(defun help-choices ()
+  "Return a list of choices for a help subject."
+  (concatenate
+   'list (remove "" (help-subjects) :test #'equal)
+   (mapcar #'(lambda (x)
+	       (or (and (symbolp x) (string-downcase (symbol-name x)))
+		   (and (stringp x) x)
+		   x))
+	   *command-list*)))
+
+(define-builtin-arg-type help-subject (arg-choice)
+  "Something which we can get help on."
+  ()
+  (:default-initargs
+   :choice-func
+      #+clisp 'help-choices		; I'm not sure why.
+      #-clisp #'help-choices))
+
+(defbuiltin help
+  ((subject help-subject :help "Subject to get help on."))
+  "Show help on the subject. Without a subject show some subjects that are
+available."
+  (when (null subject)
+    (setf subject ""))
+  (let (cmd)
+    (cond
+      ((help-function subject)
+       (help-on subject))
+      ((setf cmd (get-command subject)) ;; Try a specific command
+       (let* ((symb (intern (string-upcase subject) :lish))
+	      (doc  (when cmd (documentation cmd 'function)))
+	      (fdoc (when (fboundp symb)
+		      (documentation (symbol-function symb) 'function))))
+	 (cond
+	   (doc  (setf *output* (print-command-help cmd)))
+	   (fdoc (format t "Lisp function:~%~a~%" fdoc))
+	   (cmd  (format t "Sorry, there's no help for \"~a\".~%" subject)))))
+      (t
+       (format t "I don't know about the subject \"~a\"~%" subject)))))
 
 (defmethod documentation ((b command) (doctype (eql 'function)))
   "Return the documentation string for the given shell command."

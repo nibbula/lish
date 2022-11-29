@@ -82,6 +82,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:lish-suspended-jobs
    #:lish-last-background-job
    #:lish-start-time
+   #:shell-help-table
    #:lish-options
    ;; arguments
    #:argument
@@ -116,6 +117,9 @@ without any particular knowledge of it's Lisp programming features.")
    #:!wait #:!exec #:!bind #:!undefcommand #:!hash #:!type #:!opt #:!l #:!load
    #:!ldirs #:!ql #:!autoload #:!doc #:!var
    #:print-command-help
+   ;; help
+   #:defhelp #:help-table #:help-function #:help-subjects
+   #:help-subjects-description #:help-on
    ;; convenience / scripting
    #:alias #:set-alias #:unset-alias #:get-alias
    #:command-paths

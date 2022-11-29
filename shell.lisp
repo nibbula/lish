@@ -77,6 +77,9 @@
     :initarg :start-time :accessor lish-start-time :type integer
     :documentation
     "Seconds elapsed since some time. Defaults to since shell was started.")
+   (help-table
+    :initarg :help-table :accessor shell-help-table :initform nil
+    :documentation "A custom help table for this shell.")
    (options
     :initarg :options :accessor lish-options :initform nil
     :documentation "Operator configurable options."))
