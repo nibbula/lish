@@ -518,6 +518,7 @@ Uses the first available of:
   - a pre-defined external command, from an external command cache
   - a mined external command"
   (assert command-name)			; Don't be calling this with NIL.
+  (assert (stringp command-name))	; or some crap
   (let ((command (get-command command-name)))
     (typecase command
       (autoloaded-command
@@ -842,10 +843,12 @@ complete, and call the appropriate completion function."
 	      (dbugf 'completion "nothing special : hello ~a ~a~%"
 		     word first-word)
 	      (let* ((from-end (- (length context) pos))
+		     (first-command (and first-word
+					 (first-command-of first-word)))
 		     (result
 		      (if (and first-word
-			       (setf cmd (try-command
-					  (first-command-of first-word))))
+			       (stringp first-command)
+			       (setf cmd (try-command first-command)))
 			  (progn
 			    (dbugf 'completion "command : blurgg~%")
 			    (complete-command-arg
