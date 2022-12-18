@@ -247,6 +247,9 @@ then the pathname is changed before the command.")
 		       echo-list
 		       (oelt echo-list 0)))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; help
+
 (defun print-columnar-help (rows)
   (with-grout ()
     (let ((table (make-table-from
