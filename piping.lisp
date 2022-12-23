@@ -329,23 +329,28 @@ stream, or NIL if we can't."
 
 ;; This is useful for commands which want to take a list of files as an argument
 ;; or as *input*.
-(defmacro with-files-or-input ((arg &key on-unknown-input-type) &body body)
+(defmacro with-files-or-input ((arg &key on-unknown-input-type arg-list)
+			       &body body)
   "Evaluate ‘body’ adding ‘*input*’ to ‘arg’ if it could be a file
 or list of files. ‘arg’ should probably be the name of command argument that
-could be a list of files."
-  `(progn
-     (cond
-       ((possible-file-name-p lish:*input*)
-	(push lish:*input* ,arg))
-       ((consp lish:*input*)
-	;; We only check first item, but whatever.
-	(when (possible-file-name-p (first lish:*input*))
-	  (setf ,arg (append lish:*input* ,arg))))
-       (t
-	;; What to do for *input* that we can't determine is a file name.
-	;; By default, just ignore it.
-	,on-unknown-input-type))
-     ,@body))
+could be a list of files. If ‘arg-list’ is given, it is the name of the command
+argument plist, as provided to :args-as, and ‘arg’ is the keyword."
+  (let ((place (if arg-list
+		   `(getf ,arg-list (keywordify ,arg))
+		   arg)))
+    `(progn
+       (cond
+	 ((possible-file-name-p lish:*input*)
+	  (push lish:*input* ,place))
+	 ((consp lish:*input*)
+	  ;; We only check first item, but whatever.
+	  (when (possible-file-name-p (first lish:*input*))
+	    (setf ,place (append lish:*input* ,place))))
+	 (t
+	  ;; What to do for *input* that we can't determine is a file name.
+	  ;; By default, just ignore it.
+	  ,on-unknown-input-type))
+       ,@body)))
 
 ;; (defun spread (command &rest commands)
 ;;   "Send output from a command to multiple commands in parallel."
