@@ -322,6 +322,7 @@ stream, or NIL if we can't."
   (:documentation "Return true if ‘thing’ could be a file name.")
   (:method (thing) nil)
   (:method ((thing pathname)) t)
+  (:method ((thing os-pathname)) t)
   (:method ((thing string)) t)
   (:method ((thing vector))
     (equal (array-element-type thing) '(unsigned-byte 8))))
