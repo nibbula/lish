@@ -56,8 +56,8 @@ an EOF on SOURCE."
      :do (write-byte b destination)))
 
 (defun append-files (input-files output-file &key callback)
-  "Copy the data from INPUT-FILES appending it to OUTPUT-FILE. Create
-OUTPUT-FILE if it doesn't exist."
+  "Copy the data from ‘input-files’ appending it to ‘output-file’. Create
+‘output-file’ if it doesn't exist."
   (with-open-file (out (quote-filename output-file) :direction :output
 		       :if-exists :append
 		       :if-does-not-exist :create
@@ -257,8 +257,17 @@ expression in a separagte thread, if threads are supported."
   (when (and *shell* *context*)
     (and (context-out-pipe *context*) t)))
 
+(defgeneric input-source-p (thing)
+  (:documentation "Return true if ‘thing’ could be an input source.")
+  (:method ((thing stream)) (input-stream-p thing))
+  (:method ((thing pathname)) (nos:file-exists thing))
+  (:method ((thing string)) (nos:file-exists thing))
+  (:method ((thing vector))
+    (equal (array-element-type thing) '(unsigned-byte 8))))
+
+#|
 (defun input-source-p (thing)
-  "Return true if THING could be an input source."
+  "Return true if ‘thing’ could be an input source."
   (or (and (streamp thing) (input-stream-p thing))
       (and (or (pathnamep thing) (stringp thing))
 	   (nos:file-exists thing))
@@ -267,9 +276,10 @@ expression in a separagte thread, if threads are supported."
       ;; as byte array
       (and (vectorp thing)
 	   (equal (array-element-type thing) '(unsigned-byte 8)))))
+|#
 
 (defun as-input-stream (thing)
-  "Make an input stream out of THING."
+  "Make an input stream out of ‘thing’."
   (etypecase thing
     (stream thing) ;; assuming it's an input stream
     (pathname
@@ -288,7 +298,7 @@ expression in a separagte thread, if threads are supported."
 
 (defmacro with-streamlike-input ((arg &key use-stdin) &body body)
   "Allow a command to take stream-like input, getting the input from the
-argument ARG, or from the the shell input *input*. Set ARG to be an input
+argument ‘arg’, or from the the shell input *input*. Set ‘arg’ to be an input
 stream, or NIL if we can't."
   (with-names (arg-value used-stdin)
     `(let ((,arg-value ,arg) ,used-stdin)
@@ -307,6 +317,34 @@ stream, or NIL if we can't."
 	      ,@body)
 	 (when (and ,arg (streamp ,arg) (not ,used-stdin))
 	   (close ,arg))))))
+
+(defgeneric possible-file-name-p (thing)
+  (:documentation "Return true if ‘thing’ could be a file name.")
+  (:method (thing) nil)
+  (:method ((thing pathname)) t)
+  (:method ((thing string)) t)
+  (:method ((thing vector))
+    (equal (array-element-type thing) '(unsigned-byte 8))))
+
+;; This is useful for commands which want to take a list of files as an argument
+;; or as *input*.
+(defmacro with-files-or-input ((arg &key on-unknown-input-type) &body body)
+  "Evaluate ‘body’ adding ‘*input*’ to ‘arg’ if it could be a file
+or list of files. ‘arg’ should probably be the name of command argument that
+could be a list of files."
+  `(progn
+     (cond
+       ((possible-file-name-p lish:*input*)
+	(push lish:*input* ,arg))
+       ((consp lish:*input*)
+	;; We only check first item, but whatever.
+	(when (possible-file-name-p (first lish:*input*))
+	  (setf ,arg (append lish:*input* ,arg))))
+       (t
+	;; What to do for *input* that we can't determine is a file name.
+	;; By default, just ignore it.
+	,on-unknown-input-type))
+     ,@body))
 
 ;; (defun spread (command &rest commands)
 ;;   "Send output from a command to multiple commands in parallel."
