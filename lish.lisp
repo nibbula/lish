@@ -1719,7 +1719,8 @@ Arguments:
 			     :prompt-func nil
 			     :filter-hook `(colorize)
 			     :partial-line-indicator
-			     (lish-partial-line-indicator *shell*)))
+			     (lish-partial-line-indicator *shell*)
+			     :gutter-char (lish-gutter-char *shell*)))
 
 	(start-history sh)
 

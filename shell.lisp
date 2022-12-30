@@ -310,6 +310,17 @@ not to indicate partial lines."
   (when (lish-editor sh)
     (setf (rl::partial-line-indicator (lish-editor sh)) value)))
 
+(defoption gutter-char (:omit-setter t) object
+  :help "A character to use for the gutter, or NIL not use a gutter. The gutter
+is an unused area under the prompt. Having a gutter helps align the display of
+multiple lines."
+  :default #\space)
+
+(defmethod set-lish-gutter-char (value (sh shell))
+  (setf (arg-value (find-option sh 'gutter-char)) value)
+  (when (lish-editor sh)
+    (setf (rl::gutter-char (lish-editor sh)) value)))
+
 (defoption export-pipe-results () boolean
   :help "True to export LISH_INPUT and LISH_OUTPUT to sub-processes.")
 
