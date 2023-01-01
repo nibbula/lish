@@ -320,7 +320,7 @@ stream, or NIL if we can't."
 
 (defgeneric possible-file-name-p (thing)
   (:documentation "Return true if ‘thing’ could be a file name.")
-  (:method (thing) nil)
+  (:method (thing) (declare (ignore thing)) nil)
   (:method ((thing pathname)) t)
   (:method ((thing os-pathname)) t)
   (:method ((thing string)) t)
