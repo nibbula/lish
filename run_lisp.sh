@@ -37,15 +37,28 @@ fi
 
 try_to_figure_flags()
 {
+  LOAD_ARGS=""
+  BATCH_ARGS=""
   case "$LISP" in
-    *sbcl*)  OUR_PLAIN_LISP_FLAGS="--no-userinit" ;
-	     BATCH_ARGS="--noinform --noprint --disable-debugger --no-sysinit"
-	     ;;
-    #*ccl*)   OUR_PLAIN_LISP_FLAGS="--no-init"     ; BATCH_ARGS="--batch" ;;
-    *ccl*)   OUR_PLAIN_LISP_FLAGS="--no-init"     ; BATCH_ARGS="--quiet" ;;
-    *clisp*) OUR_PLAIN_LISP_FLAGS="-norc"         ; BATCH_ARGS="" ;;
-    *abcl*)  OUR_PLAIN_LISP_FLAGS="--noinit"      ; BATCH_ARGS="" ;;
-    *ecl*)   OUR_PLAIN_LISP_FLAGS="--norc"        ; BATCH_ARGS="" ;;
+    *sbcl*)
+      OUR_PLAIN_LISP_FLAGS="--no-userinit" ;
+      BATCH_ARGS="--noinform --noprint --disable-debugger --no-sysinit"
+      ;;
+    *ccl*)
+      OUR_PLAIN_LISP_FLAGS="--no-init"
+      #BATCH_ARGS="--batch"
+      BATCH_ARGS="--quiet"
+      ;;
+    *clisp*)
+      OUR_PLAIN_LISP_FLAGS="-norc"
+      ;;
+    *abcl*)
+      OUR_PLAIN_LISP_FLAGS="--noinit"
+      ;;
+    *ecl*)
+      OUR_PLAIN_LISP_FLAGS="--norc"
+      BATCH_ARGS="-q"
+      ;;
     *)
       echo "I'm not sure how to set flags for $LISP."
       ;;
@@ -59,7 +72,8 @@ export LISH_FLAGS="${BATCH_ARGS}"
 echo "[Using ${LISP} ${LISH_FLAGS} ${LISH_PLAIN_FLAGS}]"
 echo "[Running $script_name]"
 
+echo $LISP $LISH_FLAGS $LISH_PLAIN_FLAGS
 echo '(load "'"$script_name"'")' |
-  $LISP $LISH_FLAGS $LISH_PLAIN_FLAGS "$@" || fail "somehow failed"
+  $LISP $LISH_FLAGS $LISH_PLAIN_FLAGS || fail "somehow failed"
 
 exit 0
