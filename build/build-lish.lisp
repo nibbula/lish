@@ -41,7 +41,10 @@
   "Run commands with input from a file or stream. COMMAND should be a list of
 strings."
   (multiple-value-bind (stupid stupider exit-code)
-      (uiop:run-program command :input stream :output t :error-output t
+      (uiop:run-program command :input stream
+				;; :output t
+				:output :interactive
+				:error-output t
 			:ignore-error-status t)
     (declare (ignore stupid stupider))
     (format t "~%[Build ~a]~%"
