@@ -338,7 +338,7 @@ argument plist, as provided to :args-as, and ‘arg’ is the keyword."
   (let ((place (if arg-list
 		   `(getf ,arg-list (keywordify ,arg))
 		   arg)))
-    `(progn
+    `(block nil
        (cond
 	 ((possible-file-name-p lish:*input*)
 	  (push lish:*input* ,place))
