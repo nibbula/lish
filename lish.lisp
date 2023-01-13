@@ -1946,9 +1946,58 @@ invoked as with a (s+ *shell-name* “-”) stripped off."
 	 (!lish :greeting t :terminal-type :crunch))))
     (nos:exit-lisp)))
 
-(defun make-standalone (&key (name #-windows "lish" #+windows "lish.exe")
-			     (smaller t))
-  "Make a lish executable."
+;;; @@@ refactor with shell-toplevel
+(defun command-toplevel (command)
+  "Invoked a standalone commaned."
+  (setf *standalone* t
+	*default-lishrc* (default-lishrc))
+  ;; No, this doesn't work:
+  ;; (asdf:initialize-output-translations)
+  (uiop:restore-image)
+
+  (let ((level-string (nos:environment-variable "LISH_LEVEL"))
+	(args (nos:lisp-args)))
+    (when level-string
+      (setf *lish-level* (parse-integer level-string)))
+
+    ;; @@@ Of course this is wrong. We really get it from LANG or LC_CYTPE, or
+    ;; whatever it is on Windows or whatever O/S.
+    #+sbcl (setf sb-impl::*default-external-format*
+		 (or *saved-default-external-format* :utf-8))
+
+    (if (and *lish-level* (> *lish-level* 7))
+	(format t "We're ~s levels deep. Something probably went ~
+                   wrong, so I'm giving up.~%~
+                   The command was ~s.~%" *lish-level* (command-name command))
+	;; @@@ Maybe refactor this terminal thing from the main lish function.
+	(with-terminal (nil *terminal* :start-at-current-line t)
+	  ;; We can't just use a terminal-crunch as *standard-output* because
+	  ;; it won't know about output from other programs or other streams,
+	  ;; but since the lower level terminals are are something like
+	  ;; "immediate mode" maybe they should work? The point is to get
+	  ;; color output for fat-strings.
+	  (let ((*standard-output*
+		  ;; We can't use typecase because the terminal types don't
+		  ;; have to be loaded.
+		  (case (keywordify (type-of *terminal*))
+		    (:terminal-crunch (terminal-wrapped-terminal *terminal*))
+		    (:null *standard-output*)
+		    (t *terminal*))))
+	    (setf (tt-input-mode) :line)
+	    (with-new-shell (:debug nil)
+	      (setf (shell-interactive-p *shell*) nil)
+	      (let ((state (make-read-state)))
+		(with-simple-restart (abort "Abort the command.")
+		  (with-error-handling (state)
+		    (with-shell-command ()
+		      (invoke-command
+		       command
+		       (posix-to-lisp-args command
+					   (wordify-list (cdr args))))))))))))
+    (nos:exit-lisp)))
+
+(defun make-standalone-executable (name function &key (smaller t))
+  "Save an executable shell command in ‘name’, which calls ‘function’."
   #-sbcl (declare (ignore smaller))
   ;; (update-version)
   (let (options)
@@ -1987,8 +2036,34 @@ invoked as with a (s+ *shell-name* “-”) stripped off."
     ;; Make sure ASDF is cleared.
     (asdf:clear-configuration)
     (setf asdf:*central-registry* nil)
-    (apply #'save-image-and-exit name :initial-function #'lish:shell-toplevel
-	   options)))
+    (apply #'save-image-and-exit name :initial-function function options)))
+
+(defun make-standalone (&key (name #-windows "lish" #+windows "lish.exe")
+			     (smaller t))
+  "Make a lish executable."
+  (make-standalone-executable name #'lish:shell-toplevel :smaller smaller))
+
+(defun make-standalone-command (command &key (smaller t))
+  "Make a lish executable."
+  (typecase command
+    (command)
+    (string
+     (when (null (setf command (get-command command)))
+       (error "Command ‘~a’ isn't defined." command)))
+    (t
+     (error "I don't know how to make a ~s ~s into a command."
+	    (type-of command) command)))
+
+  ;; (let ((type (command-type *shell* command)))
+  ;;   (when (member type '(:external-command :file))
+  ;;     (error "The command shouldn't be a ~s." type)))
+  (when (not (typep command 'shell-command))
+    (error "The command should be a ‘shell-command’, not ~s."
+	   (type-of command)))
+
+  (make-standalone-executable (command-name command)
+			      (lambda () (command-toplevel command))
+			      :smaller smaller))
 
 ;; So we can conditionalize adding of lish commands in other packages.
 (d-add-feature :lish)
