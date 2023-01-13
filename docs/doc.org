@@ -31,6 +31,19 @@ Lish Documentation                                        -*- org -*-
     You should put it somewhere in your PATH.
 **** Customizing your executable
 ***** Executables with pre-loaded commands
+**** Other implementations than SBCL
+     In theory Lish can run on implemtations other than SBCL, but it doesn't
+     seem to work well in practice.
+***** CCL, ECL, CLisp
+      Lish can usually compile and run on these, but the result is too slow.
+      These are tested less, so may have bugs.
+***** Allegro, LispWorks
+      Lish could probably work on these, and maybe even be fast enough, but
+      the free versions run out of memory before it can be loaded, so
+      I can't really test it. There are probably minor implementation
+      portability issues.
+***** Mezzano, ABCL, CMUCL, Clasp
+      Needs work.
 ** Loading without the build script
    When you want to compile and load lish from the Common Lisp REPL.
 *** Loading
@@ -45,76 +58,18 @@ Lish Documentation                                        -*- org -*-
    (ql:quickload :lish)
 #+END_SRC
 **** Dependencies
-***** A Common Lisp implementation:
-****** sbcl (recommended)
-****** ccl
-****** ecl
-****** cmucl
-****** clisp
-***** Quicklisp
-***** Lisp software not in quicklisp:
-****** https://github.com/nibbula/yew.git
-******* dlib
-******* stretchy
-******* char-util
-******* tiny-repl
-******* keymap
-******* collections
-******* ochar
-******* ostring
-******* color
-******* fatchar
-******* fatchar-io
-******* glob
-******* table
-******* table-print
-******* dlib-misc
-******* dl-list
-******* reader-ext
-******* syntax
-******* syntax-lisp
-******* theme
-******* style
-******* terminal-table
-******* grout
-******* completion
-******* unipose
-******* inator
-******* fui
-******* terminal-inator
-******* dlib-interactive
-******* magic
-****** https://github.com/nibbula/opsys.git
-******* opsys
-******* opsys-base
-******* opsys-<system>
-****** https://github.com/nibbula/terminal.git
-******* terminal
-******* terminal-crunch
-******* terminal-ansi
-******* terminal-dumb
-****** https://github.com/nibbula/deblarg.git
-******* deblarg
-****** https://github.com/nibbula/rl.git
-******* rl
-****** https://github.com/nibbula/lish.git
-******* lish
-***** Lisp packages in quicklisp, are probably:
+     This changes a lot so this list is probably not accurate.
+     If you build a fully loaded Lish, with los and tools, it adds a lot of
+     external dependencies.
+***** But at least are probably:
+      - cffi
       - asdf
       - uiop
-      - trivial-features
-      - babel
-      - alexandria
-      - cffi
-      - trivial-gray-streams
       - cl-ppcre
-      - eclector
-      - closer-mop
-      - acclimation
-      - cl-unicode
-      - flexi-streams
-      - chipz
+      - eclector, or an SBCL patch
+      - cl-base64
       - bordeaux-threads
+      - chipz
 *** Building an executable
     Once =lish= is loaded you can, say
 #+BEGIN_SRC lisp
@@ -496,7 +451,7 @@ Lish Documentation                                        -*- org -*-
 ***** Function call
       ()
 ***** Values
-      !
+      , ! #
 ***** Quotes
       ' `
 **** Expansion
@@ -521,7 +476,7 @@ Lish Documentation                                        -*- org -*-
 ** Expansion
 *** Environment variables: $
 *** History : !
-*** Expression : !
+*** Expression : ! ,
 ** Shell Commands
    Shell commands are defined with the =defcommand= macro.
    Arguments to shell commands are classes.
