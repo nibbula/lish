@@ -241,7 +241,7 @@
      (or (find (string job-descriptor) (lish-jobs *shell*) :test #'equalp
 	       :key #'job-name)
 	 (when (find-package :bt)
-	   (find job-descriptor (bt:all-threads)
+	   (find (string job-descriptor) (bt:all-threads)
 		 :test #'equalp
 		 :key #'bt:thread-name))))
     (t
