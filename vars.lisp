@@ -74,6 +74,8 @@ means every dumped executable."))
   (export-output)
   value)
 
+;; Possibly exporting *input* and *output* in the environment to sub-processes
+;; when they're set is the reason for the symbol macro and functions nonsense.
 (defsetf input set-input)
 (defsetf output set-output)
 
