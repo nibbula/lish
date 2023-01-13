@@ -48,6 +48,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:*exit-shell-hook*
    ;; installation
    #:make-standalone
+   #:make-standalone-command
    ;; shell options
    #:option
    ;; @@@ maybe we don't really need to export all this junk
