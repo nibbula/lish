@@ -2043,6 +2043,7 @@ invoked as with a (s+ *shell-name* “-”) stripped off."
   "Make a lish executable."
   (make-standalone-executable name #'lish:shell-toplevel :smaller smaller))
 
+;; @@@ figure out how to appease asdf to do this from an already dumped lish
 (defun make-standalone-command (command &key (smaller t))
   "Make a lish executable."
   (typecase command
