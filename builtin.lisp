@@ -1276,19 +1276,18 @@ drastic thing to do to a running Lisp system."
   ())
 
 (defbuiltin bind
-  (("print-bindings"		 boolean      :short-arg #\p
+  ((print-bindings boolean :short-arg #\p
     :help "Print key bindings.")
-   ("print-readable-bindings"	 boolean      :short-arg #\P
+   (print-readable-bindings boolean :short-arg #\P
     :help "Print key bindings in a machine readable way.")
-   ("query"			 function     :short-arg #\q
+   (query function :short-arg #\q
     :help "Ask what key invokes a function.")
-   ("remove-function-bindings" function	      :short-arg #\u
-    :help "Remove the binding for FUNCTION.")
-   ("remove-key-binding"	 key-sequence :short-arg #\r
-    :help "Remove the binding for a KEY-SEQUENCE.")
-   ("key-sequence"		 key-sequence
-    :help "The key sequence to bind.")
-   ("function-name"		 function
+   (remove-function-bindings function :short-arg #\u
+    :help "Remove the binding for ‘function’.")
+   (remove-key-binding key-sequence :short-arg #\r
+    :help "Remove the binding for a ‘key-sequence’.")
+   (key-sequence key-sequence :help "The key sequence to bind.")
+   (function-name function
     :help "The function to bind the key sequence to."))
   "Manipulate key bindings."
   (when (> (count t (list print-bindings print-readable-bindings query
@@ -1301,7 +1300,7 @@ drastic thing to do to a running Lisp system."
      (keymap:map-keymap
       #'(lambda (key val)
 	  (format t "(keymap:define-key rl:*normal-keymap* ~w '~a)~%"
-		  key val))
+		  key (key-definition-action val)))
       rl:*normal-keymap*))
     ;; @@@ todo: query remove-function-bindings remove-key-binding
     ((and key-sequence (not function-name))
@@ -1309,13 +1308,12 @@ drastic thing to do to a running Lisp system."
 	     (keymap:key-sequence-binding
 	      key-sequence rl:*normal-keymap*)))
     (query
-     (if (not function-name)
-	 (error "Missing function name.")
-	 (keymap:map-keymap
-	  #'(lambda (key val)
-	      (when (equal val function-name)
-		(format t "~w: ~a~%" key val)))
-	  rl:*normal-keymap*)))
+     (keymap:map-keymap
+      #'(lambda (key val)
+	  (let ((a (key-definition-action val)))
+	    (when (equalp (string query) (string a))
+	      (format t "~a: ~(~a~)~%" (char-util:nice-char key) a))))
+	  rl:*normal-keymap*))
     ((and key-sequence function-name)
      (keymap:set-key key-sequence function-name rl:*normal-keymap*))))
 
