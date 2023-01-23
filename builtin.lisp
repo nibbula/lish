@@ -1969,6 +1969,8 @@ things.")
   "Print out documentation for ‘class’."
   (let ((class (find-class symbol)))
     (output-text (or (documentation class t) (documentation class 'type)))
+    (when (not (mop:class-finalized-p class))
+      (ignore-errors (mop:finalize-inheritance class)))
     (grout-print-table
      (make-table-from
       (loop :for s :in (mop:class-slots class)
