@@ -1032,7 +1032,8 @@ variables explicitly set in arguments are passed to the command."
 ;; would necessitate forking and waiting, which I'm not sure is a good idea.
 (defbuiltin time ((command string :repeating t :help "Command to time."))
   "Shows some time statistics resulting from the execution of COMMNAD."
-  (time (shell-eval (expr-from-args command))))
+  (prog1 (time (shell-eval (expr-from-args command)))
+    (force-output *trace-output*)))
 
 (defun print-time (seconds micro-seconds &optional (stream t))
   (let* ((secs  (+ seconds (/ micro-seconds 1000000)))
