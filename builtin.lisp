@@ -1276,6 +1276,7 @@ drastic thing to do to a running Lisp system."
   "A key sequence."
   ())
 
+;; @@@@ need to update for new inator keymaps
 (defbuiltin bind
   ((print-bindings boolean :short-arg #\p
     :help "Print key bindings.")

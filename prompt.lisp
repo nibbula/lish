@@ -11,6 +11,7 @@ LISH_LEVEL environment variable.")
 ;; This is mostly so we can override some editor commands.
 (defclass lish-line-editor (line-editor)
   ()
+  (:default-initargs :default-keymap *lish-default-keymap*)
   (:documentation "A line editor for lish."))
 
 (defsingle-method inator:redraw ((e lish-line-editor))

@@ -11,6 +11,14 @@
     (,(meta-char #\o)	. shell-expand-line)
     ))
 
+(define-key *lish-default-keymap*
+  #\escape (build-escape-map *lish-default-keymap*))
+
+;; @@@ perhaps temporary for backwards compatibility
+(defun lish-keymap (fake)
+  (declare (ignore fake))
+  *lish-default-keymap*)
+
 ;; @@@ I want to change all the lish-* accessors to shell-*
 (defclass shell ()
   ((exit-flag
@@ -38,9 +46,6 @@
     :initarg :history-store
     :accessor lish-history-store :initform nil
     :documentation "Where to save history.")
-   (keymap
-    :accessor lish-keymap
-    :documentation "Keymap for the line editor.")
    (old-pwd
     :accessor lish-old-pwd
     :initform nil
@@ -86,8 +91,7 @@
   (:default-initargs
    :exit-flag nil
    :exit-values '()
-   :start-time (get-universal-time)
-   :keymap (copy-keymap *lish-default-keymap*))
+   :start-time (get-universal-time))
   (:documentation "A lispy system command shell."))
 
 (defmethod initialize-instance :after
@@ -100,13 +104,6 @@
   ;; Make alias tables
   (setf (slot-value sh 'aliases) (make-hash-table :test #'equal))
   (setf (slot-value sh 'global-aliases) (make-hash-table :test #'equal))
-
-  ;; Set default keymap
-  (when (or (not (slot-boundp sh 'keymap)) (not (slot-value sh 'keymap)))
-    (setf (slot-value sh 'keymap)
-	  (copy-keymap *lish-default-keymap*))
-    (define-key (slot-value sh 'keymap)
-	#\escape (build-escape-map (slot-value sh 'keymap))))
 
   ;; Copy the objecs from the defined option list, and set the default values.
   (loop :with o :for opt :in *options* :do
