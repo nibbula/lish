@@ -507,10 +507,25 @@ NIL on failure. The Lisp path is most likely the ASDF path."
   (load-lisp-command-from command (intern (string-upcase command) :keyword)
 			  :silent silent))
 
-(defclass autoloaded-command (base-command)
+(defclass file-based-command (base-command)
+  ;; @@@ In the case of source commands, "load" isn't exactly right, so
+  ;; we should change it.
   ((load-from
     :initarg :load-from :accessor command-load-from
     :documentation "Where to load the command from."))
+  (:documentation "A command loaded from somewhere when invoked."))
+
+(defmethod print-object ((o file-based-command) stream)
+  "Print a lish command in an unreadable way."
+  (print-unreadable-object (o stream :identity nil :type t)
+    (format stream "from ~s" (command-load-from o))))
+
+#|──────────────────────────────────────────────────────────────────────────┤#
+ │ Autoloaded commands
+ ╰|#
+
+(defclass autoloaded-command (file-based-command)
+  ()
   (:documentation "A command automatically loaded from somewhere when invoked."))
 
 ;; (defmethod initialize-instance
@@ -521,15 +536,15 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 ;;     (error "autoloaded-command must have a name."))
 ;;   )
 
-(defmethod print-object ((o autoloaded-command) stream)
-  "Print a lish command in an unreadable way."
-  (print-unreadable-object (o stream :identity nil :type t)
-    ;; (if (slot-boundp o 'synopsis)
-    ;; 	(format stream "~s" (command-synopsis o))
-    ;; 	(format stream "~s" (if (slot-boundp o 'name)
-    ;; 				(command-name o)
-    ;; 				(format stream "<unnamed>"))))))
-    (format stream "from ~s" (command-load-from o))))
+;; (defmethod print-object ((o autoloaded-command) stream)
+;;   "Print a lish command in an unreadable way."
+;;   (print-unreadable-object (o stream :identity nil :type t)
+;;     ;; (if (slot-boundp o 'synopsis)
+;;     ;; 	(format stream "~s" (command-synopsis o))
+;;     ;; 	(format stream "~s" (if (slot-boundp o 'name)
+;;     ;; 				(command-name o)
+;;     ;; 				(format stream "<unnamed>"))))))
+;;     (format stream "from ~s" (command-load-from o))))
 
 (defmethod invoke-command ((command autoloaded-command) args)
   (let ((loaded-command (load-lisp-command-from
@@ -551,6 +566,36 @@ NIL on failure. The Lisp path is most likely the ASDF path."
        ;; We can only convert the args AFTER we load the command.
        (let ((lisp-args (posix-to-lisp-args loaded-command args)))
 	 (invoke-command loaded-command lisp-args))))))
+
+#|──────────────────────────────────────────────────────────────────────────┤#
+ │ Sourced commands
+ ╰|#
+
+(defclass sourced-command (file-based-command)
+  ()
+  (:documentation "A command sourced from somewhere when invoked."))
+
+(defun source-command-p (path)
+  "Return true if the file in ‘path’ is a source command."
+  (block nil
+    (handler-case
+	(with-open-file (f path :element-type '(unsigned-byte 8))
+	  (and (= (read-byte f) (char-code #\;))
+	       (= (read-byte f) (char-code #\!))))
+      (error () (return nil)))))
+
+(defun make-source-command (path)
+  (let* ((command-name (path-file-name path))
+	 (command (make-instance 'sourced-command
+				 :name command-name
+				 :load-from path)))
+    (pushnew command-name *command-list* :test #'equal)
+    ;; (setf (documentation (command-function-name command-name) 'function)
+    ;; 	  docstring)
+    (set-command command-name command)))
+
+(defmethod invoke-command ((command sourced-command) args)
+  (load-file (command-load-from command)))
 
 ;; (defun load-external-command (command)
 ;;   "Try to load an external command definition."

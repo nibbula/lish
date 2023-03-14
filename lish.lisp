@@ -524,9 +524,9 @@ them as a list."
 If ALREADY-KNOWN is true, only check for already cached commands, don't bother
 consulting the file system."
   ;;(declare (ignore already-known)) ;; @@@
-  (let (cmd)
-    ;; The order here is important and should reflect what actually happens
-    ;; in shell-eval.
+  ;; The order here is important and should reflect what actually happens
+  ;; in shell-eval.
+  (let (cmd path)
     (cond
       ((setf cmd (gethash command (lish-commands)))
        (typecase cmd
@@ -539,8 +539,11 @@ consulting the file system."
       ;; @@@ A loadable system isn't really a command, rather a potential
       ;; command, so maybe it shouldn't be in here?
       ((loadable-system-p command)		  :loadable-system)
-      ((get-command-path
-	command :already-known already-known)	  :file)
+      ((setf path (get-command-path
+		   command :already-known already-known))
+       (if (source-command-p path)
+	   :source-command
+	   :file))
       ((and (lish-auto-cd sh)
 	    (directory-p (expand-tilde command))) :directory)
       ((and (fboundp (symbolify command)))	  :function)
@@ -855,10 +858,16 @@ probably fail, but perhaps in similar way to other shells."
 			     cmd :silent (lish-autoload-quietly sh))))
 	 (call-thing command (subseq (shell-expr-words expanded-expr) 1)
 	  	     context))
+	;; Source a file
+	((and (setf path (get-command-path cmd))
+	      (source-command-p path)
+	      (setf command (make-source-command path)))
+	 (call-thing command (subseq (shell-expr-words expanded-expr) 1)
+	  	     context))
 	((stringp cmd)
 	 ;; If we can find a command in the path, try it first.
 	 (cond
-	   ((get-command-path cmd)
+	   (path
 	    (sys-cmd))
 	   ((and (lish-auto-cd sh) (directory-p cmd))
 	    (when (> (length (shell-expr-words expr)) 1)
@@ -1100,7 +1109,9 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		(setf line (s+ line +newline-string+ new-line)))
 	     (when (and expr (not (eql expr *continue-symbol*)))
 	       (setf expression-start-line nil))
-	     (shell-eval expr))
+	     (with-input (nil)
+	       (with-output (nil)
+		 (shell-eval expr))))
 	  (when (eql expr *continue-symbol*)
 	    (error "End of file in expression. Probably starting at line ~a."
 		   expression-start-line)))))))
@@ -1580,7 +1591,9 @@ if we aren't already inside one."
     `(if *shell*
 	 ;; @@@ How can we avoid the code duplication? I don't think the thunk
 	 ;; trick will work here?
-	 (progn ,@body)
+	 (with-input (nil)
+	   (with-output (nil)
+	     (progn ,@body)))
 	 (with-new-shell ()
 	   (with-shell-command ()
 	     ,@body)))))
