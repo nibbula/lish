@@ -738,28 +738,34 @@ NAME is replaced by EXPANSION before any other evaluation."
 the current value of NAME is exported. Omitting both, prints all the exported
 environment variables. If NAME and VALUE are converted to strings if necessary.
 If NAME has an equal sign ‘=’ in it, do the POSIX shell style of NAME=value."
+  (when (not name)
+    (setf name *input*))
   (when (and name (not (stringp name)))
     (setf name (princ-to-string name)))
   (when (and value (not (stringp value)))
     (setf value (princ-to-string value)))
-  (if name
-      (let (pos)
-	(cond
-	  ((setf pos (position #\= name)) ; POSIX style
-	   (let ((n (subseq name 0 pos))
-		 (v (subseq name (1+ pos))))
-	     (setf (nos:environment-variable n) v)))
-	  (remove
-	   (setf (nos:environment-variable name) nil))
-	  (edit
-	   (setf (nos:environment-variable name)
-		 (rl :prompt (s+ "export " name #\=)
-		     :string (or value (nos:environment-variable name)))))
-	  (value
-	   (setf (nos:environment-variable name) value))
-	  (t
-	   (nos:environment-variable name)))) ; Actually does nothing
-      (dlib-interactive:printenv)))
+  (setf *output*
+	(if name
+	    (let (pos)
+	      (cond
+		((setf pos (position #\= name)) ; POSIX style
+		 (let ((n (subseq name 0 pos))
+		       (v (subseq name (1+ pos))))
+		   (setf (nos:environment-variable n) v)))
+		(remove
+		 (prog1 (nos:environment-variable name)
+		   (setf (nos:environment-variable name) nil)))
+		(edit
+		 (setf (nos:environment-variable name)
+		       (rl :prompt (s+ "export " name #\=)
+			   :string (or value (nos:environment-variable name)))))
+		(value
+		 (setf (nos:environment-variable name) value))
+		(t
+		 (nos:environment-variable name)))) ; Actually does nothing
+	    (progn
+	      (dlib-interactive:printenv)
+	      (nos:environment)))))
 
 #|-+
  |\|   So we have (from a man page):
