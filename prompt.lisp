@@ -251,7 +251,8 @@ Strings can have '%' directives which are expanded by format-prompt."
 		   (or
 		    (handle-it (make-prompt sh (lish-right-prompt sh)))
 		    (progn
-		      (format t "Your right prompt is broken: ~s~%" prompt-error)
+		      (format t "Your right prompt is broken: ~s~%"
+			      prompt-error)
 		      "")))
 	      "")
 	  (or (and (lish-prompt-function sh)
@@ -408,31 +409,34 @@ indicate which color to affect, and defaults to :bg."
   (setf start-color (dcolor:lookup-color start-color)
 	end-color (dcolor:lookup-color end-color))
 
-  (let* ((steps (- end start))
-	 (end-red     (dcolor:color-component end-color :red))
-	 (end-blue    (dcolor:color-component end-color :blue))
-	 (end-green   (dcolor:color-component end-color :green))
-	 (start-red   (dcolor:color-component start-color :red))
-	 (start-blue  (dcolor:color-component start-color :blue))
-	 (start-green (dcolor:color-component start-color :green))
-	 (red-step   (/ (abs (- end-red   start-red))   (- steps 1)))
-	 (green-step (/ (abs (- end-green start-green)) (- steps 1)))
-	 (blue-step  (/ (abs (- end-blue  start-blue))  (- steps 1))))
-    (setf red-step   (if (< (- end-red  start-red) 0)
-			 (- red-step) red-step))
-    (setf green-step (if (< (- end-green  start-green) 0)
-			 (- green-step) green-step))
-    (setf blue-step  (if (< (- end-blue  start-blue) 0)
-			  (- blue-step) blue-step))
+  (let ((steps (- end start)))
+    (when (> steps 1)
+      (let* ((end-red     (dcolor:color-component end-color :red))
+	     (end-blue    (dcolor:color-component end-color :blue))
+	     (end-green   (dcolor:color-component end-color :green))
+	     (start-red   (dcolor:color-component start-color :red))
+	     (start-blue  (dcolor:color-component start-color :blue))
+	     (start-green (dcolor:color-component start-color :green))
+	     (red-step   (/ (abs (- end-red   start-red))   (- steps 1)))
+	     (green-step (/ (abs (- end-green start-green)) (- steps 1)))
+	     (blue-step  (/ (abs (- end-blue  start-blue))  (- steps 1))))
+	(setf red-step   (if (< (- end-red  start-red) 0)
+			     (- red-step) red-step))
+	(setf green-step (if (< (- end-green  start-green) 0)
+			     (- green-step) green-step))
+	(setf blue-step  (if (< (- end-blue  start-blue) 0)
+			     (- blue-step) blue-step))
 
-    (loop :for i :from start :below (+ start steps)
-	  :for r = start-red   :then (+ r red-step)
-	  :for g = start-green :then (+ g green-step)
-	  :for b = start-blue  :then (+ b blue-step)
-       :do
-       (case which
-	 (:fg (setf (fatchar-fg (oelt string i)) (vector :rgb r g b)))
-	 (:bg (setf (fatchar-bg (oelt string i)) (vector :rgb r g b))))))
+	(loop :for i :from start :below (+ start steps)
+	      :for r = start-red   :then (+ r red-step)
+	      :for g = start-green :then (+ g green-step)
+	      :for b = start-blue  :then (+ b blue-step)
+	      :do
+	      (case which
+		(:fg
+		 (setf (fatchar-fg (oelt string i)) (vector :rgb r g b)))
+		(:bg
+		 (setf (fatchar-bg (oelt string i)) (vector :rgb r g b))))))))
   string)
 
-;; EOF
+;; End
