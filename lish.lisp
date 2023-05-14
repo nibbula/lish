@@ -2048,6 +2048,13 @@ invoked as with a (s+ *shell-name* “-”) stripped off."
     ;; Make sure ASDF is cleared.
     (asdf:clear-configuration)
     (setf asdf:*central-registry* nil)
+
+    ;; Make all the current systems register as pre-loaded.
+    ;; This should make it so we can load new things in the image.
+    (loop :for system :in (asdf:registered-systems) :do
+      (asdf:register-preloaded-system system)
+      (asdf:clear-system system))
+
     (apply #'save-image-and-exit name :initial-function function options)))
 
 (defun make-standalone (&key (name #-windows "lish" #+windows "lish.exe")
