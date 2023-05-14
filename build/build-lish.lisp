@@ -137,6 +137,9 @@ strings."
   ;; (copy-file file dir)
   )
 
+;; I know it seems dum to have Lisp code as strings, but it seems simpler
+;; because of package issues.
+
 (defmethod build ((target (eql 'lish)))
   "Normal lish."
   (msg "[Build target ~s]" target)
@@ -164,6 +167,22 @@ strings."
 		(ql:quickload :deblarg :verbose nil) ~
 		(ql:quickload :lish :verbose nil) ~
 		(load \"build/fully-loaded.lisp\" :verbose nil) ~
+	        (load \"build/build-deinit.lisp\" :verbose nil) ~
+		(lish:make-standalone :smaller t)"))
+    (maybe-increment-build-version *version-file*)
+    (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
+
+(defmethod build ((target (eql 'lol)))
+  (msg "[Build target ~s]" target)
+  (with-input-from-string
+      (stream
+       (format nil
+	       "(load \"build/build-init.lisp\" :verbose nil) ~
+		(ql:quickload :dlib :verbose nil) ~
+		(ql:quickload :tiny-repl :verbose nil) ~
+		(ql:quickload :deblarg :verbose nil) ~
+		(ql:quickload :lish :verbose nil) ~
+		(load \"build/lol.lisp\" :verbose nil) ~
 	        (load \"build/build-deinit.lisp\" :verbose nil) ~
 		(lish:make-standalone :smaller t)"))
     (maybe-increment-build-version *version-file*)
