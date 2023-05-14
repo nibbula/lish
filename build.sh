@@ -27,6 +27,10 @@ fail()
   echo "\\-------------------------------------------------------------------/"
 }
 
+if [ -n "$1" ]; then
+  export TARGET="$1"
+fi
+
 #${SHELL:-sh} ./run_lisp.sh "build/build-lish.lisp" || fail
 /usr/bin/env sh ./run_lisp.sh "build/build-lish.lisp" || fail
 
