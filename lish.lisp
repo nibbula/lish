@@ -1368,7 +1368,7 @@ suspend itself."
 	     *input* nil
 	     *output* nil)
        ;; @@@ This one is the trouble
-       (when (shell-interactive-p sh)
+       (when (shell-interactive-p *shell*)
 	 (format t "~%"))		; <<<<
        (force-output)
        (when (catch 'interactive-interrupt
