@@ -736,7 +736,7 @@ read from."
 	    ;; 	  in-pipe
 	    ;; 	  (slurp in-pipe))
 	    ;;   (file-position in-pipe 0))
-	    (setf result-stream
+	    (setf (values result-stream pid)
 		  (apply #'nos:pipe-program
 			 `(,path ,args
 				 ,@(when in-pipe `(:in-stream ,in-pipe))
@@ -807,7 +807,7 @@ probably fail, but perhaps in similar way to other shells."
 	 (command (get-command cmd))
 	 (alias (gethash cmd (shell-aliases sh)))
 	 (expanded-expr (lisp-exp-eval expr))
-	 result result-stream)
+	 result result-stream path)
     ;; These are in order of precedence, so:
     ;;  aliases, lisp path, commands, system path
     (flet ((sys-cmd ()
@@ -870,7 +870,8 @@ probably fail, but perhaps in similar way to other shells."
 	 (call-thing command (subseq (shell-expr-words expanded-expr) 1)
 	  	     context))
 	;; Source a file
-	((and (setf path (get-command-path cmd))
+	((and (not (listp cmd))
+	      (setf path (get-command-path cmd))
 	      (source-command-p path)
 	      (setf command (make-source-command path)))
 	 (call-thing command (subseq (shell-expr-words expanded-expr) 1)
