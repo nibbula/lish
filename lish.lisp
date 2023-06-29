@@ -62,8 +62,9 @@
 			   (flipped-io  nil flipped-io-p)
 			   (pipe-plus   nil pipe-plus-p)
 			   (pipe-dot    nil pipe-dot-p)
+			   (pipe-both   nil pipe-both-p)
 			   (background  nil background-p))
-  "Return a new context based on CONTEXT, with the given slots."
+  "Return a new context based on ‘context’, with the given slots."
   (if (not context)
       (make-context 
        :in-pipe     in-pipe
@@ -687,6 +688,15 @@ CALL-PARENLESS."
 		    (let ((vals (multiple-value-list (runky thing args))))
 		      (values vals nil t)))))))))
 
+(defun expr-to-args (expr)
+  "Convert the shell expression ‘expr’ to system command arguments, which must
+be a list of strings. Spread expression words that need it."
+  (mapcan (_ (let ((x (spread (word-word _))))
+	       (if (listp x)
+		   (mapcar #'princ-to-string x)
+		   (list (princ-to-string x)))))
+	  (shell-expr-words expr)))
+
 (defun do-system-command (expr context)
   "Run a system command.
 EXPR is a shell-expr.
@@ -695,9 +705,10 @@ OUT-PIPE is T to return a input stream which the output of the command can be
 read from."
   (let* ((command-line
 	  ;; System command arguments must be strings
-	  (mapcar (_ (or (and (stringp _) _)
-			 (princ-to-string (shell-word-word _))))
-		     (shell-expr-words expr)))
+	  ;; (mapcar (_ (or (and (stringp _) _)
+	  ;; 		 (princ-to-string (shell-word-word _))))
+	  ;; 	     (shell-expr-words expr)))
+	   (expr-to-args expr))
 	 (program (car command-line))
 	 (args    (cdr command-line))
 	 (path    #| (get-command-path program) |#)

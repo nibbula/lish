@@ -192,7 +192,9 @@ Otherwise, return words which will evaluate a lisp expression."
 			(shell-expr (shell-expr-words expansion))
 			(t (list expansion))))
 		;;(push (make-shell-word :word obj :eval t) results)))
-		(push obj results)))
+		;; (push obj results)
+		(push word results)
+		))
 	(end-of-file ())
 	(reader-error ()))
       results))
@@ -460,7 +462,9 @@ x{1..5}y -> x1y x2y x3y x4y x5y
   "Expand filenames with glob in STRING. Return a list of filenames or just
 STRING if it's not a pattern or there's no matching files."
   (or (and (glob:pattern-p string nil t)
-	   (glob:glob string :tilde t))
+	   (make-file-expansion :files (glob:glob string :tilde t))
+	   ;; (glob:glob string :tilde t)
+	   )
       string))
 
 #|
@@ -595,7 +599,9 @@ Remove backslash quotes."
 	((push-word (w)
 	   (typecase w
 	     (string (push (make-shell-word :word w) new-words))
-	     (t (push w new-words))))
+	     (t (push w new-words))
+	     ;; (t (push (make-shell-word :word w) new-words))
+	     ))
 	 (apply-func (func word until-stable unit)
 	   (let ((result word) (i 0))
 	     (if until-stable
@@ -608,7 +614,7 @@ Remove backslash quotes."
 		    (when (and *recursive-expansion-limit*
 			       (>= i *recursive-expansion-limit*))
 		      (cerror "Keep expanding"
-			      "Shell expansion bailed out after ~s iterations.
+                              "Shell expansion bailed out after ~s iterations.
 Set lish::*recursive-expansion-limit* higher (or to nil) and continue if you
 really want to keep expanding." i)))
 		 (setf result (funcall func word)))

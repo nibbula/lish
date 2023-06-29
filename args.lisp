@@ -101,7 +101,11 @@
     :initarg :override :accessor arg-override :initform nil
     :documentation
     "A boolen to process before other arguments, or a function that given the
- argument returns a boolean indicating whether to overrride."))
+ argument returns a boolean indicating whether to overrride.")
+   (flattenable-p
+    :initarg :flattenable-p :accessor arg-flattenable-p
+    :type boolean :initform nil
+    :documentation "True if we can flatten multiple arguments of this type."))
   (:documentation "Generic command parameter."))
 
 (defmethod initialize-instance :after
@@ -357,11 +361,16 @@
 
 (defclass arg-pathname (arg-string) ()
   (:default-initargs
-   :completion-function #'shell-complete-filename)
+   :completion-function #'shell-complete-filename
+   :flattenable-p t)
   (:documentation "A file system path."))
 (defmethod convert-arg ((arg arg-pathname) (value string) &optional quoted)
   (declare (ignore arg quoted))
   value)
+(defmethod convert-arg ((arg arg-pathname)
+			(value file-expansion) &optional quoted)
+  (declare (ignore arg quoted))
+  (file-expansion-files value))
 
 ;; (defmethod argument-choices ((arg arg-pathname))
 ;;   "Return the possible path names."
@@ -383,7 +392,7 @@
 
 (defclass arg-stream (argument)
   () (:documentation "An stream of some sort."))
-(defmethod convert-arg ((arg arg-pathname) (value symbol) &optional quoted)
+(defmethod convert-arg ((arg arg-stream) (value symbol) &optional quoted)
   (declare (ignore arg quoted))
   (symbol-value value))
 
@@ -394,7 +403,7 @@
 (defclass arg-io-stream (arg-stream)
   () (:documentation "An input/output stream."))
 
-(defclass arg-stream-or-filename (arg-stream)
+(defclass arg-stream-or-filename (arg-stream arg-pathname)
   () (:documentation "An stream or a filename."))
 (defclass arg-input-stream-or-filename (arg-stream-or-filename)
   () (:documentation "An input stream or a filename."))

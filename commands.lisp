@@ -742,13 +742,34 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 ;; @@@ Make argument type classes work, with specific type
 ;; validation and completion methods.
 
+(defun maybe-flatten (arg value)
+  (if (and (arg-flattenable-p arg)
+	   (consp value))
+      (progn
+	(dbugf :lish-arg "flattened ~s~%" value)
+	(flatten value)) ;; oflatten?
+      value))
+
+(defun convert-and-flatten-arg (arg value)
+  (maybe-flatten arg (convert-arg arg
+				  (word-word value)
+				  (word-quoted value))))
+
+(defun push-arg (arg value list &key (convert t))
+  "Push the word ‘value’ of ‘arg’ on ‘list’, converting it and flattening it,
+as appropriate. Return the new list."
+  (push (maybe-flatten arg
+		       (if convert
+			   (convert-arg arg
+					(word-word value)
+					(word-quoted value))
+			   value))
+	list))
+
 (defmacro move-arg (old new i arg)
   "Move the I'th item from the OLD to the NEW list, and return both."
   `(progn
-     (setf ,new (push (convert-arg ,arg
-				   (word-word (nth ,i ,old))
-				   (word-quoted (nth ,i ,old)))
-		      ,new)
+     (setf ,new (push-arg ,arg (nth ,i ,old) ,new)
 	   ,old (delete-nth ,i ,old))))
 
 (defun arg-key (arg)
@@ -759,10 +780,7 @@ NIL on failure. The Lisp path is most likely the ASDF path."
   `(progn
      (when ,keyworded
        (setf ,new (push (arg-key ,arg) ,new)))
-     (setf ,new (push (convert-arg ,arg
-				   (word-word (nth ,i ,old))
-				   (word-quoted (nth ,i ,old)))
-		      ,new))
+     (setf ,new (push-arg ,arg (nth ,i ,old) ,new))
      (setf ,old (delete-nth ,i ,old))))
 
 (defmacro push-key (new arg value keyworded)
@@ -772,28 +790,14 @@ NIL on failure. The Lisp path is most likely the ASDF path."
        (when ,keyworded
 	 (setf ,new (push (arg-key ,arg) ,new)))
        (let ((,val ,value))
-	 (setf ,new (push (convert-arg ,arg
-				       (word-word ,val)
-				       (word-quoted ,val))
-			  ,new))))))
+	 (setf ,new (push-arg ,arg ,val ,new))))))
 
 (defmacro move-flag (old new i arg)
   `(progn
      (setf ,new (push (arg-key ,arg) ,new))
-;;;     (format t "(nth (1+ ~s) ~s) = ~s~%" ,i ,old (nth ,i ,old))
-;;;     (format t "(convert-arg ~s ~s) = ~s~%" ,arg (nth ,i ,old)
-;;;	     (convert-arg ,arg (nth ,i ,old)))
-;;;     (setf ,new (push (convert-arg ,arg (nth (1+ ,i) ,old)) ,new))
-     (dbugf :lish-arg "before i=~s old=~s~%" ,i ,old)
-     (dbugf :lish-arg "~s -> ~s~%" (nth (1+ ,i) ,old)
-	   (convert-arg ,arg (nth (1+ ,i) ,old)))
-     (setf ,new (push (convert-arg ,arg
-				   (word-word (nth (1+ ,i) ,old))
-				   (word-quoted (nth (1+ ,i) ,old)))
-		      ,new))
+     (setf ,new (push-arg ,arg (nth (1+ ,i) ,old) ,new))
      (setf ,old (delete-nth ,i ,old)) ; flag
      (setf ,old (delete-nth ,i ,old)) ; arg
-     (dbugf :lish-arg "after i=~s old=~s~%" ,i ,old)
      (setf possible-flags (delete ,arg possible-flags))))
 
 (defmacro move-boolean-2 (old new i arg)
@@ -811,40 +815,32 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 
 (defmacro move-repeating (old new start arg keyworded &optional until)
   (declare (ignore keyworded))
-  (let (#| (e (gensym "move-repeating-e")) |#
-	(did-one (gensym "move-repeating-did-one")))
+  (let ((did-one (gensym "move-repeating-did-one")))
     `(progn
        (let (,did-one)
 	 (declare (ignorable ,did-one)) ;; @@@ remove if fixed
 	 (if ,until
 	     (error "can't do until yet") ;; @@@
 	     (progn
-	       ;; (if ,keyworded
-		   (progn
-		     (setf ,new (push (arg-key ,arg) ,new))
-		     (setf ,new (push (mapcar
-				       #'(lambda (x)
-					   (convert-arg
-					    ,arg
-					    (word-word x)
-					    (word-quoted x)))
-					      (nthcdr ,start ,old)) ,new))
-		     (when (length (nthcdr ,start ,old))
-		       (setf ,did-one t)))
-		   #| (loop :for ,e :in (nthcdr ,start ,old) :do
-		      (setf ,new
-			    (push (convert-arg
-				   ,arg
-				   (word-word ,e)
-				   (word-quoted ,e)) ,new)
-			    ,did-one t))) |#
+	       (setf ,new (push (arg-key ,arg) ,new))
+	       (setf ,new (push-arg ,arg
+				    (mapcar
+				     #'(lambda (x)
+					 (convert-arg
+					  ,arg
+					  (word-word x)
+					  (word-quoted x)))
+				     (nthcdr ,start ,old))
+				    ,new :convert nil))
+	       (when (length (nthcdr ,start ,old))
+		 (setf ,did-one t))
 	       (setf ,old (subseq ,old 0 ,start))
 	       ;; Push default if we have one and didn't get any values.
 	       (when (and (not ,did-one) (arg-default ,arg))
-		 ;(when ,keyworded
 		 (setf ,new (push (arg-key ,arg) ,new))
-		 (setf ,new (push (convert-arg
-				   ,arg (eval (arg-default ,arg))) ,new)))))))))
+		 (setf ,new
+		       (push-arg ,arg (eval (arg-default ,arg)) ,new
+				 :convert nil)))))))))
 
 ;; I used to handle default values to arguments here, but they were not getting
 ;; evaluated properly, so it's probably best to let the command function handle
@@ -1157,12 +1153,11 @@ become keyword arguments, in a way specified in the command's arglist."
 					 remaining-mandatory-count))
 			    (repeating-list
 			     (loop
-				:for j :from i :below (+ i snip-len)
-				:collect
-				(convert-arg
-				 arg
-				 (word-word (nth j old-list))
-				 (word-quoted (nth j old-list))))))
+			       :for j :from i :below (+ i snip-len)
+			       :for x :in (nthcdr i old-list)
+			       :nconc
+			       (let ((xx (convert-and-flatten-arg arg x)))
+				 (if (listp xx) xx (list xx))))))
 		       (when (zerop snip-len)
 			 ;; Really it's not this one missing, it's the next one.
 			 (error "Missing mandatory argument: ~a."
