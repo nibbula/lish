@@ -402,8 +402,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 	      (decf bracket-depth))
 	    (add-to-word))
 	   ;; a lisp expr
-	   ;; ((eql c #\!)
-	   ((or (and (eql c #\!) (zerop bracket-depth))
+	   ((or #|(and (eql c #\!) (zerop bracket-depth)) |#
 		(and (eql c #\,) (zerop brace-depth)))
 	    (dbugf 'reader "sub-expr ")
 	    (setf sub-expr nil)
