@@ -462,9 +462,11 @@ x{1..5}y -> x1y x2y x3y x4y x5y
   "Expand filenames with glob in STRING. Return a list of filenames or just
 STRING if it's not a pattern or there's no matching files."
   (or (and (glob:pattern-p string nil t)
-	   (make-file-expansion :files (glob:glob string :tilde t))
-	   ;; (glob:glob string :tilde t)
-	   )
+	   (let ((expansion (glob:glob string :tilde t)))
+	     ;; If expansion fails we have to just return the pattern string.
+	     (if expansion
+		 (make-file-expansion :files expansion)
+		 string)))
       string))
 
 #|
