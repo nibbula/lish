@@ -147,13 +147,13 @@
 (defcommand clop
   ((from string :repeating t #| :optional nil |#)
    (to string :optional nil))
-  "Test argumnet conversion."
+  "Test argument conversion."
   (format t "from = ~s to = ~a~%" from to))
 
 (defcommand snerp
   ((from string :repeating t :optional nil)
    (to string :optional nil))
-  "Test argumnet conversion."
+  "Test argument conversion."
   (format t "from = ~s to = ~a~%" from to))
 
 (deftests (posix-to-lisp-args-1 :doc "Test POSIX-TO-LISP-ARGS.")
