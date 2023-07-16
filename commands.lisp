@@ -743,11 +743,10 @@ NIL on failure. The Lisp path is most likely the ASDF path."
 ;; validation and completion methods.
 
 (defun maybe-flatten (arg value)
+  "If ‘arg’ is flattenable, return ‘value’ flattened."
   (if (and (arg-flattenable-p arg)
 	   (consp value))
-      (progn
-	(dbugf :lish-arg "flattened ~s~%" value)
-	(flatten value)) ;; oflatten?
+      (flatten value)
       value))
 
 (defun convert-and-flatten-arg (arg value)
