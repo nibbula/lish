@@ -595,6 +595,7 @@ NIL on failure. The Lisp path is most likely the ASDF path."
     (set-command command-name command)))
 
 (defmethod invoke-command ((command sourced-command) args)
+  (declare (ignore args)) ;; @@@
   (load-file (command-load-from command)))
 
 ;; (defun load-external-command (command)
