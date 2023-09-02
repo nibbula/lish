@@ -332,6 +332,9 @@
 ;; (defmethod convert-arg ((arg arg-function) (value string) &optional quoted)
 ;;   (declare (ignore arg quoted))
 ;;   (symbolify value))
+(defmethod convert-arg ((arg arg-function) (value function) &optional quoted)
+  (declare (ignore arg quoted))
+  value)
 
 (defclass arg-package (arg-keyword)
   ()
