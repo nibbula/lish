@@ -1311,27 +1311,57 @@ drastic thing to do to a running Lisp system."
     (error "Mutually exclusive arguments provided."))
   (cond
     (print-bindings
-     (keymap:describe-keymap rl:*normal-keymap*))
+     (loop :for keymap :in (inator:inator-keymap (lish:lish-editor *shell*))
+	   :do (format t "~s:~%" (keymap:keymap-name keymap))
+	       (keymap:describe-keymap keymap)))
     (print-readable-bindings
-     (keymap:map-keymap
-      #'(lambda (key val)
-	  (format t "(keymap:define-key rl:*normal-keymap* ~w '~a)~%"
-		  key (key-definition-action val)))
-      rl:*normal-keymap*))
-    ;; @@@ todo: query remove-function-bindings remove-key-binding
+     (loop :for keymap :in (inator:inator-keymap (lish:lish-editor *shell*))
+	   :do (format t ";; ~s:~%" (keymap:keymap-name keymap))
+	       (keymap:map-keymap
+		#'(lambda (key val)
+		    (format t "(keymap:define-key ~(~s~) ~w '~a)~%"
+			    (keymap-name keymap)
+			    key (key-definition-action val)))
+		keymap)))
+    ;; @@@ todo: remove-function-bindings remove-key-binding
     ((and key-sequence (not function-name))
-     (format t "~w: ~(~a~)~%" key-sequence
-	     (keymap:key-sequence-binding
-	      key-sequence rl:*normal-keymap*)))
+     (format t "~a: ~(~a~)~%"
+	     (typecase key-sequence
+	       (character
+		(nice-char key-sequence))
+	       (sequence
+		(with-output-to-string (str)
+		  (when (plusp (length key-sequence))
+		    (princ (nice-char (oelt key-sequence 0)) str))
+		  (omapn (_ (write-char #\space str)
+			    (princ (nice-char _) str))
+			 (osubseq key-sequence 1)))))
+	     (keymap:key-sequence-binding key-sequence
+	      (inator:inator-keymap (lish:lish-editor *shell*)))))
     (query
-     (keymap:map-keymap
-      #'(lambda (key val)
-	  (let ((a (key-definition-action val)))
-	    (when (equalp (string query) (string a))
-	      (format t "~a: ~(~a~)~%" (char-util:nice-char key) a))))
-	  rl:*normal-keymap*))
+     (flet ((print-it (key action)
+	      (format t "~a: ~(~a~)~%" (char-util:nice-char key) action)))
+       (loop :for keymap :in (inator:inator-keymap (lish-editor *shell*))
+         :do
+	 (keymap:map-keymap
+	  #'(lambda (key val)
+	      (let ((a (key-definition-action val)))
+		(typecase a
+		  (function
+		   (when (and (functionp query) (eq query a))
+		     (print-it key a)))
+		  (symbol
+		   (typecase query
+		     (function
+		      (when (eq query (ignore-errors (fdefinition a)))
+			(print-it key a)))
+		     ((or symbol string)
+		      (when (equalp (string query) (string a))
+			(print-it key a))))))))
+	  keymap))))
     ((and key-sequence function-name)
-     (keymap:set-key key-sequence function-name rl:*normal-keymap*))))
+     (keymap:set-key key-sequence function-name
+		     (rl::local-keymap (lish-editor *shell*))))))
 
 #|
 This is really just for simple things. You should probably use the
