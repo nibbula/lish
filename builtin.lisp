@@ -1282,6 +1282,14 @@ drastic thing to do to a running Lisp system."
   "A key sequence."
   ())
 
+(defmethod convert-arg ((arg arg-key-sequence) (value vector) &optional quoted)
+  (declare (ignore arg quoted))
+  value)
+
+(defmethod convert-arg ((arg arg-key-sequence) (value list) &optional quoted)
+  (declare (ignore arg quoted))
+  value)
+
 ;; @@@@ need to update for new inator keymaps
 (defbuiltin bind
   ((print-bindings boolean :short-arg #\p
