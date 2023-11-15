@@ -151,6 +151,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:get-command
    #:command-to-lisp-args
    #:posix-to-lisp-args
+   #:expr-from-args
    #:enable-sharp-dollar-reader
    #:disable-sharp-dollar-reader
    #:file-enable-sharp-dollar-reader
