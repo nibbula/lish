@@ -1362,7 +1362,9 @@ suspend itself."
        (format t "~%"))			; <<<<
       ((eq expr *error-symbol*)
        ;; do nothing
-       (break))
+       ;; (break)
+       (cerror "Go on." "lish-eval got an ~s~%" *error-symbol*)
+       )
       (t
        (setf pre-str nil
 	     *input* nil
