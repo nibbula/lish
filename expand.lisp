@@ -201,7 +201,7 @@ Otherwise, return words which will evaluate a lisp expression."
    word))
 
 (defun expr-from-args (args)
-  "Return a shell expression made up of ARGS as the words."
+  "Return a shell expression made up of ‘args’ as the words."
   (let* (words
 	 (line (with-output-to-string (str)
 		(loop :with pos = 0 :and as-string
