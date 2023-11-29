@@ -15,7 +15,6 @@
 (in-package :build-lish)
 
 ;; Do things that are too horrible to mention here.
-(defvar *build-verbose* t)
 (load "build/horrible.lisp" :verbose nil)
 
 (msg "[Start builder on ~a ~a]" (lisp-implementation-type)
@@ -26,8 +25,12 @@
 	  40 #\- #\- message args 40 #\- #\-)
   (exit-lisp :code 1))
 
+(defvar *build-verbose* (sf-getenv "LISH_BUILD_VERBOSE")
+  "True to build with more compilation messages. Can be set with the
+environment variable LISH_BUILD_VERBOSE.")
+
 (msg "[Load ASDF]")
-(load "build/load-asdf.lisp" :verbose nil)
+(load "build/load-asdf.lisp" :verbose *build-verbose*)
 
 (defvar *home* (or (and (sf-getenv "LISP_HOME")
 			(namestring (probe-file (sf-getenv "LISP_HOME"))))
@@ -146,13 +149,14 @@ strings."
   (with-input-from-string
       (stream
        (format nil
-	       "(load \"build/build-init.lisp\" :verbose nil) ~
-		(ql:quickload :dlib :verbose nil) ~
-		(ql:quickload :tiny-repl :verbose nil) ~
-		(ql:quickload :deblarg :verbose nil) ~
-		(ql:quickload :lish :verbose nil) ~
-	        (load \"build/build-deinit.lisp\" :verbose nil) ~
-		(lish:make-standalone :smaller t)"))
+	       "(load \"build/build-init.lisp\" :verbose ~a~:*) ~
+		(ql:quickload :dlib :verbose ~a~:*) ~
+		(ql:quickload :tiny-repl :verbose ~a~:*) ~
+		(ql:quickload :deblarg :verbose ~a~:*) ~
+		(ql:quickload :lish :verbose ~a~:*) ~
+	        (load \"build/build-deinit.lisp\" :verbose ~a~:*) ~
+		(lish:make-standalone :smaller t)"
+	       *build-verbose*))
     (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
@@ -161,14 +165,15 @@ strings."
   (with-input-from-string
       (stream
        (format nil
-	       "(load \"build/build-init.lisp\" :verbose nil) ~
-		(ql:quickload :dlib :verbose nil) ~
-		(ql:quickload :tiny-repl :verbose nil) ~
-		(ql:quickload :deblarg :verbose nil) ~
-		(ql:quickload :lish :verbose nil) ~
-		(load \"build/fully-loaded.lisp\" :verbose nil) ~
-	        (load \"build/build-deinit.lisp\" :verbose nil) ~
-		(lish:make-standalone :smaller t)"))
+	       "(load \"build/build-init.lisp\" :verbose ~a~:*) ~
+		(ql:quickload :dlib :verbose ~a~:*) ~
+		(ql:quickload :tiny-repl :verbose ~a~:*) ~
+		(ql:quickload :deblarg :verbose ~a~:*) ~
+		(ql:quickload :lish :verbose ~a~:*) ~
+		(load \"build/fully-loaded.lisp\" :verbose ~a~:*) ~
+	        (load \"build/build-deinit.lisp\" :verbose ~a~:*) ~
+		(lish:make-standalone :smaller t)"
+	       *build-verbose*))
     (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
@@ -177,14 +182,15 @@ strings."
   (with-input-from-string
       (stream
        (format nil
-	       "(load \"build/build-init.lisp\" :verbose nil) ~
-		(ql:quickload :dlib :verbose nil) ~
-		(ql:quickload :tiny-repl :verbose nil) ~
-		(ql:quickload :deblarg :verbose nil) ~
-		(ql:quickload :lish :verbose nil) ~
-		(load \"build/lol.lisp\" :verbose nil) ~
-	        (load \"build/build-deinit.lisp\" :verbose nil) ~
-		(lish:make-standalone :smaller t)"))
+	       "(load \"build/build-init.lisp\" :verbose ~a~:*) ~
+		(ql:quickload :dlib :verbose ~a~:*) ~
+		(ql:quickload :tiny-repl :verbose ~a~:*) ~
+		(ql:quickload :deblarg :verbose ~a~:*) ~
+		(ql:quickload :lish :verbose ~a~:*) ~
+		(load \"build/lol.lisp\" :verbose ~a~:*) ~
+	        (load \"build/build-deinit.lisp\" :verbose ~a~:*) ~
+		(lish:make-standalone :smaller t)"
+	       *build-verbose*))
     (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags* "--" "-norl"))))
 
@@ -218,14 +224,15 @@ strings."
 		(push (truename \"../rl/\") asdf:*central-registry*) ~
 		(push (truename \"../tools/\") asdf:*central-registry*) ~
 		(push (truename \"./\") asdf:*central-registry*) ~
-		(ql:quickload :dlib :verbose nil) ~
-		(ql:quickload :lish :verbose nil) ~
-	        (load \"build/build-deinit.lisp\" :verbose nil) ~
+		(ql:quickload :dlib :verbose ~a~:*) ~
+		(ql:quickload :lish :verbose ~a~:*) ~
+	        (load \"build/build-deinit.lisp\" :verbose ~a~:*) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
-		(lish:make-standalone :smaller t)"))
+		(lish:make-standalone :smaller t)"
+	       *build-verbose*))
     (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags*
 					  ,@*lisp-plain-flags* "--" "-norl"))))
@@ -246,15 +253,16 @@ strings."
 		(push (truename \"../rl/\") asdf:*central-registry*) ~
 		(push (truename \"../tools/\") asdf:*central-registry*) ~
 		(push (truename \"./\") asdf:*central-registry*) ~
-		(ql:quickload :dlib :verbose nil) ~
-		(ql:quickload :lish :verbose nil) ~
-	        (load \"build/build-deinit.lisp\" :verbose nil) ~
+		(ql:quickload :dlib :verbose ~a~:*) ~
+		(ql:quickload :lish :verbose ~a~:*) ~
+	        (load \"build/build-deinit.lisp\" :verbose ~a~:*) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
 		(setf asdf:*central-registry* ~
 		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
-		(load \"build/fully-loaded.lisp\" :verbose nil) ~
-		(lish:make-standalone :smaller t)"))
+		(load \"build/fully-loaded.lisp\" :verbose ~a~:*) ~
+		(lish:make-standalone :smaller t)"
+	       *build-verbose*))
     (maybe-increment-build-version *version-file*)
     (run-with-input-from stream `(,*lisp* ,@*lisp-flags*
 					  ,@*lisp-plain-flags* "--" "-norl"))))

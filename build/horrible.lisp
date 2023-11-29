@@ -2,8 +2,10 @@
 ;;; horrible.lisp - Things are in here so you don't have look at them.
 ;;;
 
+(defvar *build-messages* t)
+
 (defun msg (fmt &rest args)
-  (when *build-verbose*
+  (when *build-messages*
     (format t "~&~?~%" fmt args)
     (finish-output)))
 

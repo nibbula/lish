@@ -2,7 +2,7 @@
 ;;; fully-loaded.lisp - Load shell commands before dumping Lish.
 ;;;
 
-(let ((*load-verbose* nil))
+(let ((*load-verbose* build-init:*build-verbose*))
   (push (truename "../los") asdf:*central-registry*)
   (push (truename "../image/") asdf:*central-registry*)
   (loop :for s :in '("pager" "puca" "char-picker" "pick-list" "tree-viewer"
@@ -11,7 +11,7 @@
 		     "view-org" "view-lisp" "dired"
 		     )
        ;; :do (asdf:load-system s :verbose nil))
-     :do (ql:quickload s :verbose nil))
+     :do (ql:quickload s :verbose build-init:*build-verbose*))
 
   (let ((systems
 	 (mapcar (dlib:_
@@ -26,7 +26,7 @@
     (setf systems (delete :unzip systems))
     (loop :for s :in systems
        ;; :do (asdf:load-system s :verbose nil)))
-       :do (ql:quickload s :verbose nil)))
+       :do (ql:quickload s :verbose build-init:*build-verbose*)))
 
   ;; view-image is useless if it can't view any image types.
   (dlib:symbol-call :image :load-known-formats)

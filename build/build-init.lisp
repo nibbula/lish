@@ -4,10 +4,10 @@
 
 (defpackage :build-init
   (:documentation "Initialization for built Lish.")
-  (:use :cl))
+  (:use :cl)
+  (:export #:*build-verbose*))
 (in-package :build-init)
 
-(defvar *build-verbose* t)
 ;; Do things that are too horrible to mention here.
 (load "build/horrible.lisp" :verbose nil)
 
@@ -18,7 +18,11 @@
 	  40 #\- #\- message args 40 #\- #\-)
   (exit-lisp :code 1))
 
-(load "build/load-asdf.lisp" :verbose nil)
+(defvar *build-verbose* (sf-getenv "LISH_BUILD_VERBOSE")
+  "True to build with more compilation messages. Can be set with the
+environment variable LISH_BUILD_VERBOSE.")
+
+(load "build/load-asdf.lisp" :verbose *build-verbose*)
 
 (defvar *home* (or (and (sf-getenv "LISP_HOME")
 			(namestring (probe-file (sf-getenv "LISP_HOME"))))
