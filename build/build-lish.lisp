@@ -214,23 +214,9 @@ strings."
       (stream
        (format nil
 	       "(load \"build/build-init.lisp\") ~
-		(push (truename \"../lib/\") asdf:*central-registry*) ~
-		(push (truename \"../opsys/\") asdf:*central-registry*) ~
-		(push (truename \"../io/\") asdf:*central-registry*) ~
-		(push (truename \"../iof/\") asdf:*central-registry*) ~
-		(push (truename \"../syntax/\") asdf:*central-registry*) ~
-		(push (truename \"../unicode/\") asdf:*central-registry*) ~
-		(push (truename \"../terminal/\") asdf:*central-registry*) ~
-		(push (truename \"../rl/\") asdf:*central-registry*) ~
-		(push (truename \"../tools/\") asdf:*central-registry*) ~
-		(push (truename \"./\") asdf:*central-registry*) ~
 		(ql:quickload :dlib :verbose ~a~:*) ~
 		(ql:quickload :lish :verbose ~a~:*) ~
 	        (load \"build/build-deinit.lisp\" :verbose ~a~:*) ~
-		(setf asdf:*central-registry* ~
-		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
-		(setf asdf:*central-registry* ~
-		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
 		(lish:make-standalone :smaller t)"
 	       *build-verbose*))
     (maybe-increment-build-version *version-file*)
@@ -243,24 +229,12 @@ strings."
       (stream
        (format nil
 	       "(load \"build/build-init.lisp\") ~
-		(push (truename \"../lib/\") asdf:*central-registry*) ~
-		(push (truename \"../opsys/\") asdf:*central-registry*) ~
-		(push (truename \"../io/\") asdf:*central-registry*) ~
-		(push (truename \"../iof/\") asdf:*central-registry*) ~
-		(push (truename \"../syntax/\") asdf:*central-registry*) ~
-		(push (truename \"../unicode/\") asdf:*central-registry*) ~
-		(push (truename \"../terminal/\") asdf:*central-registry*) ~
-		(push (truename \"../rl/\") asdf:*central-registry*) ~
-		(push (truename \"../tools/\") asdf:*central-registry*) ~
-		(push (truename \"./\") asdf:*central-registry*) ~
 		(ql:quickload :dlib :verbose ~a~:*) ~
+		(ql:quickload :tiny-repl :verbose ~a~:*) ~
+		(ql:quickload :deblarg :verbose ~a~:*) ~
 		(ql:quickload :lish :verbose ~a~:*) ~
-	        (load \"build/build-deinit.lisp\" :verbose ~a~:*) ~
-		(setf asdf:*central-registry* ~
-		 (delete \"./\" asdf:*central-registry* :test #'equal)) ~
-		(setf asdf:*central-registry* ~
-		 (delete \"../\" asdf:*central-registry* :test #'equal)) ~
 		(load \"build/fully-loaded.lisp\" :verbose ~a~:*) ~
+	        (load \"build/build-deinit.lisp\" :verbose ~a~:*) ~
 		(lish:make-standalone :smaller t)"
 	       *build-verbose*))
     (maybe-increment-build-version *version-file*)
