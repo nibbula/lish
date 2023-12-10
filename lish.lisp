@@ -1966,10 +1966,14 @@ invoked as with a (s+ *shell-name* “-”) stripped off."
 	 (apply #'!lish
 		`(,@(posix-to-lisp-args (get-command "lish")
 					(wordify-list (cdr args)))
-		  :greeting t :terminal-type :crunch)))
+		  :greeting t
+		  ;; :terminal-type :crunch
+		  )))
 	(t ;; No args
 	 ;; Interactive
-	 (!lish :greeting t :terminal-type :crunch))))
+	 (!lish :greeting t
+		;; :terminal-type :crunch
+		))))
     (nos:exit-lisp)))
 
 ;;; @@@ refactor with shell-toplevel
