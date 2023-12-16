@@ -442,9 +442,12 @@ value, an explaination which consists of (tag-symbol datum...)."
 	    ;; @@@ need to get the file name as a word
 	    (let ((e (list
 		      (if (eql c #\>)
-			  (if (eql (next-char) #\>)
-			      (progn (incf i) :append-to)
-			      :redirect-to)
+			  (cond
+			    ((eql (next-char) #\>)
+			     (progn (incf i) :append-to))
+                            ((eql (next-char) #\&)
+			     (progn (incf i) :redirect-both-to))
+			    (t :redirect-to))
 			  :redirect-from)
 		      (make-the-expr))))
 	      (setf word-start i)

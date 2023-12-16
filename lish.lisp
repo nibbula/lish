@@ -73,6 +73,7 @@
        :flipped-io  flipped-io
        :pipe-plus   pipe-plus
        :pipe-dot    pipe-dot
+       :pipe-both   pipe-both
        :background  background)
       (let ((c (copy-structure context)))
 	(when in-pipe-p     (setf (context-in-pipe     c) in-pipe))
@@ -81,6 +82,7 @@
 	(when flipped-io-p  (setf (context-flipped-io  c) flipped-io))
 	(when pipe-plus-p   (setf (context-pipe-plus   c) pipe-plus))
 	(when pipe-dot-p    (setf (context-pipe-dot    c) pipe-dot))
+	(when pipe-both-p   (setf (context-pipe-both   c) pipe-both))
 	(when background-p  (setf (context-background  c) background))
 	c)))
 
@@ -259,17 +261,58 @@
      (setf (job-status job) :suspended)
      nil)))
 
+(defun wait-for-jobs (sh)
+  "Wait for any jobs we started in a pipeline."
+  #+unix
+  (loop
+   :with pid :and result :and status :and job
+   ;; :while (shell-wait-for sh)
+   ;; :do
+   ;;    (format t "WAIT: -------~%")
+   ;;   ;; (multiple-value-setq (pid result status) (uos:wait))
+   ;;   (multiple-value-setq (pid result status) (uos:check-jobs t))
+   ;;   (format t "WAIT: ~s ~s ~s~%" pid result status)
+   ;;   (cond
+   ;;    ((not pid)
+   ;;     (return nil))
+   ;;    ((setf job (find pid (shell-wait-for sh)
+   ;; 			   :key #'job-pid))
+   ;;     (handle-job-change job result status :foreground t)
+   ;;     (setf (shell-wait-for sh)
+   ;; 	     (delete job (shell-wait-for sh))))
+   ;;    (t
+   ;;     (format t "WAIT: some other job?~%"))))
+   :while (shell-wait-for sh)
+   :do
+     ;; (format t "WAIT: -------~%")
+     ;; (multiple-value-setq (pid result status) (uos:wait))
+     (multiple-value-setq (pid result status) (uos:check-jobs))
+     ;; (format t "WAIT: ~s ~s ~s~%" pid result status)
+     (cond
+      ((not pid)
+       (return nil))
+      ((setf job (find pid (shell-wait-for sh)
+   			   :key #'job-pid))
+       (handle-job-change job result status :foreground t)
+       (setf (shell-wait-for sh)
+   	     (delete job (shell-wait-for sh))))
+      (t
+       ;; (format t "WAIT: some other job?~%")
+       )))
+  #-unix
+  (declare (ignore sh)))
 
 (defparameter *compound-expr-strings*
-  '(:and           "&&"
-    :or            "||"
-    :sequence      "^"
-    :redirect-to   ">"
-    :append-to     ">>"
-    :redirect-from "<"
-    :pipe          "|"
-    :pipe-plus     "|+"
-    :pipe-dot      "|.")
+  '(:and               "&&"
+    :or                "||"
+    :sequence          "^"
+    :redirect-to       ">"
+    :redirect-both-to  ">&"
+    :append-to         ">>"
+    :redirect-from     "<"
+    :pipe              "|"
+    :pipe-plus         "|+"
+    :pipe-dot          "|.")
   "For reconstructing expression strings.")
 
 (defun compound-tag-string (keyword)

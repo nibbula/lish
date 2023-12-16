@@ -202,6 +202,8 @@ variables."
   pipe-plus
   ;; True if we should not pass the *output*.
   pipe-dot
+  ;; True if we should pipe both output and error
+  pipe-both
   )
 
 (defvar *context* nil
