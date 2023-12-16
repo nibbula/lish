@@ -32,11 +32,12 @@
      (:file "jobs"      :depends-on ("package" "vars"))
      (:file "commands"  :depends-on ("package" "vars" "types" "args"))
      (:file "shell"     :depends-on ("package" "vars" "types" "args" "commands"))
-     (:file "complete"  :depends-on ("package" "vars" "args" "commands"))
      (:file "prompt"    :depends-on ("package" "vars" "args" "commands"
 				     "shell"))
      (:file "expand"   	:depends-on ("package" "vars" "types" "args" "jobs"
-				     "commands" "shell" "prompt" "complete"))
+				     "commands" "shell" "prompt"))
+     (:file "complete"  :depends-on ("package" "vars" "args" "commands"
+				     "expand"))
      (:file "lish"   	:depends-on ("package" "vars" "types" "args" "jobs"
 				     "commands" "shell" "prompt" "complete"
 				     "expand"))
