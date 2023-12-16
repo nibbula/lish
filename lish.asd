@@ -18,7 +18,7 @@
      :table :table-print :reader-ext :dlib-interactive :completion
      :keymap :terminal :terminal-ansi :rl
      :fatchar :fatchar-io :magic :theme :theme-default :style :collections
-     :ostring :ochar :grout :utf8b-stream :dtime :locale
+     :ostring :ochar :grout :utf8b-stream :dtime :locale :string-expand
      ;; Things in not in yew
       #+use-re :re
       #-use-re :cl-ppcre

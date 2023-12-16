@@ -85,33 +85,6 @@ if any."
 	    (setf c (read-char stream)))
        (read-char stream))))) ;; read the final #
 
-#|
-(defvar *saved-readtable* nil
-  "Save a copy of the starting readtable so we can go back to it.")
-
-(defun enable-sharp-dollar-reader ()
-  "Turn on the #$ reader macro. Saves the readtable so it can be restored with
-disable-sharpsign-dollar-reader."
-  (when (not *saved-readtable*)
-    (setf *saved-readtable* *readtable*
-	  *readtable* (copy-readtable))
-    (set-dispatch-macro-character #\# #\$ #'sharp-dollar-reader)))
-
-(defun disable-sharp-dollar-reader ()
-  "Turn off the #$ reader macro, and restore original readtable."
-  (when *saved-readtable*
-    (setf *readtable* *saved-readtable*
-	  *saved-readtable* nil)))
-
-(defmacro file-enable-sharp-dollar-reader ()
-  "Turns on the #$ reader syntax for the rest of the file."
-  '(eval-when (:compile-toplevel :load-toplevel :execute)
-    ;; It works to just set it because when a file is finished loading the
-    ;; *readtable* is restored.
-    (setf *readtable* (copy-readtable))
-    (set-dispatch-macro-character #\# #\$ #'sharpsign-dollar-reader)))
-|#
-
 ;; I'm not sure if I would ever use this.
 
 (define-reader-macro #\h sharp-h (stream subchar arg)
@@ -128,7 +101,6 @@ The token should probably be a string."
 	    (write-line line s)
 	    (setf line (read-line stream t nil t)))))))
 
-;; I gave in and added ^L.
 (defparameter *shell-whitespace* #(#\space #\tab #\newline #\return #\page)
   "Word separators for lish.")
 
@@ -141,7 +113,7 @@ The token should probably be a string."
   "Characters which the reader interprets specially if not quoted.")
 
 (defun shell-read (line &key partial (package *lish-user-package*))
-  "Read objects in shell syntax and return them. It returns a SHELL-EXPR or
+  "Read objects in shell syntax and return them. It returns a ‘shell-expr’ or
 a normal lisp object.
 The syntax is vaguely like:
   ; comment
@@ -153,8 +125,8 @@ The syntax is vaguely like:
   command > file-name
   ([lisp expressions...])
 
-If PARTIAL is true, don't signal an error if we can't read a full expression.
-Instead we return *CONTINUE-SYMBOL* as the first value, and as the second
+If ‘partial’ is true, don't signal an error if we can't read a full expression.
+Instead we return ‘*continue-symbol*’ as the first value, and as the second
 value, an explaination which consists of (tag-symbol datum...)."
 ;  (setf line (expand-global-aliases line))
   (let (words word-start
@@ -166,6 +138,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	(w (make-stretchy-string 12))	; temp word
 	(in-word nil)			; t if in word
 	(in-first-word t)		; t if in the first word on the line
+	(join-left t)			; t if we should maybe join left
+	(join-right t)			; t if we should maybe join right
 	(string-quote nil)
 	(lisp-quote nil)
 	(in-compound nil)
@@ -190,7 +164,6 @@ value, an explaination which consists of (tag-symbol datum...)."
 	       ;; As a special hack for reading lisp characters for
 	       ;; parenless lisp evaluation, convert words starting with
 	       ;; #\ to the actual character.
-	       (dbugf 'reader "try-char ~s~%" w)
 	       (let ((char (ignore-errors
 			    (read-from-string
 			     (copy-seq w) nil *continue-symbol*))))
@@ -207,7 +180,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 		    (add-finished-word)))))
 	     (finish-word ()
 	       "Finish the current word."
-	       (dbugf 'reader "finish-word ~s ~s~%" w in-word)
+	       ;; (dbugf 'reader "finish-word ~s ~s~%" w in-word)
 	       (when in-word
 		 (if (and (not sub-expr) (>= (length w) 2)
 			  (char= (aref w 0) #\#) (char= (aref w 1) #\\))
@@ -221,8 +194,16 @@ value, an explaination which consists of (tag-symbol datum...)."
 	     (add-to-word ()
 	       "Add the character to the current word or start a new one."
 	       (when (not in-word)
-		 (setf word-start i))
-	       (setf in-word t)
+		 (setf word-start i)
+		 (when (and join-right (car args)
+			    (shell-word-eval (car args)))
+		   (setf (shell-word-join (car args))
+			 (if (eq (shell-word-join (car args)) :left)
+			     :both
+			     :right)))
+		 (setf join-right nil))
+	       (setf in-word t
+                     join-left t)
 	       (vector-push-extend c w)
 	       (incf i))
 	     (read-lisp-expr ()
@@ -255,11 +236,18 @@ value, an explaination which consists of (tag-symbol datum...)."
 					     *continue-symbol* :start i)))
 		   (setf word-start i
 		        i pos)
+		   ;; The CL reader reads one whitespace character past the end
+		   ;; of the expression. We need to see that whitespace, so
+		   ;; back it up.
+		   (when (and (/= i len) (plusp i)
+			      (position (aref line (1- i)) *shell-whitespace*))
+		     (decf i))
 		   (push (make-shell-word :word obj
 					  :eval t
 					  :quoted lisp-quote
 					  :start word-start
-					  :end i)
+					  :end i
+					  :join (if join-left :left nil))
 			 args)
 		   )))
 	     (return-partial ()
@@ -293,24 +281,12 @@ value, an explaination which consists of (tag-symbol datum...)."
 	       (setf words (nreverse args)))
 	     (make-the-expr ()
 	       "Make an expression, with it's own copy of the lists."
-	       (dbugf 'reader "make-the-expr ~s~%" words)
 	       (setf in-compound nil)
 	       (make-shell-expr
 		:line line
 		:words (copy-seq words)))
 	     (make-compound (key &optional (inc 2))
 	       "Make a compound expression with type KEY."
-	       ;; (finish-word)
-	       ;; (reverse-things)
-	       ;; (let ((e (list key (make-the-expr))))
-	       ;; 	 (setf args (list e)))
-	       ;; (setf word-start (list i))
-	       ;; (incf i inc)
-	       ;; (setf word-end (list i)
-	       ;; 	     word-quoted (list nil)
-	       ;; 	     word-eval (list nil)
-	       ;; 	     in-compound t)))
-	       (dbugf 'reader "make-compound ~s~%" key)
 	       ;; (ignore-word)
 	       (finish-word)
 	       (reverse-things)
@@ -321,7 +297,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 		     ;; word-end	 (list 0)
 	       	     ;; word-quoted (list nil)
 	       	     ;; word-eval	 (list nil)
-		     in-compound key)))
+		     in-compound key
+		     join-left nil)))
       (loop
 	 :named tralfaz
 	 :while (< i len)
@@ -345,7 +322,6 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ;; a string
 	   ((eql c #\")
 	    (finish-word)
-	    (dbugf 'reader "read-string~%")
 	    ;; read a string as a separate word
 	    (multiple-value-bind (str ink cont)
 		(read-string (subseq line (1+ i)))
@@ -364,7 +340,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ((eql c #\()
 	    (finish-word)
 	    (read-lisp-expr)
-	    (setf lisp-quote nil))
+	    (setf lisp-quote nil
+		  join-right t))
 	   ((and (or (eql c #\') (eql c #\`)) (eql (next-char) #\())
 	    (finish-word)
 	    (setf lisp-quote t)
@@ -404,7 +381,6 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ;; a lisp expr
 	   ((or #|(and (eql c #\!) (zerop bracket-depth)) |#
 		(and (eql c #\,) (zerop brace-depth)))
-	    (dbugf 'reader "sub-expr ")
 	    (setf sub-expr nil)
 	    (finish-word)
 	    (when (not in-word)
@@ -425,7 +401,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 					  :start (+ i 1))))
 		(setf i pos)
 		(setf in-word t) ; so it gets output
-		(dbugf 'reader " ~s~%" obj)
+		;; (dbugf 'reader " ~s~%" obj)
 		(if (and obj (integerp obj)
 			 *shell* (get-option *shell* 'history-expansion))
 		    (map-into w #'identity (subseq line word-start i))
@@ -440,6 +416,8 @@ value, an explaination which consists of (tag-symbol datum...)."
 	   ;; whitespace
 	   ((position c *shell-whitespace*)
 	    (finish-word)
+	    (setf join-left nil
+		  join-right nil)
 	    (incf i))
 	   ;; comment
 	   ((eql c #\;)
@@ -476,7 +454,6 @@ value, an explaination which consists of (tag-symbol datum...)."
 						:end i
 						:quoted nil
 						:eval t))))
-	    (dbugf 'reader "args 1 = ~s~%" args)
 	    (incf i))
 	   ;; and
 	   ((and (eql c #\&) (eql (next-char) #\&))
@@ -492,10 +469,7 @@ value, an explaination which consists of (tag-symbol datum...)."
 	    (add-to-word)))
 	 :finally
 	 (progn
-	   (dbugf 'reader "Finally!~%")
-	   (dbugf 'reader "args 2 = ~s~%" args)
 	   (finish-word)
-	   (dbugf 'reader "args 3 = ~s~%" args)
 	   (reverse-things)
 	   ))
       (if (and (= (length words) 1) (consp (first words))
@@ -508,4 +482,4 @@ value, an explaination which consists of (tag-symbol datum...)."
 		(values *continue-symbol* `(compound ,in-compound)))
 	      (make-the-expr))))))
 
-;; EOF
+;; End

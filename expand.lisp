@@ -79,7 +79,7 @@
   *fake-var-table*)
 
 (defun fake-var (name)
-  "Return the value of fake var named NAME."
+  "Return the value of fake var named ‘name’."
   (make-fake-var-table)
   (flet ((evaluate (x)
 	   (cond
@@ -95,7 +95,6 @@
 		      (evaluate (fake-var-value var))))
 	    (evaluate (fake-var-value var)))))))
 
-;; @@@ This is overly consy.
 (defun remove-backslashes (s)
   "Remove quoting backslashes from the string S, except don't remove doubled
 backslashes."
@@ -116,8 +115,17 @@ backslashes."
 	(princ (subseq s last-start) str)))))
 
 ;; a.k.a. parameter expansion
+(defun shell-expand-variables (s)
+  (make-fake-var-table)
+  (expand-variables s :value-funcs `(,#'fake-var ,#'nos:env)
+		      :allowed
+		      (_ (or (alphanumericp _)
+			     (char= _ #\_)
+			     (position _ *fake-var-single-chars*)))))
+
+#+(or)
 (defun expand-variables (s)
-  "Return a string based on the string S with variables expanded."
+  "Return a string based on the string ‘s’ with variables expanded."
   (let ((start 0) (last-start 0) (len (length s)))
     (with-output-to-string (str)
       (loop
@@ -219,8 +227,8 @@ Otherwise, return words which will evaluate a lisp expression."
 		   (princ a str)))))
     (make-shell-expr :line line :words (reverse words))))
 
-(defun lisp-exp-eval (expr)
-  "Return a shell-expr with Lisp expressions expanded."
+(defun OLD-lisp-exp-eval (expr)
+  "Return the shell-expr ‘expr’ with Lisp expressions expanded."
   (make-shell-expr
    :words
    (loop :with results :and first-word = t
@@ -242,6 +250,61 @@ Otherwise, return words which will evaluate a lisp expression."
       :do (setf first-word nil))
    ;; @@@ doesn't fix the line
    :line (shell-expr-line expr)))
+
+(defun lisp-exp-eval (expr)
+  "Return the shell-expr ‘expr’ with Lisp expressions expanded."
+  (let ((eval-results nil)
+	(prev nil)
+	(prev-join nil)
+	(first-word t)
+	(result nil))
+    (flet ((join (w value)
+	     "String append to previous and return nil (to omit this word)."
+	     (setf (shell-word-word (car prev))
+		   (s+ (shell-word-word (car prev)) value)
+		   (shell-word-end (car prev)) (shell-word-end w))
+	     nil))
+      (make-shell-expr
+       :words
+       (mapcan
+	(lambda (w)
+	  (setf result
+		(if (and (not first-word)
+			 (shell-word-p w)
+			 (or (consp (shell-word-word w))
+			     (symbolp (shell-word-word w)))
+			 (shell-word-eval w))
+		    (progn
+		      (setf eval-results (eval (shell-word-word w)))
+		      (cond
+			((and (listp eval-results) (not (shell-word-quoted w)))
+			 ;; Spread list results into separate args
+			 (mapcar #'(lambda (x) (make-shell-word :word x))
+				 eval-results))
+			((and prev (or (eq (shell-word-join w) :left)
+				       (eq (shell-word-join w) :both)))
+			 ;; string append to previous, and omit this word
+			 (join w eval-results))
+			((and prev (or (eq prev-join :right)
+				       (eq prev-join :both)))
+			 (join w eval-results))
+			(t
+			 (list (make-shell-word :word eval-results)))))
+		    ;; not evaled
+		    (cond
+		      ((and prev (or (eq prev-join :right)
+				     (eq prev-join :both))
+			    (shell-word-p w))
+		       (join w (shell-word-word w)))
+		      (t
+		       (list w))))
+		first-word nil
+		prev (or result prev)
+		prev-join (and (shell-word-p w) (shell-word-join w)))
+	  result)
+	(shell-expr-words expr))
+       ;; @@@ doesn't fix the line
+       :line (shell-expr-line expr)))))
 
 ;; @@@ should probably rename lisp-exp-eval to this
 (defun expand-lisp-exp (exp)
@@ -577,15 +640,15 @@ expanded."
 ;; expectations much.
 
 (defparameter *expansions*
-  ;; function           until-stable?  word / line
-  `((expand-bang        nil            :word)
-    (expand-braces      nil            :word)
-    (expand-tilde       nil            :word)
-    (expand-variables   t              :word)
-    ;;(expand-lisp-exp    t              :line) ;; lisp-exp-eval
-    ;;(expand-lisp-exp    t              :expr)
-    (expand-filenames   nil            :word)
-    (remove-backslashes nil            :word)
+  ;; function                 until-stable?  word / line
+  `((expand-bang              nil            :word)
+    (expand-braces            nil            :word)
+    (expand-tilde             nil            :word)
+    (shell-expand-variables     t            :word)
+    ;;(expand-lisp-exp          t            :line) ;; lisp-exp-eval
+    ;;(expand-lisp-exp          t            :expr)
+    (expand-filenames         nil            :word)
+    (remove-backslashes       nil            :word)
     ))
 
 (defparameter *recursive-expansion-limit* 100000

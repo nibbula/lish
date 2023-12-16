@@ -170,11 +170,12 @@ end points in the original string."
 
 (defstruct shell-word
   "A word in a shell-expr."
-  word					; an object
-  start					; integer start position
-  end					; integer end position
-  quoted				; boolean, true if word quoted
-  eval)					; boolean, true to evaluate word
+  word			; an object
+  start			; integer start position
+  end			; integer end position
+  quoted		; boolean, true if word quoted
+  eval			; boolean, true to evaluate word
+  join)			; nil :left :right or :both, to add to adjacent word
 
 ;; @@@ I'm not really sure if this is good idea yet.
 (defmethod print-object ((object shell-word) stream)

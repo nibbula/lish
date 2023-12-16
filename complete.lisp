@@ -158,20 +158,29 @@ preceding exclamation point '!' ."
   "Characters that may need quoting in shell syntax, like if they are in a file
 name, so they don't get interpreted by the shell.")
 
-(defun quotify (string)
-  "Put a backslash in front of any character that might not be intrepreted
-literally in shell syntax."
+(defun quotify (string &key exceptions)
+  "Put a backslash in front of any character in ‘string’ that might not be
+intrepreted literally in shell syntax. ‘exceptions’ is a sequence of character
+position not to quote."
   (let ((result string))
-    (flet ((possibly-quote (c)
-	     (when (oposition c result)
-	       (setf result (join-by (typecase string
-				       (string 'string)
-				       (fat-string 'fat-string))
-				     (osplit c result)
-				     (s+ #\\ c))))))
-      (loop :for c :across *quote-needing-chars* :do ;
-	 (possibly-quote c))
-      result)))
+    (labels
+	((char-loop (str)
+	   (let ((i 0))
+	     (omapn (_
+		     (when (and (oposition _ *quote-needing-chars*)
+				(or (not exceptions)
+				    (not (position i exceptions))))
+		       (princ #\\ str))
+		     (princ _ str)
+		     (incf i))
+		    result))))
+      (typecase string
+	(string
+	 (with-output-to-string (str)
+	   (char-loop str)))
+	(fat-string
+	 (with-output-to-fat-string (str)
+	   (char-loop str)))))))
 
 ;; perhaps would be faster with position and subseq?
 (defun de-quotify (string)
@@ -395,10 +404,28 @@ literally in shell syntax."
 (defun shell-complete-quoted (func word position all &key parsed-exp)
   "Complete a thing that needs quoting, using the completion function FUNC."
   (declare (ignore parsed-exp))
-  (let ((result (funcall func (de-quotify word) position all)))
-    (when (and result (completion-result-completion result))
+  (make-fake-var-table)
+  ;; Include our fake-vars in with real env vars.
+  (let* ((*filename-completion-value-funcs* `(,#'fake-var ,#'nos:env))
+	 ;; Make some stupid chars be allowed variable names.
+	 (*filename-completion-value-allowed*
+	   (_ (or (alphanumericp _)
+		  (char= _ #\_)
+		  (position _ *fake-var-single-chars*))))
+	 ;; Try not to quote the $ in vars, but do quote them in file names.
+	 (exceptions
+	   (with-collecting ()
+	     (let ((i 0))
+	       (omapn (_ (when (oposition _ *quote-needing-chars*)
+			   (collect i))
+			 (incf i))
+		      word))))
+	 (result (funcall func (de-quotify word) position all)))
+    (when (and result (completion-result-completion result)
+	       (ostringp (completion-result-completion result)))
       (setf (completion-result-completion result)
-	    (quotify (completion-result-completion result))))
+	    (quotify (completion-result-completion result)
+		     :exceptions exceptions)))
     result))
 
 (defun shell-complete-filename (word position all &key parsed-exp)
@@ -873,4 +900,4 @@ complete, and call the appropriate completion function."
 				(1+ ss) ss))))
 		result)))))))))
 
-;; EOF
+;; End

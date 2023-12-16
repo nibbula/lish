@@ -1,0 +1,3 @@
+Everything is licensed under the GPLv3 in LICENSE, except for the file
+build/quicklisp.lisp which is the vendored quickstart for QuickLisp and is
+provided under the terms in build/LICENSE-QuickLisp.txt

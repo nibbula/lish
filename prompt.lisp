@@ -366,7 +366,8 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 		  ;;    (opsys-error (c)
 		  ;;      (declare (ignore c))))
 		  ((ignore-errors
-		     (nos:file-exists (glob:expand-tilde (word-word w))))
+		     (nos:file-exists (shell-expand-variables
+				       (glob:expand-tilde (word-word w)))))
 		   (theme-it '(:command-arg :existing-path :style) w))
 		  (t
 		   (unthemify-shell-word-in-fat-string w fat-str))))))))))

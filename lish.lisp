@@ -1129,7 +1129,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 		   expression-start-line)))))))
 
 (defun expand-load-file-name (file-name)
-  (expand-tilde (expand-variables file-name)))
+  (expand-tilde (shell-expand-variables file-name)))
 
 (defun pick-an-rc-file ()
   (loop :for file :in (list *lishrc*
