@@ -1839,7 +1839,8 @@ Arguments:
 				      remain remain))))
 		      (progn
 			(setf eof-count 0)
-			(lish-eval sh expr state)))
+			(prog1 (lish-eval sh expr state)
+			  (incf (shell-command-count sh)))))
 		  (setf (read-state-error-count state) 0))
 		(abort ()
 		  :report

@@ -82,6 +82,10 @@
     :initarg :start-time :accessor lish-start-time :type integer
     :documentation
     "Seconds elapsed since some time. Defaults to since shell was started.")
+   (command-count
+    :initarg :command-count :accessor shell-command-count
+    :type integer :initform 0
+    :documentation "The count of commands entered in this shell.")
    (help-table
     :initarg :help-table :accessor shell-help-table :initform nil
     :documentation "A custom help table for this shell.")
