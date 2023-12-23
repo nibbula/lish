@@ -86,17 +86,20 @@ So far we support:
  %T      12 hour HH:MM:SS
  %@      The time, in 12-hour am/pm format.
  %A      The time, in 24-hour HH:MM format.
- Not implemented yet:
- %!      The history number of this command.
- %#      The command number of this command.
- %[      Start of non-printing characters.
- %]      End of non-printing characters.
- %l      The basename of the shell's terminal device name.
  %D{FORMAT}
-         Some date formated by Unix strftime. Without the FORMAT just put some
+         Some date formated by mini-strftime. Without the FORMAT just put some
          locale-specific date.
  %j      The number of jobs currently managed by the shell.
+ %!      The history number of this command.
+ %#      The command number of this command.
+ %l      The approximate name of the shell's terminal device.
 "
+  ;; These are not implemented yet, but I don't think it's a good idea anyway
+  ;; since we can do colors and effects a better way and it would assume
+  ;; something inappropriate about the terminal.
+  ;;
+  ;; %[      Start of non-printing characters.
+  ;; %]      End of non-printing characters.
   (declare (ignore sh))
   (flet ((output-loop (str)
     (loop :with c
@@ -155,6 +158,31 @@ So far we support:
 				   (:12-hours :minutes :am)) str))
 		(#\A (write-string
 		      (format-date "~2,'0d:~2,'0d" (:hours :minutes)) str))
+		(#\D
+		 (multiple-value-bind (s e ss ee)
+		     (ppcre:scan "\\{(%[A-Za-z]{1,10})\\}" (subseq prompt i))
+		   (cond
+		     ((and s ss)
+		      (write-string
+		       (dtime:mini-strftime
+			(subseq prompt (+ i (aref ss 0)) (+ i (aref ee 0))))
+		       str)
+		      (incf i (1- e)))
+		     (t
+		      (write-string (dtime:date-string) str)))))
+		(#\j
+		 (format str "~d" (length (lish-jobs *shell*))))
+		(#\!
+		 ;; This is slow
+		 (format str "~d" (olength (rl::history-current-get))))
+		(#\#
+		 (format str "~d" (shell-command-count *shell*)))
+		(#\l
+		 (write-string
+		  #+unix (remove-prefix (file-handle-terminal-name 0) "/dev/")
+		  #-unix (file-handle-terminal-name
+			  (stream-system-handle *terminal-io*)) ;whatever
+		  str))
 		)))
 	;; (write-char c str)
 	(princ c str)
