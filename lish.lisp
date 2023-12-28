@@ -1137,7 +1137,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 				       :no-alias no-expansions))
 	     (values vals out-stream show-vals))))))))
 
-(defun load-file (file)
+(defun read-file (file &key (action #'shell-eval))
   "Load a lish syntax file."
   (let ((*load-pathname* (pathname file))
 	(line-number 1)
@@ -1166,10 +1166,16 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 	       (setf expression-start-line nil))
 	     (with-input (nil)
 	       (with-output (nil)
-		 (shell-eval expr))))
+		 ;; (shell-eval expr)
+		 (funcall action expr)
+		 )))
 	  (when (eql expr *continue-symbol*)
 	    (error "End of file in expression. Probably starting at line ~a."
 		   expression-start-line)))))))
+
+(defun load-file (file)
+  "Load a lish syntax file."
+  (read-file file))
 
 (defun expand-load-file-name (file-name)
   (expand-tilde (shell-expand-variables file-name)))
