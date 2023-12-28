@@ -374,8 +374,9 @@ string STRING. Don't do anything if theme-item isn't found or is nil."
 					  :already-known t))
 		 ;; (dbugf :recolor "command-type ~s~%" type)
 		 (case type
-		   ((:external-command :builtin-command :shell-command :command
-                     :alias :global-alias :function :loadable-system)
+		   ((:external-command :source-command :builtin-command
+		     :shell-command :command :alias :global-alias :function
+		     :loadable-system)
 		    (dbugf :recolor "melgor ~s~%" first-word)
 		    (theme-it `(:command ,type :style) first-word))
 		   (:file
