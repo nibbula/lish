@@ -1752,6 +1752,11 @@ string. Sometimes gets it wrong for words startings with 'U', 'O', or 'H'."
     :help "Suppress compiler notes on some implementations.")
    (no-warn boolean :short-arg #\w
     :help "Suppress compiler warnings on some implementations.")
+   (verbose boolean :short-arg #\v :default *compile-verbose*
+    :help
+    "Show more compiler output than normal. Defaults to *compile-verbose*.")
+   (print boolean :short-arg #\p :default *compile-print*
+    :help "Print what's being compiled. Defaults to *compile-print*.")
    (force boolean :short-arg #\f :help "Force reloading systems.")
    (force-all boolean :short-arg #\F
     :help "Force reloading all systems, even dependencies.")
@@ -1766,8 +1771,10 @@ Note that this option overrides the -d and -s options."))
   ;; We could theoretically use asdf:*compile-file-warnings-behaviour*
   ;; but it doesn't look like it applies to notes.
   (labels ((load-that ()
-	     (asdf-load system #| :verbose (not no-verbose) |#
-			:force (or force (and force-all :all))))
+	     (let ((*compile-verbose* verbose)
+		   (*compile-print* print))
+	       (asdf-load system :verbose verbose
+				 :force (or force (and force-all :all)))))
 	   (with-opt (qualities-list)
 	     (uiop/lisp-build:with-optimization-settings (qualities-list)
 	       (load-that)))
