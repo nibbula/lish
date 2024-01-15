@@ -1177,7 +1177,7 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
   "Load a lish syntax file."
   (read-file file))
 
-(defun expand-load-file-name (file-name)
+(defun expand-single-file-name (file-name)
   (expand-tilde (shell-expand-variables file-name)))
 
 (defun pick-an-rc-file ()
@@ -1186,14 +1186,14 @@ command, which is a :PIPE, :AND, :OR, :SEQUENCE.
 			    *default-lishrc*)
      :do
      (when file
-       (let ((expanded-file (expand-load-file-name file)))
+       (let ((expanded-file (expand-single-file-name file)))
 	 (when (and expanded-file (probe-file expanded-file))
 	   (return expanded-file))))))
   
 (defun load-rc-file (init-file)
   "Load the users start up (a.k.a. run commands) file, if it exists."
   (when init-file
-    (let ((file-name (expand-load-file-name init-file)))
+    (let ((file-name (expand-single-file-name init-file)))
       (when (nos:file-exists file-name)
 	(let ((*lish-user-package* (find-package :lish-user)))
 	  (load-file file-name))))))

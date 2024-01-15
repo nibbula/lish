@@ -164,6 +164,7 @@ without any particular knowledge of it's Lisp programming features.")
    #:format-prompt
    #:symbolic-prompt-to-string
    #:load-file
+   #:expand-single-file-name
    #:suspend-job
    #:find-job
    #:job #:job-id #:job-name #:job-command-line #:job-status
