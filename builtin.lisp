@@ -1773,7 +1773,7 @@ Note that this option overrides the -d and -s options."))
   (labels ((load-that ()
 	     (let ((*compile-verbose* verbose)
 		   (*compile-print* print))
-	       (asdf-load system :verbose verbose
+	       (asdf-load system #| :verbose verbose |#
 				 :force (or force (and force-all :all)))))
 	   (with-opt (qualities-list)
 	     (uiop/lisp-build:with-optimization-settings (qualities-list)
