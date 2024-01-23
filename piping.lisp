@@ -379,7 +379,7 @@ argument plist, as provided to :args-as, and ‘arg’ is the keyword."
 ;; 	  (close stream)
 ;; 	  nil))))
 
-(defun run-with-env (env-alist &rest args)
+(defun run-with-env (env-alist args)
   "Run a shell command with environement variables as specified in ‘env-alist’."
   (with-shell ()
     (shell-eval (possibly-read args)
