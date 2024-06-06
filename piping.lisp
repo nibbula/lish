@@ -298,7 +298,7 @@ expression in a separagte thread, if threads are supported."
 
 (defmacro with-streamlike-input ((arg &key use-stdin) &body body)
   "Allow a command to take stream-like input, getting the input from the
-argument ‘arg’, or from the the shell input *input*. Set ‘arg’ to be an input
+argument ‘arg’, or from the the shell input ‘*input*’. Set ‘arg’ to be an input
 stream, or NIL if we can't."
   (with-names (arg-value used-stdin)
     `(let ((,arg-value ,arg) ,used-stdin)
