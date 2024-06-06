@@ -373,14 +373,15 @@ then the pathname is changed before the command.")
   (defmacro defhelp (subject () &body body)
    "Define a help subject for ‘subject-name’, which can be invoked by the ‘help’
 command. You should provide a docstring in the body which will be the subject
-description. The body should output the help to *standard-output*."
+description. The body should probably output the help to *standard-output*,
+but could do whatever you think is helpful, such as invoking a more sophisticated
+help viewer."
     (let ((func-name (help-function-name subject)))
       `(progn
 	 (defun ,func-name ()
 	   ,@body)
 	 (setf (gethash (string ',subject) (help-table))
-	       (function ,func-name)
-	       )))))
+	       (function ,func-name))))))
 
 (defparameter *basic-help*
 "~
