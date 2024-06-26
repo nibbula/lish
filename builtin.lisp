@@ -1826,30 +1826,34 @@ Note that this option overrides the -d and -s options."))
 				   asdf:*central-registry*
 				   asdf:*source-registry-parameter*))))
 
+(defun fix-load-dir (d dont-warn)
+  "Make a directory be appropriate for the ldirs command."
+  (let ((result (nos:safe-namestring d)))
+    (when (not (nos:absolute-path-p result))
+      (setf result (nos:path-to-absolute result)))
+    (when (and (plusp (length result))
+	       (not (equal (char result (1- (length result)))
+			   nos:*directory-separator*)))
+      (setf result (s+ result nos:*directory-separator*)))
+    (when (and (not (nos:file-exists result)) (not dont-warn))
+      (warn "Adding a non-existent directory to the Lisp path: ~a"
+	    result))
+    result))
+
 (defbuiltin ldirs
   ((push   boolean :short-arg #\p :help "Push directories on the load path.")
    (add    boolean :short-arg #\a :help "Append directories to the load path.")
    (remove boolean :short-arg #\r :help "Remove directories from the load path.")
+   (clear  boolean :short-arg #\C :help "Empty the whole load path.")
    (dir pathname :optional t :repeating t :help "Directories to operate on."))
-  "List some directories where things are maybe loaded from. Missing directories
-are printed in red on some terminals. If a directory is given without an action
-option, it is as if --push was given."
+  "Manipulate the ASDF load path. Without arguments list some directories where
+things are maybe loaded from. Missing directories are printed in red on some
+terminals. If a directory is given without an action option, it is as if --push
+was given."
   (labels ((pr (d) (grout-format "~a~%" d))
 	   ;; This should probably be some system specific thing in opsys.
-	   (fix-dir (d)
-	     (let ((result (nos:safe-namestring d)))
-	       (when (not (nos:absolute-path-p result))
-		 (setf result (nos:path-to-absolute result)))
-	       (when (and (plusp (length result))
-			  (not (equal (char result (1- (length result)))
-				      nos:*directory-separator*)))
-		 (setf result (s+ result nos:*directory-separator*)))
-	       (when (and (not (nos:file-exists result)) (not remove))
-		 (warn "Adding a non-existent directory to the Lisp path: ~a"
-		       result))
-	       result))
 	   (do-push ()
-	     (map nil (_ (let ((fixed-dir (fix-dir _)))
+	     (map nil (_ (let ((fixed-dir (fix-load-dir _ remove)))
 			   (pushnew fixed-dir asdf:*central-registry*
 				    :test #'equal)
 			   (add-asdf-directory fixed-dir))) dir)))
@@ -1861,15 +1865,19 @@ option, it is as if --push was given."
       (cond
 	(push (do-push))
 	(add
-	 (let ((dirs (map 'list (_ (fix-dir _)) dir)))
+	 (let ((dirs (map 'list (_ (fix-load-dir _ remove)) dir)))
 	   (map nil #'add-asdf-directory dirs)
 	   (nconc asdf:*central-registry* dirs)))
 	(remove
 	 (map nil (_ (setf asdf:*central-registry*
-			   (delete (fix-dir _) asdf:*central-registry*
+			   (delete (fix-load-dir _ remove)
+				   asdf:*central-registry*
 				   :key #'safe-namestring
 				   :test #'equal)))
 	      dir))
+	(clear
+	 (when (y-or-n-p "Really clear the load path?")
+	   (setf asdf:*central-registry* nil)))
 	(dir (do-push))
 	(t ;; No args
 	 (typecase *input*
