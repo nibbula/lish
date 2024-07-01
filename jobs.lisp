@@ -171,7 +171,8 @@
   (:documentation "A job which is a thread."))
 
 (defmethod continue-job-in-foreground ((job thread-job))
-  (bt:join-thread (job-thread job)))
+  (nos:join-thread (job-thread job))
+  )
 
 (defmethod continue-job-in-background ((job thread-job))
   ;; @@@ If we created the the thread, we could have set up
@@ -182,26 +183,26 @@
 
 (defmethod kill-job ((job thread-job) &key signal)
   (declare (ignore signal))
-  (bt:destroy-thread (job-thread job)))
+  (nos:destroy-thread (job-thread job)))
 
 (defmethod list-all-jobs ((type (eql 'thread-job)))
   ;; @@@ This still has the id specification problem.
-  (when bt:*supports-threads-p*
+  (when nos:*supports-threads-p*
     (mapcar (_ (make-instance 'thread-job
 			      :id nil
-			      :name (bt:thread-name _)
+			      :name (nos:thread-name _)
 			      :command-line ""
 			      :thread _))
-	    (bt:all-threads))))
+	    (nos:all-threads))))
 
 (defmethod check-job-status (shell (type (eql 'thread-job)))
   (loop :for j :in (lish-jobs shell)
      :when (typep j 'thread-job) :do
        (cond
-	 ((not (find (job-thread j) (bt:all-threads)))
+	 ((not (find (job-thread j) (nos:all-threads)))
 	  (format t ";; Thread done ~a~%" (job-name j))
 	  (delete-job j))
-	 ((not (bt:thread-alive-p (job-thread j)))
+	 ((not (nos:thread-alive-p (job-thread j)))
 	  ;; It's destroyed but it's still in all-threads ??
 	  (setf (job-status j) :dead)))))
 
@@ -229,9 +230,9 @@
        (setf job-descriptor (subseq job-descriptor 1)))
      (or
       (find job-descriptor (lish-jobs *shell*) :test #'equalp :key #'job-name)
-      (find job-descriptor (bt:all-threads)
+      (find job-descriptor (nos:all-threads)
 	    :test #'equalp
-	    :key #'bt:thread-name)
+	    :key #'nos:thread-name)
       (and (setf job-descriptor (ignore-errors (parse-integer job-descriptor)))
 	   (find job-descriptor (lish-jobs *shell*)
 		 :test #'eql :key #'job-id))))
@@ -241,9 +242,9 @@
      (or (find (string job-descriptor) (lish-jobs *shell*) :test #'equalp
 	       :key #'job-name)
 	 (when (find-package :bt)
-	   (find (string job-descriptor) (bt:all-threads)
+	   (find (string job-descriptor) (nos:all-threads)
 		 :test #'equalp
-		 :key #'bt:thread-name))))
+		 :key #'nos:thread-name))))
     (t
      (find job-descriptor (lish-jobs *shell*) :test #'equalp
 	   :key #'job-name))))

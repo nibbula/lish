@@ -642,7 +642,7 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 (defmacro maybe-do-in-background ((bg-p name args) &body body)
   (with-names (thunk string-name args-val)
     `(flet ((,thunk () (progn ,@body)))
-       (if (and ,bg-p bt:*supports-threads-p*)
+       (if (and ,bg-p nos:*supports-threads-p*)
 	   (progn
 	     (let ((,string-name (prin1-to-string ,name))
 		   (,args-val ,args))
@@ -650,7 +650,7 @@ a non-I/O pipeline, supply *INPUT* as the missing tail argument."
 		     (add-job ,string-name
 			      (or (and ,args-val
 				       (shell-words-to-string ,args-val)) "")
-			      (bt:make-thread #',thunk :name ,string-name)))))
+			      (nos:make-thread #',thunk :name ,string-name)))))
 	   (progn
 	     (funcall #',thunk))))))
 
