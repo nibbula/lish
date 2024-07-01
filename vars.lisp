@@ -10,7 +10,7 @@
 ;; Yet another version of versions where presumably the new "improved" build
 ;; script will increment it.
 
-(defparameter *version* #.(uiop:read-file-form
+(defparameter *version* #.(read-file-form
 			   (asdf:system-relative-pathname
 			    :lish "version.lisp")))
 
