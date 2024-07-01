@@ -111,4 +111,22 @@ just return SEQUENCE. Elements are compared with TEST which defaults to EQL."
 	(subseq sequence 0 pos)
 	(copy-seq sequence))))
 
-;; EOF
+(defun optimization-qualities ()
+  "Return a list of optimization qualities currently in effect."
+  #+sbcl (map 'list (lambda (_)
+		      (list _ (sb-c::policy-quality sb-c::*policy* _)))
+	      '(compilation-speed debug safety space speed))
+  ;; @@@ at some point *policy* was changed from a list to struct with numbers
+  #+(and sbcl some-old-version) sb-c::*policy*
+  #+ccl (ccl:declaration-information 'optimize nil)
+  #+ecl (list c::*debug* c::*speed* c::*safety* c::*space*)
+  #+clisp (loop :for q :in '(speed space safety debug compilation-speed)
+		:collect (list q (gethash x system::*optimize* 1))))
+
+(defun read-file-form (file)
+  "Read the first form from ‘file’ and return it."
+  (with-open-file (s file :direction :input)
+    (let ((*read-eval* nil))
+      (read-preserving-whitespace s nil))))
+
+;; End

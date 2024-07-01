@@ -71,7 +71,7 @@ strings."
 (defun increment-build-version (file)
   "Increment the last component of the dotted version string in FILE."
   (format t "increment-build-version ~s~%" file)
-  (let* ((vers (uiop:read-file-form file))
+  (let* ((vers (read-file-form file))
 	 (vers-nums (mapcar (lambda (x)
 			      (parse-integer x :junk-allowed t))
 			    (split #\. vers)))

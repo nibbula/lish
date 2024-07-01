@@ -66,11 +66,11 @@ environment variable LISH_BUILD_VERBOSE.")
 ;; We really want to set debug up so that we can get function arguments.
 ;; This will porbably be turned back off in build-deinit.lisp.
 (defparameter *saved-debug-quality* nil)
-(let ((debug (cadr (assoc 'debug (uiop:get-optimization-settings)))))
+(let ((debug (cadr (assoc 'debug (optimization-qualities)))))
   (when (< debug 2)
     (setf *saved-debug-quality* debug)
     (proclaim `(optimize (debug 2)))))
 
 (in-package :cl-user)
 
-;; EOF
+;; End

@@ -1777,7 +1777,7 @@ Note that this option overrides the -d and -s options."))
 	       (asdf-load system #| :verbose verbose |#
 				 :force (or force (and force-all :all)))))
 	   (with-opt (qualities-list)
-	     (uiop/lisp-build:with-optimization-settings (qualities-list)
+	     (with-optimization (qualities-list)
 	       (load-that)))
 	   ;; (with-opt (qualities-list)
 	   ;;   (do-opt qualities-list system (or force (and force-all :all))))
