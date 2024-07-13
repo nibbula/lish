@@ -57,14 +57,15 @@
     ("zip" chipz:zlib)))
 
 (defmacro with-possibly-compressed-file ((stream-var filename) &body body)
-  "Evaluate the BODY with STREAM-VAR open on FILENAME. If FILENAME has
+  "Evaluate the ‘body’ with ‘stream-var’ open on ‘filename’. If ‘filename’ has
 a known compression suffix, then the stream is appropriately decompressed."
   (with-names (in-stream method)
-    `(let (,method)
-       (if (setf ,method
-		 (cadr (find-if
-			#'(lambda (s) (glob:fnmatch (s+ "*." s) ,filename))
-			*compression-suffixes* :key #'car)))
+    `(let ((,method
+	     (cadr
+	      (find-if #'(lambda (s)
+			   (and (glob:fnmatch (s+ "*." s) ,filename) t))
+		       *compression-suffixes* :key #'car))))
+       (if ,method
 	   (progn
 	     (format t "Uncompressing~%")
 	     (with-input-from-string
