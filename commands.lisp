@@ -1048,12 +1048,15 @@ become keyword arguments, in a way specified in the command's arglist."
 
     ;; Flagged arguments (optional or manditory)
     (dbugf :lish-arg "considering flagged: ~s~%" old-list)
-    (loop :with a
+    (loop :with a :and w
        :while (< i (length old-list)) :do
        #| (setf a (car old-list)) |#
-       (setf a (word-word (nth i old-list)))
+       (setf w (nth i old-list)
+	     a (word-word w))
        (if (and (stringp a) (> (length a) 0)
-		(is-flag-char (char a 0)))
+		(is-flag-char (char a 0))
+		;; Don't consider quoted args as flags.
+		(not (word-quoted w)))
 	   (if (and (> (length a) 1)
 		    (is-flag-char (char a 0))
 		    (is-flag-char (char a 1))) ; two dash arg
