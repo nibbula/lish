@@ -177,6 +177,8 @@ without any particular knowledge of it's Lisp programming features.")
    #:get-accepts
    #:twiddlify
    #:unix-truthy
+   #:shell-error #:shell-error-format #:shell-error-arguments
+   #:file-expansion #:file-expansion-files
    ))
 
-;; EOF
+;; End
