@@ -1,3 +1,5 @@
+# Moved to https://codeberg.org/nibbula/yew/src/branch/master/lish
+
 #### `lish` may someday be a Lisp shell.
 
 If you really want to try it, have sbcl around, and:
